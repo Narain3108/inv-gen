@@ -41,11 +41,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus } from 'lucide-react';
-import { useAuth } from '@/lib/firebase/auth-context';
 import { useCompany } from '@/hooks/useCompany';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout';
 import { z } from 'zod';
 import { invoiceFormSchema } from '@/lib/validations';
@@ -55,7 +53,6 @@ type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
 function InvoicesContent() {
   const router = useRouter();
-  const { user } = useAuth();
   const { selectedCompany } = useCompany();
   
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -68,22 +65,17 @@ function InvoicesContent() {
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
-
     if (!selectedCompany) {
-      router.push('/dashboard/settings/company');
+      router.push('/invoices/settings/company');
       toast.error('Please select or create a company first.');
       return;
     }
 
     loadData();
-  }, [user, selectedCompany]);
+  }, [selectedCompany]);
 
   const loadData = async () => {
-    if (!user || !selectedCompany) return;
+    if (!selectedCompany) return;
 
     setLoading(true);
     try {
@@ -104,11 +96,10 @@ function InvoicesContent() {
       })) as Invoice[];
       setInvoices(invoicesData);
 
-      // Load products - Filter by userId
+      // Load products - Filter by companyId
       const productsRef = collection(db, 'products');
       const productsQuery = query(
         productsRef,
-        where('userId', '==', user.uid),
         where('companyId', '==', selectedCompany.id)
       );
       const productsSnapshot = await getDocs(productsQuery);
@@ -118,11 +109,10 @@ function InvoicesContent() {
       })) as Product[];
       setProducts(productsData);
 
-      // Load clients - Filter by userId
+      // Load clients - Filter by companyId
       const clientsRef = collection(db, 'clients');
       const clientsQuery = query(
         clientsRef,
-        where('userId', '==', user.uid),
         where('companyId', '==', selectedCompany.id)
       );
       const clientsSnapshot = await getDocs(clientsQuery);
@@ -160,12 +150,11 @@ function InvoicesContent() {
   };
 
   const handleSubmit = async (data: any) => {
-    if (!user || !selectedCompany) return;
+    if (!selectedCompany) return;
 
     try {
       const invoiceData = {
         ...data,
-        userId: user.uid,
         companyId: selectedCompany.id,
         date: Timestamp.fromDate(new Date(data.date)),
         totalAmountInWords: amountToWords(data.totalAmount),
@@ -321,10 +310,8 @@ function InvoicesContent() {
 
 export default function InvoicesPage() {
   return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <InvoicesContent />
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout>
+      <InvoicesContent />
+    </DashboardLayout>
   );
 }

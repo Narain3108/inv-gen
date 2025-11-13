@@ -6,7 +6,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { CompanyForm, CompanyList } from '@/components/company';
@@ -14,50 +13,28 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { Plus, Building2 } from 'lucide-react';
-import { useAuth } from '@/lib/firebase/auth-context';
 import { Company } from '@/types';
 import { createDocument, getUserDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { companyFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
+import { useCompanies } from '@/hooks/useCompanies';
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 
 export default function CompanySettingsPage() {
-  const { user } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { companies, loading: isLoading, loadCompanies, addCompany, updateCompany: updateCompanyInStore, removeCompany } = useCompanies();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
 
-  // Load companies
+  // Load companies on mount
   useEffect(() => {
     loadCompanies();
-  }, [user]);
-
-  const loadCompanies = async () => {
-    if (!user) return;
-
-    setIsLoading(true);
-    try {
-      const data = await getUserDocuments<Company>('companies', user.uid);
-      setCompanies(data);
-
-      // Set first company as selected if none selected
-      if (data.length > 0 && !selectedCompany) {
-        setSelectedCompany(data[0]);
-      }
-    } catch (error) {
-      console.error('Error loading companies:', error);
-      toast.error('Failed to load companies');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [loadCompanies]);
 
   const handleCreateCompany = () => {
     setEditingCompany(undefined);
@@ -79,6 +56,7 @@ export default function CompanySettingsPage() {
 
     try {
       await deleteDocument('companies', companyToDelete);
+      removeCompany(companyToDelete); // Update global store
       toast.success('Company deleted successfully');
       
       // If deleted company was selected, select another one
@@ -86,8 +64,6 @@ export default function CompanySettingsPage() {
         const remaining = companies.filter(c => c.id !== companyToDelete);
         setSelectedCompany(remaining.length > 0 ? remaining[0] : null);
       }
-      
-      await loadCompanies();
     } catch (error) {
       console.error('Error deleting company:', error);
       toast.error('Failed to delete company');
@@ -98,8 +74,6 @@ export default function CompanySettingsPage() {
   };
 
   const handleSubmit = async (data: CompanyFormData) => {
-    if (!user) return;
-
     try {
       // Extract state from GSTIN (first 2 digits) or use address state
       let state = data.address.state;
@@ -111,21 +85,25 @@ export default function CompanySettingsPage() {
 
       const companyData = {
         ...data,
-        userId: user.uid,
         state: state, // Store state for tax calculation
       };
 
       if (editingCompany) {
         // Update existing company
+        console.log('Updating company:', editingCompany.id, companyData);
         await updateDocument('companies', editingCompany.id, companyData);
+        updateCompanyInStore(editingCompany.id, companyData as Partial<Company>); // Update global store
         toast.success('Company updated successfully');
       } else {
         // Create new company
+        console.log('Creating new company:', companyData);
         const id = await createDocument('companies', companyData);
+        console.log('Created company with ID:', id);
+        const newCompany = { id, ...companyData } as Company;
+        addCompany(newCompany); // Add to global store
         
         // Set as selected if it's the first company
         if (companies.length === 0) {
-          const newCompany = { id, ...companyData } as Company;
           setSelectedCompany(newCompany);
         }
         
@@ -134,7 +112,6 @@ export default function CompanySettingsPage() {
 
       setIsFormOpen(false);
       setEditingCompany(undefined);
-      await loadCompanies();
     } catch (error) {
       console.error('Error saving company:', error);
       throw error;
@@ -143,23 +120,20 @@ export default function CompanySettingsPage() {
 
   if (isLoading) {
     return (
-      <ProtectedRoute>
-        <DashboardLayout>
-          <div className="flex h-96 items-center justify-center">
-            <div className="text-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              <p className="mt-4 text-sm text-muted-foreground">Loading companies...</p>
-            </div>
+      <DashboardLayout>
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="mt-4 text-sm text-muted-foreground">Loading companies...</p>
           </div>
-        </DashboardLayout>
-      </ProtectedRoute>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <div className="space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">{/*...rest of content...*/}
           <PageHeader
             icon={Building2}
             title="Company Management"
@@ -213,6 +187,5 @@ export default function CompanySettingsPage() {
           />
         </div>
       </DashboardLayout>
-    </ProtectedRoute>
   );
 }

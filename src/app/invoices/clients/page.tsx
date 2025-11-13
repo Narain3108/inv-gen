@@ -5,14 +5,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserPlus } from 'lucide-react';
 import { ClientForm, ClientList } from '@/components/clients';
-import { useAuth } from '@/lib/firebase/auth-context';
 import { Client } from '@/types';
 import { createDocument, getUserCompanyDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
 import { toast } from 'sonner';
@@ -24,7 +22,6 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 type ClientFormData = z.infer<typeof clientFormSchema>;
 
 function ClientsContent() {
-  const { user } = useAuth();
   const { selectedCompany } = useCompany();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,11 +36,11 @@ function ClientsContent() {
   }, [selectedCompany]);
 
   const loadClients = async () => {
-    if (!selectedCompany || !user) return;
+    if (!selectedCompany) return;
 
     setIsLoading(true);
     try {
-      const data = await getUserCompanyDocuments('clients', user.uid, selectedCompany.id);
+      const data = await getUserCompanyDocuments('clients', 'default-user', selectedCompany.id);
       setClients(data as Client[]);
     } catch (error) {
       console.error('Error loading clients:', error);
@@ -64,13 +61,12 @@ function ClientsContent() {
   };
 
   const handleSubmit = async (data: ClientFormData) => {
-    if (!user || !selectedCompany) return;
+    if (!selectedCompany) return;
 
     try {
       const clientData = {
         ...data,
         companyId: selectedCompany.id,
-        userId: user.uid,
       };
 
       if (editingClient) {
@@ -185,10 +181,8 @@ function ClientsContent() {
 
 export default function ClientsPage() {
   return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <ClientsContent />
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout>
+      <ClientsContent />
+    </DashboardLayout>
   );
 }

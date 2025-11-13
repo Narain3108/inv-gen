@@ -49,7 +49,6 @@ export interface BankDetails {
 
 export interface Company {
   id: string;
-  userId: string;
   name: string;
   gstin?: string; // Optional GSTIN
   state?: string; // State for tax determination - derived from GSTIN or address
@@ -78,7 +77,6 @@ export interface CompanyFormData {
 
 export interface Product {
   id: string;
-  userId: string;
   companyId: string;
   productName: string;
   description?: string;
@@ -109,7 +107,6 @@ export interface ProductFormData {
 
 export interface Client {
   id: string;
-  userId: string;
   companyId: string;
   clientName: string;
   gstin?: string;
@@ -167,7 +164,6 @@ export interface Invoice {
   invoiceNumber: string;
   companyId: string;
   clientId: string;
-  userId: string;
   date: Timestamp;
   items: InvoiceItem[];
   totalAmount: number;

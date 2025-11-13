@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/lib/firebase/auth-context";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -22,10 +21,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <AuthProvider>
-          {children}
-          <Toaster position="top-right" richColors closeButton />
-        </AuthProvider>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );

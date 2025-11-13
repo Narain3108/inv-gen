@@ -10,7 +10,6 @@ import { Company, Product, Client, Invoice } from '@/types';
  * Generate demo company data
  */
 export const generateDemoCompany = (userId: string): Omit<Company, 'id'> => ({
-  userId,
   name: 'TechVista Solutions Pvt Ltd',
   gstin: '29AABCT1332L1Z4',
   state: 'Karnataka',
@@ -44,9 +43,8 @@ export const generateDemoCompany = (userId: string): Omit<Company, 'id'> => ({
 /**
  * Generate demo products
  */
-export const generateDemoProducts = (userId: string, companyId: string): Omit<Product, 'id'>[] => [
+export const generateDemoProducts = (companyId: string): Omit<Product, 'id'>[] => [
   {
-    userId,
     companyId,
     productName: 'Web Development Service',
     description: 'Custom website development with modern technologies',
@@ -59,7 +57,6 @@ export const generateDemoProducts = (userId: string, companyId: string): Omit<Pr
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     productName: 'Mobile App Development',
     description: 'iOS and Android app development',
@@ -72,7 +69,6 @@ export const generateDemoProducts = (userId: string, companyId: string): Omit<Pr
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     productName: 'UI/UX Design',
     description: 'User interface and experience design services',
@@ -85,7 +81,6 @@ export const generateDemoProducts = (userId: string, companyId: string): Omit<Pr
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     productName: 'Cloud Hosting Package',
     description: 'Annual cloud hosting and maintenance',
@@ -99,7 +94,6 @@ export const generateDemoProducts = (userId: string, companyId: string): Omit<Pr
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     productName: 'SEO Optimization',
     description: 'Search engine optimization services',
@@ -116,9 +110,8 @@ export const generateDemoProducts = (userId: string, companyId: string): Omit<Pr
 /**
  * Generate demo clients
  */
-export const generateDemoClients = (userId: string, companyId: string): Omit<Client, 'id'>[] => [
+export const generateDemoClients = (companyId: string): Omit<Client, 'id'>[] => [
   {
-    userId,
     companyId,
     clientName: 'Acme Corporation',
     gstin: '29AAECA1234A1Z5',
@@ -138,7 +131,6 @@ export const generateDemoClients = (userId: string, companyId: string): Omit<Cli
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     clientName: 'GlobalTech Industries',
     gstin: '27AABCG5678M1Z1',
@@ -158,7 +150,6 @@ export const generateDemoClients = (userId: string, companyId: string): Omit<Cli
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     clientName: 'StartupHub Ventures',
     gstin: '29AADCS9012P1ZX',
@@ -178,7 +169,6 @@ export const generateDemoClients = (userId: string, companyId: string): Omit<Cli
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     clientName: 'E-Commerce Solutions Ltd',
     gstin: '07AAHCE2233R1Z2',
@@ -198,7 +188,6 @@ export const generateDemoClients = (userId: string, companyId: string): Omit<Cli
     createdAt: Timestamp.now(),
   },
   {
-    userId,
     companyId,
     clientName: 'Digital Marketing Pro',
     gstin: '29AAFCD4567K1ZB',
@@ -335,7 +324,6 @@ export const generateDemoInvoices = (
       const totalAmount = items.reduce((sum, item) => sum + item.lineTotal, 0);
 
       invoices.push({
-        userId,
         companyId,
         clientId: client.id!,
         invoiceNumber: generateInvoiceNumber(invoices.length),

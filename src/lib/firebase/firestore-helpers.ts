@@ -215,7 +215,8 @@ export async function deleteDocument(
 }
 
 /**
- * Get documents by user ID (for multi-user data)
+ * Get documents by user ID (DEPRECATED for single-user app)
+ * Now just returns all documents since we don't use userId anymore
  */
 export async function getUserDocuments<T>(
   collectionName: string,
@@ -223,14 +224,8 @@ export async function getUserDocuments<T>(
   orderByField?: string,
   orderDirection: OrderByDirection = 'desc'
 ): Promise<T[]> {
-  return queryDocuments<T>(
-    collectionName,
-    'userId',
-    '==',
-    userId,
-    orderByField,
-    orderDirection
-  );
+  // Single-user app - just get all documents
+  return getAllDocuments<T>(collectionName, orderByField, orderDirection);
 }
 
 /**
@@ -253,7 +248,7 @@ export async function getCompanyDocuments<T>(
 }
 
 /**
- * Get documents by userId and companyId (for user-specific data isolation in SaaS)
+ * Get documents by userId and companyId (simplified for single-user personal app)
  */
 export async function getUserCompanyDocuments<T>(
   collectionName: string,
@@ -262,27 +257,8 @@ export async function getUserCompanyDocuments<T>(
   orderByField?: string,
   orderDirection: OrderByDirection = 'desc'
 ): Promise<T[]> {
-  try {
-    const constraints: QueryConstraint[] = [
-      where('userId', '==', userId),
-      where('companyId', '==', companyId)
-    ];
-
-    if (orderByField) {
-      constraints.push(orderBy(orderByField, orderDirection));
-    }
-
-    const q = query(collection(db, collectionName), ...constraints);
-    const querySnapshot = await getDocs(q);
-
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as T[];
-  } catch (error) {
-    console.error(`Error getting user company documents from ${collectionName}:`, error);
-    throw error;
-  }
+  // Simplified - just query by companyId since it's a single-user app
+  return getCompanyDocuments<T>(collectionName, companyId, orderByField, orderDirection);
 }
 
 /**

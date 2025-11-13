@@ -9,19 +9,21 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { invoiceFormSchema } from '@/lib/validations';
-import { Invoice, Product, Client, InvoiceItem } from '@/types';
+import { Invoice, Product, Client, Company, InvoiceItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { z } from 'zod';
+import { useCompanies } from '@/hooks/useCompanies';
+import { useCompany } from '@/hooks/useCompany';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -46,6 +48,12 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const { companies, loadCompanies } = useCompanies();
+  const { selectedCompany, setSelectedCompany } = useCompany();
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
 
   const {
     register,
@@ -220,6 +228,57 @@ export function InvoiceForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {/* Company Selection */}
+      <Card className="border-primary/50 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Select Company
+          </CardTitle>
+          <CardDescription>Choose which company this invoice is for</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="company">Company *</Label>
+            <Select
+              value={selectedCompany?.id || ''}
+              onValueChange={(value) => {
+                const company = companies.find((c) => c.id === value);
+                if (company) setSelectedCompany(company);
+              }}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Select your company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No companies found
+                  </SelectItem>
+                ) : (
+                  companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        {company.name}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {!selectedCompany && (
+              <p className="text-sm text-muted-foreground">
+                Please select a company or{' '}
+                <a href="/invoices/settings/company" className="text-primary underline">
+                  create one
+                </a>
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Invoice Details */}
       <Card>
         <CardHeader>

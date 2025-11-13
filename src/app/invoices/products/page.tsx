@@ -5,14 +5,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { ProductForm, ProductList } from '@/components/products';
-import { useAuth } from '@/lib/firebase/auth-context';
 import { Product } from '@/types';
 import { createDocument, getUserCompanyDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
 import { toast } from 'sonner';
@@ -24,7 +22,6 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 type ProductFormData = z.infer<typeof productFormSchema>;
 
 function ProductsContent() {
-  const { user } = useAuth();
   const { selectedCompany } = useCompany();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,11 +36,13 @@ function ProductsContent() {
   }, [selectedCompany]);
 
   const loadProducts = async () => {
-    if (!selectedCompany || !user) return;
+    if (!selectedCompany) return;
 
     setIsLoading(true);
     try {
-      const data = await getUserCompanyDocuments('products', user.uid, selectedCompany.id);
+      console.log('Loading products for company:', selectedCompany.id);
+      const data = await getUserCompanyDocuments('products', 'default-user', selectedCompany.id);
+      console.log('Loaded products:', data);
       setProducts(data as Product[]);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -64,22 +63,24 @@ function ProductsContent() {
   };
 
   const handleSubmit = async (data: ProductFormData) => {
-    if (!user || !selectedCompany) return;
+    if (!selectedCompany) return;
 
     try {
       const productData = {
         ...data,
         companyId: selectedCompany.id,
-        userId: user.uid,
       };
 
       if (editingProduct) {
         // Update existing product
+        console.log('Updating product:', editingProduct.id, productData);
         await updateDocument('products', editingProduct.id, productData);
         toast.success('Product updated successfully');
       } else {
         // Create new product
-        await createDocument('products', productData);
+        console.log('Creating new product:', productData);
+        const id = await createDocument('products', productData);
+        console.log('Created product with ID:', id);
         toast.success('Product created successfully');
       }
 
@@ -185,11 +186,9 @@ function ProductsContent() {
 
 export default function ProductsPage() {
   return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <ProductsContent />
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout>
+      <ProductsContent />
+    </DashboardLayout>
   );
 }
 

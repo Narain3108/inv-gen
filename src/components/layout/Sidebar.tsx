@@ -5,16 +5,14 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
   Package,
   Users,
   FileText,
-  BarChart3,
   Settings,
   Building2,
   ChevronDown,
@@ -28,6 +26,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCompany } from '@/hooks/useCompany';
+import { useCompanies } from '@/hooks/useCompanies';
+import { Company } from '@/types';
 
 interface NavItem {
   title: string;
@@ -38,33 +39,23 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    title: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
+    title: 'Invoices',
+    href: '/invoices',
+    icon: FileText,
   },
   {
     title: 'Products',
-    href: '/dashboard/products',
+    href: '/invoices/products',
     icon: Package,
   },
   {
     title: 'Clients',
-    href: '/dashboard/clients',
+    href: '/invoices/clients',
     icon: Users,
   },
   {
-    title: 'Invoices',
-    href: '/dashboard/invoices',
-    icon: FileText,
-  },
-  {
-    title: 'Reports',
-    href: '/dashboard/reports',
-    icon: BarChart3,
-  },
-  {
     title: 'Settings',
-    href: '/dashboard/settings',
+    href: '/invoices/settings',
     icon: Settings,
   },
 ];
@@ -75,12 +66,25 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
+  const { selectedCompany, setSelectedCompany } = useCompany();
+  const { companies, loading, loadCompanies } = useCompanies();
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
+
+  useEffect(() => {
+    // If no company is selected and we have companies, select the first one
+    if (!selectedCompany && companies.length > 0) {
+      setSelectedCompany(companies[0]);
+    }
+  }, [companies, selectedCompany, setSelectedCompany]);
 
   return (
     <div className={cn('flex h-full flex-col border-r bg-background', className)}>
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
           <FileText className="h-6 w-6 text-primary" />
           <span className="text-xl">InvoiceHub</span>
         </Link>
@@ -93,7 +97,9 @@ export function Sidebar({ className }: SidebarProps) {
             <Button variant="outline" className="w-full justify-between">
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
-                <span className="truncate">My Company</span>
+                <span className="truncate">
+                  {loading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
+                </span>
               </div>
               <ChevronDown className="h-4 w-4 opacity-50" />
             </Button>
@@ -101,13 +107,28 @@ export function Sidebar({ className }: SidebarProps) {
           <DropdownMenuContent align="start" className="w-[240px]">
             <DropdownMenuLabel>Select Company</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Building2 className="mr-2 h-4 w-4" />
-              My Company
-            </DropdownMenuItem>
+            {companies.length === 0 ? (
+              <DropdownMenuItem disabled>
+                <span className="text-muted-foreground">No companies found</span>
+              </DropdownMenuItem>
+            ) : (
+              companies.map((company) => (
+                <DropdownMenuItem
+                  key={company.id}
+                  onClick={() => setSelectedCompany(company)}
+                  className={cn(
+                    'cursor-pointer',
+                    selectedCompany?.id === company.id && 'bg-accent'
+                  )}
+                >
+                  <Building2 className="mr-2 h-4 w-4" />
+                  {company.name}
+                </DropdownMenuItem>
+              ))
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Link href="/dashboard/settings/company" className="flex w-full items-center">
+            <DropdownMenuItem asChild>
+              <Link href="/invoices/settings/company" className="flex w-full items-center cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 Manage Companies
               </Link>
