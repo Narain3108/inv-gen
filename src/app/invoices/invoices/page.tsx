@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
+import { useCompanies } from '@/hooks/useCompanies';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { DashboardLayout } from '@/components/layout';
@@ -53,7 +54,8 @@ type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
 function InvoicesContent() {
   const router = useRouter();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, setSelectedCompany } = useCompany();
+  const { companies, loading: companiesLoading, loadCompanies } = useCompanies();
   
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -63,18 +65,27 @@ function InvoicesContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
+  // Load companies on mount
   useEffect(() => {
-    if (!selectedCompany) {
-      router.push('/invoices/settings/company');
-      toast.error('Please select or create a company first.');
-      return;
+    const init = async () => {
+      await loadCompanies();
+      setInitialized(true);
+    };
+    init();
+  }, []);
+
+  // Auto-select first company if none selected
+  useEffect(() => {
+    if (initialized && !selectedCompany && companies.length > 0) {
+      console.log('Auto-selecting first company:', companies[0]);
+      setSelectedCompany(companies[0]);
     }
+  }, [companies, selectedCompany, initialized, setSelectedCompany]);
 
-    loadData();
-  }, [selectedCompany]);
-
-  const loadData = async () => {
+  // Define loadData function with useCallback to prevent infinite loops
+  const loadData = React.useCallback(async () => {
     if (!selectedCompany) return;
 
     setLoading(true);
@@ -82,18 +93,23 @@ function InvoicesContent() {
       // Set company
       setCompany(selectedCompany);
 
-      // Load invoices - Only filter by companyId (userId is redundant since company belongs to user)
+      // Load invoices - Only filter by companyId (no orderBy to avoid index requirement)
       const invoicesRef = collection(db, 'invoices');
       const invoicesQuery = query(
         invoicesRef,
-        where('companyId', '==', selectedCompany.id),
-        orderBy('createdAt', 'desc')
+        where('companyId', '==', selectedCompany.id)
       );
       const invoicesSnapshot = await getDocs(invoicesQuery);
       const invoicesData = invoicesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Invoice[];
+      // Sort in memory instead of in query
+      invoicesData.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || 0;
+        const bTime = b.createdAt?.toMillis?.() || 0;
+        return bTime - aTime;
+      });
       setInvoices(invoicesData);
 
       // Load products - Filter by companyId
@@ -127,7 +143,27 @@ function InvoicesContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCompany]); // Only depends on selectedCompany
+
+  // Load data when company is selected OR redirect if no companies
+  useEffect(() => {
+    // Not initialized yet, wait
+    if (!initialized) {
+      return;
+    }
+
+    // No companies exist, redirect to create one
+    if (companies.length === 0) {
+      router.push('/invoices/settings/company');
+      toast.error('Please create a company first.');
+      return;
+    }
+
+    // Company is selected, load data
+    if (selectedCompany) {
+      loadData();
+    }
+  }, [selectedCompany, initialized, companies.length, loadData, router]);
 
   const handleAddInvoice = () => {
     if (products.length === 0) {

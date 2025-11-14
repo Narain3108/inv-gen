@@ -108,40 +108,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Company Logo URL */}
-          <div className="space-y-2">
-            <Label htmlFor="logoUrl">Company Logo (Google Drive Link)</Label>
-            <Input
-              id="logoUrl"
-              {...register('logoUrl')}
-              placeholder="https://drive.google.com/uc?id=YOUR_FILE_ID"
-              type="url"
-            />
-            <p className="text-xs text-muted-foreground">
-              Upload your logo to Google Drive, make it publicly accessible, and paste the direct link here.
-              <br />
-              Example: https://drive.google.com/uc?id=YOUR_FILE_ID
-            </p>
-            {watch('logoUrl') && (
-              <div className="mt-2 rounded-lg border p-2">
-                <p className="mb-2 text-xs font-medium">Logo Preview:</p>
-                <div className="relative h-24 w-24 rounded-lg border bg-white">
-                  <Image
-                    src={watch('logoUrl') || ''}
-                    alt="Company logo preview"
-                    fill
-                    className="rounded-lg object-contain p-2"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="14">Invalid URL</text></svg>';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            {errors.logoUrl && (
-              <p className="text-sm text-red-500">{errors.logoUrl.message}</p>
-            )}
-          </div>
-
+       
           {/* GSTIN */}
           <div className="space-y-2">
             <Label htmlFor="gstin">GSTIN (Optional)</Label>

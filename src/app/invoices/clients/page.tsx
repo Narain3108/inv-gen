@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { UserPlus } from 'lucide-react';
 import { ClientForm, ClientList } from '@/components/clients';
 import { Client } from '@/types';
-import { createDocument, getUserCompanyDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { clientFormSchema } from '@/lib/validations';
@@ -35,13 +36,31 @@ function ClientsContent() {
     }
   }, [selectedCompany]);
 
+  // Reload when component becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && selectedCompany) {
+        loadClients();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [selectedCompany]);
+
   const loadClients = async () => {
     if (!selectedCompany) return;
 
     setIsLoading(true);
     try {
-      const data = await getUserCompanyDocuments('clients', 'default-user', selectedCompany.id);
-      setClients(data as Client[]);
+      const clientsRef = collection(db, 'clients');
+      const q = query(clientsRef, where('companyId', '==', selectedCompany.id));
+      const snapshot = await getDocs(q);
+      const clientsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Client[];
+      setClients(clientsData);
+      console.log('Loaded clients:', clientsData);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast.error('Failed to load clients');
@@ -71,11 +90,19 @@ function ClientsContent() {
 
       if (editingClient) {
         // Update existing client
-        await updateDocument('clients', editingClient.id, clientData);
+        const clientRef = doc(db, 'clients', editingClient.id);
+        await updateDoc(clientRef, {
+          ...clientData,
+          updatedAt: serverTimestamp(),
+        });
         toast.success('Client updated successfully');
       } else {
         // Create new client
-        await createDocument('clients', clientData);
+        await addDoc(collection(db, 'clients'), {
+          ...clientData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
         toast.success('Client created successfully');
       }
 
@@ -91,7 +118,7 @@ function ClientsContent() {
     if (!deletingClient) return;
 
     try {
-      await deleteDocument('clients', deletingClient.id);
+      await deleteDoc(doc(db, 'clients', deletingClient.id));
       toast.success('Client deleted successfully');
       setDeletingClient(null);
       await loadClients();

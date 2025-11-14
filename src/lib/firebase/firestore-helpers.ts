@@ -215,16 +215,15 @@ export async function deleteDocument(
 }
 
 /**
- * Get documents by user ID (DEPRECATED for single-user app)
- * Now just returns all documents since we don't use userId anymore
+ * Get all documents (no user filtering - shared public data)
  */
 export async function getUserDocuments<T>(
   collectionName: string,
-  userId: string,
+  userId?: string,
   orderByField?: string,
   orderDirection: OrderByDirection = 'desc'
 ): Promise<T[]> {
-  // Single-user app - just get all documents
+  // Shared public app - get all documents regardless of userId
   return getAllDocuments<T>(collectionName, orderByField, orderDirection);
 }
 
@@ -248,16 +247,16 @@ export async function getCompanyDocuments<T>(
 }
 
 /**
- * Get documents by userId and companyId (simplified for single-user personal app)
+ * Get documents by companyId only (shared public app - no userId needed)
  */
 export async function getUserCompanyDocuments<T>(
   collectionName: string,
-  userId: string,
+  userId: string | null,
   companyId: string,
   orderByField?: string,
   orderDirection: OrderByDirection = 'desc'
 ): Promise<T[]> {
-  // Simplified - just query by companyId since it's a single-user app
+  // Shared public app - query only by companyId, userId is ignored
   return getCompanyDocuments<T>(collectionName, companyId, orderByField, orderDirection);
 }
 
@@ -346,13 +345,8 @@ export async function searchDocuments<T>(
   userId?: string
 ): Promise<T[]> {
   try {
-    let documents: T[];
-
-    if (userId) {
-      documents = await getUserDocuments<T>(collectionName, userId);
-    } else {
-      documents = await getAllDocuments<T>(collectionName);
-    }
+    // Shared public app - always get all documents
+    const documents = await getAllDocuments<T>(collectionName);
 
     // Client-side filtering (not ideal for large datasets)
     const searchLower = searchTerm.toLowerCase();

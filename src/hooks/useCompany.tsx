@@ -1,12 +1,11 @@
 /**
  * useCompany Hook
- * Manages selected company state
+ * Manages selected company state - pure Firestore, no localStorage
  */
 
 'use client';
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { Company } from '@/types';
 
 interface CompanyStore {
@@ -15,15 +14,8 @@ interface CompanyStore {
   clearSelectedCompany: () => void;
 }
 
-export const useCompany = create<CompanyStore>()(
-  persist(
-    (set) => ({
-      selectedCompany: null,
-      setSelectedCompany: (company) => set({ selectedCompany: company }),
-      clearSelectedCompany: () => set({ selectedCompany: null }),
-    }),
-    {
-      name: 'selected-company-storage',
-    }
-  )
-);
+export const useCompany = create<CompanyStore>((set) => ({
+  selectedCompany: null,
+  setSelectedCompany: (company) => set({ selectedCompany: company }),
+  clearSelectedCompany: () => set({ selectedCompany: null }),
+}));

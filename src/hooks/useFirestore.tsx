@@ -59,6 +59,7 @@ export const useFirestore = <T extends DocumentData>(
         setError(null);
       } catch (err) {
         setError(err as Error);
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }

@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Plus } from 'lucide-react';
 import { ProductForm, ProductList } from '@/components/products';
 import { Product } from '@/types';
-import { createDocument, getUserCompanyDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
@@ -35,15 +36,32 @@ function ProductsContent() {
     }
   }, [selectedCompany]);
 
+  // Reload when component becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && selectedCompany) {
+        loadProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [selectedCompany]);
+
   const loadProducts = async () => {
     if (!selectedCompany) return;
 
     setIsLoading(true);
     try {
       console.log('Loading products for company:', selectedCompany.id);
-      const data = await getUserCompanyDocuments('products', 'default-user', selectedCompany.id);
-      console.log('Loaded products:', data);
-      setProducts(data as Product[]);
+      const productsRef = collection(db, 'products');
+      const q = query(productsRef, where('companyId', '==', selectedCompany.id));
+      const snapshot = await getDocs(q);
+      const productsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProducts(productsData);
+      console.log('Loaded products:', productsData);
     } catch (error) {
       console.error('Error loading products:', error);
       toast.error('Failed to load products');
@@ -74,13 +92,21 @@ function ProductsContent() {
       if (editingProduct) {
         // Update existing product
         console.log('Updating product:', editingProduct.id, productData);
-        await updateDocument('products', editingProduct.id, productData);
+        const productRef = doc(db, 'products', editingProduct.id);
+        await updateDoc(productRef, {
+          ...productData,
+          updatedAt: serverTimestamp(),
+        });
         toast.success('Product updated successfully');
       } else {
         // Create new product
         console.log('Creating new product:', productData);
-        const id = await createDocument('products', productData);
-        console.log('Created product with ID:', id);
+        const docRef = await addDoc(collection(db, 'products'), {
+          ...productData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        console.log('Created product with ID:', docRef.id);
         toast.success('Product created successfully');
       }
 
@@ -96,7 +122,7 @@ function ProductsContent() {
     if (!deletingProduct) return;
 
     try {
-      await deleteDocument('products', deletingProduct.id);
+      await deleteDoc(doc(db, 'products', deletingProduct.id));
       toast.success('Product deleted successfully');
       setDeletingProduct(null);
       await loadProducts();

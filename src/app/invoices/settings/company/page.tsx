@@ -31,10 +31,10 @@ export default function CompanySettingsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
 
-  // Load companies on mount
+  // Load companies from Firestore on mount
   useEffect(() => {
     loadCompanies();
-  }, [loadCompanies]);
+  }, []);
 
   const handleCreateCompany = () => {
     setEditingCompany(undefined);

@@ -69,9 +69,10 @@ export function Sidebar({ className }: SidebarProps) {
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, loading, loadCompanies } = useCompanies();
 
+  // Load companies from Firestore on mount
   useEffect(() => {
     loadCompanies();
-  }, [loadCompanies]);
+  }, []);
 
   useEffect(() => {
     // If no company is selected and we have companies, select the first one
