@@ -43,6 +43,7 @@ import {
 import { Plus } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useAppData } from '@/contexts/AppDataContext';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { DashboardLayout } from '@/components/layout';
@@ -55,11 +56,22 @@ type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 function InvoicesContent() {
   const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
-  const { companies, loading: companiesLoading, loadCompanies } = useCompanies();
+  
+  // Use global data context for companies, clients, and products
+  const {
+    companies,
+    companiesLoading,
+    companiesInitialized,
+    clients,
+    clientsLoading,
+    clientsInitialized,
+    products,
+    productsLoading,
+    productsInitialized,
+    refreshProducts,
+  } = useAppData();
   
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -67,122 +79,67 @@ function InvoicesContent() {
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [initialized, setInitialized] = useState(false);
 
-  // Load companies on mount
+  // Set company when selectedCompany changes
   useEffect(() => {
-    const init = async () => {
-      await loadCompanies();
-      setInitialized(true);
-    };
-    init();
-  }, []);
-
-  // Auto-select first company if none selected
-  useEffect(() => {
-    if (initialized && !selectedCompany && companies.length > 0) {
-      console.log('Auto-selecting first company:', companies[0]);
-      setSelectedCompany(companies[0]);
+    if (selectedCompany) {
+      setCompany(selectedCompany);
     }
-  }, [companies, selectedCompany, initialized, setSelectedCompany]);
+  }, [selectedCompany]);
 
-  // Define loadData function with useCallback to prevent infinite loops
-  const loadData = React.useCallback(async () => {
+  // Define loadData function - only loads invoices now
+  const loadInvoices = React.useCallback(async () => {
     if (!selectedCompany) return;
 
     setLoading(true);
     try {
-      // Set company
-      setCompany(selectedCompany);
+      console.log('📡 Fetching invoices for company:', selectedCompany.name);
+      
+      const invoicesSnapshot = await getDocs(
+        query(
+          collection(db, 'invoices'),
+          where('companyId', '==', selectedCompany.id)
+        )
+      );
 
-      // Load all data in parallel to avoid race conditions
-      console.log('📡 Fetching invoices, products, and clients in parallel...');
-      const [invoicesSnapshot, productsSnapshot, clientsSnapshot] = await Promise.all([
-        // Load invoices - Only filter by companyId
-        getDocs(
-          query(
-            collection(db, 'invoices'),
-            where('companyId', '==', selectedCompany.id)
-          )
-        ),
-        // Load products - Filter by companyId
-        getDocs(
-          query(
-            collection(db, 'products'),
-            where('companyId', '==', selectedCompany.id)
-          )
-        ),
-        // Load clients - Global (no company filtering)
-        getDocs(collection(db, 'clients')),
-      ]);
-
-      console.log('✅ Firestore queries completed');
-      console.log('📊 Invoices docs:', invoicesSnapshot.docs.length);
-      console.log('📦 Products docs:', productsSnapshot.docs.length);
-      console.log('👥 Clients docs:', clientsSnapshot.docs.length);
-
-      // Process invoices
       const invoicesData = invoicesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Invoice[];
-      // Sort in memory instead of in query
+      
+      // Sort in memory
       invoicesData.sort((a, b) => {
         const aTime = a.createdAt?.toMillis?.() || 0;
         const bTime = b.createdAt?.toMillis?.() || 0;
         return bTime - aTime;
       });
 
-      // Process products
-      const productsData = productsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[];
-
-      // Process clients
-      const clientsData = clientsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Client[];
-
-      console.log('✅ Processed data:');
-      console.log('  - Invoices:', invoicesData.length);
-      console.log('  - Products:', productsData.length);
-      console.log('  - Clients:', clientsData.length, clientsData.map(c => ({ id: c.id, name: c.clientName })));
-
-      // Set all state together after all data is loaded
       setInvoices(invoicesData);
-      setProducts(productsData);
-      setClients(clientsData);
-      
-      console.log('✅ All state updated successfully');
+      console.log('✅ Invoices loaded:', invoicesData.length);
     } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load data');
+      console.error('Error loading invoices:', error);
+      toast.error('Failed to load invoices');
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany]); // Only depends on selectedCompany
+  }, [selectedCompany]);
 
-  // Load data when company is selected OR redirect if no companies
+  // Load invoices when company is selected and global data is ready
   useEffect(() => {
-    // Not initialized yet, wait
-    if (!initialized) {
-      return;
+    if (!companiesInitialized || !clientsInitialized) {
+      return; // Wait for global data to load
     }
 
-    // No companies exist, redirect to create one
     if (companies.length === 0) {
       router.push('/invoices/settings/company');
       toast.error('Please create a company first.');
       return;
     }
 
-    // Company is selected, load data
     if (selectedCompany) {
-      loadData();
+      loadInvoices();
     }
-  }, [selectedCompany, initialized, companies.length, loadData, router]);
+  }, [selectedCompany, companiesInitialized, clientsInitialized, companies.length, loadInvoices, router]);
 
   const handleAddInvoice = () => {
     if (products.length === 0) {
@@ -259,7 +216,10 @@ function InvoicesContent() {
       }
 
       setIsDialogOpen(false);
-      loadData();
+      await Promise.all([
+        loadInvoices(),
+        refreshProducts(), // Refresh products to update stock
+      ]);
     } catch (error) {
       console.error('Error saving invoice:', error);
       toast.error('Failed to save invoice');
@@ -273,7 +233,7 @@ function InvoicesContent() {
       await deleteDoc(doc(db, 'invoices', deleteInvoice.id));
       toast.success('Invoice deleted successfully');
       setDeleteInvoice(null);
-      loadData();
+      loadInvoices();
     } catch (error) {
       console.error('Error deleting invoice:', error);
       toast.error('Failed to delete invoice');
@@ -360,31 +320,19 @@ function InvoicesContent() {
       toast.success('Payment recorded successfully');
       setIsPaymentDialogOpen(false);
       setPaymentInvoice(null);
-      loadData();
+      loadInvoices();
     } catch (error) {
       console.error('Error recording payment:', error);
       toast.error('Failed to record payment');
     }
   };
 
-  if (loading || !initialized) {
+  if (loading || !companiesInitialized || !clientsInitialized) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-muted-foreground">Loading invoices...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render until we have clients data loaded (even if empty array)
-  if (clients === undefined) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-muted-foreground">Loading client data...</p>
+          <p className="mt-4 text-sm text-muted-foreground">Loading data...</p>
         </div>
       </div>
     );

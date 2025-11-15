@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useAppData } from '@/contexts/AppDataContext';
 import { Company } from '@/types';
 
 interface NavItem {
@@ -73,12 +74,7 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const { selectedCompany, setSelectedCompany } = useCompany();
-  const { companies, loading, loadCompanies } = useCompanies();
-
-  // Load companies from Firestore on mount
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  const { companies, companiesLoading } = useAppData();
 
   useEffect(() => {
     // If no company is selected and we have companies, select the first one
@@ -109,7 +105,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Building2 className="h-4 w-4 text-primary" />
                 </div>
                 <span className="truncate font-medium">
-                  {loading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
+                  {companiesLoading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
                 </span>
               </div>
               <ChevronDown className="h-4 w-4 opacity-50" />

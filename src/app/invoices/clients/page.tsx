@@ -18,56 +18,17 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { clientFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
+import { useAppData } from '@/contexts/AppDataContext';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
 
 function ClientsContent() {
   const { selectedCompany } = useCompany();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { clients, clientsLoading, refreshClients } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
-
-  useEffect(() => {
-    if (selectedCompany) {
-      loadClients();
-    }
-  }, [selectedCompany]);
-
-  // Reload when component becomes visible again
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && selectedCompany) {
-        loadClients();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [selectedCompany]);
-
-  const loadClients = async () => {
-    if (!selectedCompany) return;
-
-    setIsLoading(true);
-    try {
-      const clientsRef = collection(db, 'clients');
-      // Load all clients globally - no company filtering
-      const snapshot = await getDocs(clientsRef);
-      const clientsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Client[];
-      setClients(clientsData);
-      console.log('Loaded global clients:', clientsData);
-    } catch (error) {
-      console.error('Error loading clients:', error);
-      toast.error('Failed to load clients');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleOpenForm = (client?: Client) => {
     setEditingClient(client);
@@ -107,7 +68,7 @@ function ClientsContent() {
       }
 
       handleCloseForm();
-      await loadClients();
+      await refreshClients();
     } catch (error) {
       console.error('Error saving client:', error);
       throw error;
@@ -121,7 +82,7 @@ function ClientsContent() {
       await deleteDoc(doc(db, 'clients', deletingClient.id));
       toast.success('Client deleted successfully');
       setDeletingClient(null);
-      await loadClients();
+      await refreshClients();
     } catch (error) {
       console.error('Error deleting client:', error);
       toast.error('Failed to delete client');
@@ -161,7 +122,7 @@ function ClientsContent() {
         </Button>
       </PageHeader>
 
-      {isLoading ? (
+      {clientsLoading ? (
         <div className="text-center py-12">Loading clients...</div>
       ) : (
         <ClientList

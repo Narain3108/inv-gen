@@ -18,57 +18,17 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
+import { useAppData } from '@/contexts/AppDataContext';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
 
 function ProductsContent() {
   const { selectedCompany } = useCompany();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { products, productsLoading, refreshProducts } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-
-  useEffect(() => {
-    if (selectedCompany) {
-      loadProducts();
-    }
-  }, [selectedCompany]);
-
-  // Reload when component becomes visible again
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && selectedCompany) {
-        loadProducts();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [selectedCompany]);
-
-  const loadProducts = async () => {
-    if (!selectedCompany) return;
-
-    setIsLoading(true);
-    try {
-      console.log('Loading products for company:', selectedCompany.id);
-      const productsRef = collection(db, 'products');
-      const q = query(productsRef, where('companyId', '==', selectedCompany.id));
-      const snapshot = await getDocs(q);
-      const productsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
-      setProducts(productsData);
-      console.log('Loaded products:', productsData);
-    } catch (error) {
-      console.error('Error loading products:', error);
-      toast.error('Failed to load products');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleOpenForm = (product?: Product) => {
     setEditingProduct(product);
@@ -111,7 +71,7 @@ function ProductsContent() {
       }
 
       handleCloseForm();
-      await loadProducts();
+      await refreshProducts();
     } catch (error) {
       console.error('Error saving product:', error);
       throw error;
@@ -125,7 +85,7 @@ function ProductsContent() {
       await deleteDoc(doc(db, 'products', deletingProduct.id));
       toast.success('Product deleted successfully');
       setDeletingProduct(null);
-      await loadProducts();
+      await refreshProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
       toast.error('Failed to delete product');
@@ -165,7 +125,7 @@ function ProductsContent() {
         </Button>
       </PageHeader>
 
-      {isLoading ? (
+      {productsLoading ? (
         <div className="text-center py-12">Loading products...</div>
       ) : (
         <ProductList
