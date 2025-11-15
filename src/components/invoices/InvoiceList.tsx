@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2 } from 'lucide-react';
+import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, DollarSign } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
 interface InvoiceListProps {
@@ -27,6 +27,7 @@ interface InvoiceListProps {
   onDelete: (invoice: Invoice) => void;
   onView: (invoice: Invoice) => void;
   onDownload: (invoice: Invoice) => void;
+  onPayment: (invoice: Invoice) => void;
 }
 
 export function InvoiceList({
@@ -36,6 +37,7 @@ export function InvoiceList({
   onDelete,
   onView,
   onDownload,
+  onPayment,
 }: InvoiceListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -50,6 +52,29 @@ export function InvoiceList({
       console.warn(`⚠️ Client not found for ID: ${clientId}. Available clients:`, clients.map(c => c.id));
     }
     return client?.clientName || 'Unknown Client';
+  };
+
+  const getPaymentStatusBadge = (invoice: Invoice) => {
+    const status = invoice.paymentStatus || 'pending';
+    
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
+      paid: { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+      partially_paid: { variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
+      pending: { variant: 'destructive', className: '' },
+    };
+
+    const config = variants[status] || variants.pending;
+    const labels = {
+      paid: 'Paid',
+      partially_paid: 'Partial',
+      pending: 'Pending',
+    };
+
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        {labels[status as keyof typeof labels] || 'Pending'}
+      </Badge>
+    );
   };
 
   const filteredInvoices = invoices.filter((invoice) => {
@@ -95,62 +120,95 @@ export function InvoiceList({
                 <th className="p-3 text-left text-sm font-medium">Client</th>
                 <th className="p-3 text-left text-sm font-medium">Date</th>
                 <th className="p-3 text-right text-sm font-medium">Amount</th>
+                <th className="p-3 text-center text-sm font-medium">Status</th>
+                <th className="p-3 text-right text-sm font-medium">Pending</th>
                 <th className="p-3 text-center text-sm font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredInvoices.map((invoice) => (
-                <tr
-                  key={invoice.id}
-                  className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                  onClick={() => onView(invoice)}
-                >
-                  <td className="p-3">
-                    <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
-                  </td>
-                  <td className="p-3">
-                    <span className="text-sm">{getClientName(invoice.clientId)}</span>
-                  </td>
-                  <td className="p-3">
-                    <span className="text-sm">
-                      {invoice.date?.toDate ? formatDate(invoice.date.toDate()) : 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right font-medium">
-                    {formatCurrency(invoice.totalAmount)}
-                  </td>
-                  <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onView(invoice)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDownload(invoice)}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Download PDF
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit(invoice)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onDelete(invoice)}
-                          className="text-red-600"
+              {filteredInvoices.map((invoice) => {
+                const roundTo2 = (num: number) => Math.round((num || 0) * 100) / 100;
+                const amountPending = roundTo2(invoice.amountPending ?? invoice.totalAmount);
+                const paymentStatus = (amountPending <= 0.01) ? 'paid' : (invoice.paymentStatus || 'pending');
+                
+                return (
+                  <tr
+                    key={invoice.id}
+                    className="border-b last:border-0 hover:bg-muted/30"
+                  >
+                    <td className="p-3">
+                      <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
+                    </td>
+                    <td className="p-3">
+                      <span className="text-sm">{getClientName(invoice.clientId)}</span>
+                    </td>
+                    <td className="p-3">
+                      <span className="text-sm">
+                        {invoice.date?.toDate ? formatDate(invoice.date.toDate()) : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right font-medium">
+                      {formatCurrency(invoice.totalAmount)}
+                    </td>
+                    <td className="p-3 text-center">
+                      {getPaymentStatusBadge(invoice)}
+                    </td>
+                    <td className="p-3 text-right">
+                      {amountPending > 0.01 ? (
+                        <span className="font-medium text-orange-600">
+                          {formatCurrency(amountPending)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-green-600">-</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant={paymentStatus === 'paid' ? 'ghost' : 'outline'}
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPayment(invoice);
+                          }}
+                          className="h-8"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
+                          <DollarSign className="h-3.5 w-3.5 mr-1" />
+                          {paymentStatus === 'paid' ? 'History' : 'Payment'}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onView(invoice)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onDownload(invoice)}>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onEdit(invoice)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onDelete(invoice)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

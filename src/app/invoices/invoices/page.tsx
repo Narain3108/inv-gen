@@ -20,8 +20,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { Invoice, Product, Client, Company, InvoiceItem } from '@/types';
-import { InvoiceForm, InvoiceList } from '@/components/invoices';
+import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
+import { InvoiceForm, InvoiceList, PaymentDialog } from '@/components/invoices';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -65,6 +65,8 @@ function InvoicesContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Load companies on mount
@@ -214,17 +216,26 @@ function InvoicesContent() {
       };
 
       if (editingInvoice?.id) {
-        // Update existing invoice
+        // Update existing invoice - preserve payment data
         const invoiceRef = doc(db, 'invoices', editingInvoice.id);
         await updateDoc(invoiceRef, {
           ...invoiceData,
+          // Preserve existing payment tracking fields
+          paymentStatus: editingInvoice.paymentStatus || 'pending',
+          amountPaid: editingInvoice.amountPaid || 0,
+          amountPending: editingInvoice.amountPending ?? invoiceData.totalAmount,
+          payments: editingInvoice.payments || [],
           updatedAt: Timestamp.now(),
         });
         toast.success('Invoice updated successfully');
       } else {
-        // Create new invoice and deduct stock
+        // Create new invoice with payment tracking initialized
         await addDoc(collection(db, 'invoices'), {
           ...invoiceData,
+          paymentStatus: 'pending',
+          amountPaid: 0,
+          amountPending: invoiceData.totalAmount,
+          payments: [],
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
@@ -293,6 +304,69 @@ function InvoicesContent() {
     generateInvoicePDF(pdfData as any);
   };
 
+  const handleOpenPaymentDialog = (invoice: Invoice) => {
+    setPaymentInvoice(invoice);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleRecordPayment = async (paymentData: PaymentFormData) => {
+    if (!paymentInvoice?.id) return;
+
+    try {
+      const invoiceRef = doc(db, 'invoices', paymentInvoice.id);
+      
+      // Round amounts to 2 decimal places to avoid floating point issues
+      const roundTo2Decimals = (num: number) => Math.round(num * 100) / 100;
+      
+      // Create payment record
+      const newPayment = {
+        id: `payment_${Date.now()}`,
+        amount: roundTo2Decimals(paymentData.amount),
+        paymentDate: Timestamp.fromDate(new Date(paymentData.paymentDate)),
+        paymentMode: paymentData.paymentMode,
+        referenceNumber: paymentData.referenceNumber || '',
+        notes: paymentData.notes || '',
+        recordedAt: Timestamp.now(),
+      };
+
+      // Get current invoice data with defaults for existing invoices
+      const currentPayments = paymentInvoice.payments || [];
+      const currentAmountPaid = roundTo2Decimals(paymentInvoice.amountPaid || 0);
+      const totalAmount = roundTo2Decimals(paymentInvoice.totalAmount);
+      
+      // Calculate new payment totals with proper rounding
+      const newAmountPaid = roundTo2Decimals(currentAmountPaid + paymentData.amount);
+      const newAmountPending = roundTo2Decimals(totalAmount - newAmountPaid);
+      
+      // Determine payment status with tolerance for floating point errors
+      let newPaymentStatus: 'pending' | 'partially_paid' | 'paid';
+      if (newAmountPending <= 0.01 || Math.abs(newAmountPending) < 0.01) { // Consider paid if pending is less than 1 paisa or negligible
+        newPaymentStatus = 'paid';
+      } else if (newAmountPaid > 0) {
+        newPaymentStatus = 'partially_paid';
+      } else {
+        newPaymentStatus = 'pending';
+      }
+
+      // Update invoice with new payment - set pending to 0 if it's negligible
+      await updateDoc(invoiceRef, {
+        payments: [...currentPayments, newPayment],
+        amountPaid: newAmountPaid,
+        amountPending: newAmountPending <= 0.01 ? 0 : Math.max(0, newAmountPending),
+        paymentStatus: newPaymentStatus,
+        updatedAt: Timestamp.now(),
+      });
+
+      toast.success('Payment recorded successfully');
+      setIsPaymentDialogOpen(false);
+      setPaymentInvoice(null);
+      loadData();
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      toast.error('Failed to record payment');
+    }
+  };
+
   if (loading || !initialized) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -340,6 +414,7 @@ function InvoicesContent() {
         onDelete={setDeleteInvoice}
         onView={handleViewInvoice}
         onDownload={handleDownloadInvoice}
+        onPayment={handleOpenPaymentDialog}
       />
 
       {/* Add/Edit Dialog */}
@@ -385,6 +460,14 @@ function InvoicesContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        invoice={paymentInvoice}
+        onSubmit={handleRecordPayment}
+      />
     </div>
   );
 }

@@ -166,6 +166,18 @@ export interface TaxBreakdown {
   totalTax: number;
 }
 
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  paymentDate: Timestamp;
+  paymentMode?: PaymentMode;
+  referenceNumber?: string;
+  notes?: string;
+  recordedAt: Timestamp;
+}
+
+export type InvoicePaymentStatus = 'pending' | 'partially_paid' | 'paid';
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -179,6 +191,11 @@ export interface Invoice {
   cgst: number;
   sgst: number;
   igst: number;
+  // Payment tracking fields
+  paymentStatus: InvoicePaymentStatus;
+  amountPaid: number;
+  amountPending: number;
+  payments: PaymentRecord[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -249,6 +266,14 @@ export type InvoiceStatus =
   | 'viewed'
   | 'paid'
   | 'cancelled';
+
+export interface PaymentFormData {
+  amount: number;
+  paymentDate: string;
+  paymentMode?: PaymentMode;
+  referenceNumber?: string;
+  notes?: string;
+}
 
 export type UnitType = 
   | 'Nos'
