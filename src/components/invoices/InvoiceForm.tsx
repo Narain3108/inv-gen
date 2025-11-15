@@ -156,7 +156,7 @@ export function InvoiceForm({
       totalIgst += igst;
       totalCess += cess;
 
-      return {
+      const invoiceItem: any = {
         productId: product.id,
         description: product.productName,
         hsn: product.hsn,
@@ -172,8 +172,14 @@ export function InvoiceForm({
         igst,
         cess,
         lineTotal,
-        serialNumbers: product.hasSerialNumber ? serialNumbers[validItems.indexOf(item)] : undefined,
       };
+
+      // Only add serialNumbers if product has serial numbers
+      if (product.hasSerialNumber && serialNumbers[validItems.indexOf(item)]) {
+        invoiceItem.serialNumbers = serialNumbers[validItems.indexOf(item)];
+      }
+
+      return invoiceItem;
     }).filter(Boolean) as InvoiceItem[];
 
     const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
@@ -195,6 +201,23 @@ export function InvoiceForm({
   const handleFormSubmit = async (data: InvoiceFormData) => {
     if (!totals || totals.items.length === 0) {
       toast.error('Please add valid items to the invoice');
+      return;
+    }
+
+    // Validate stock availability for products
+    let hasStockError = false;
+    watchItems.forEach((item: any) => {
+      const product = products.find(p => p.id === item.productId);
+      if (product && product.type === 'product' && typeof product.stock === 'number') {
+        const quantity = Number(item.quantity) || 0;
+        if (quantity > product.stock) {
+          toast.error(`Insufficient stock for ${product.productName}. Available: ${product.stock}, Required: ${quantity}`);
+          hasStockError = true;
+        }
+      }
+    });
+
+    if (hasStockError) {
       return;
     }
 
@@ -348,11 +371,18 @@ export function InvoiceForm({
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.productName} ({product.hsn})
-                              </SelectItem>
-                            ))}
+                            {products.map((product) => {
+                              const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
+                              return (
+                                <SelectItem 
+                                  key={product.id} 
+                                  value={product.id}
+                                  disabled={isOutOfStock}
+                                >
+                                  {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </td>
@@ -361,9 +391,15 @@ export function InvoiceForm({
                           type="number"
                           step="1"
                           min="1"
+                          max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
                           value={item?.quantity || 1}
                           onChange={(e) => {
                             const val = parseInt(e.target.value) || 1;
+                            const maxQty = product?.type === 'product' && typeof product.stock === 'number' ? product.stock : Infinity;
+                            if (val > maxQty) {
+                              toast.error(`Only ${maxQty} units available in stock`);
+                              return;
+                            }
                             setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
                           }}
                           className="text-center w-full text-base font-medium"
@@ -500,11 +536,18 @@ export function InvoiceForm({
                           <SelectValue placeholder="Select product" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.productName} ({product.hsn})
-                            </SelectItem>
-                          ))}
+                          {products.map((product) => {
+                            const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
+                            return (
+                              <SelectItem 
+                                key={product.id} 
+                                value={product.id}
+                                disabled={isOutOfStock}
+                              >
+                                {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </div>
@@ -517,9 +560,15 @@ export function InvoiceForm({
                           type="number"
                           step="1"
                           min="1"
+                          max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
                           value={item?.quantity || 1}
                           onChange={(e) => {
                             const val = parseInt(e.target.value) || 1;
+                            const maxQty = product?.type === 'product' && typeof product.stock === 'number' ? product.stock : Infinity;
+                            if (val > maxQty) {
+                              toast.error(`Only ${maxQty} units available in stock`);
+                              return;
+                            }
                             setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
                           }}
                           className="text-center text-lg font-semibold"

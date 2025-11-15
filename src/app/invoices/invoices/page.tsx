@@ -222,13 +222,29 @@ function InvoicesContent() {
         });
         toast.success('Invoice updated successfully');
       } else {
-        // Create new invoice
+        // Create new invoice and deduct stock
         await addDoc(collection(db, 'invoices'), {
           ...invoiceData,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
-        toast.success('Invoice created successfully');
+
+        // Deduct stock for each product in the invoice
+        for (const item of data.items) {
+          if (item.productId) {
+            const product = products.find(p => p.id === item.productId);
+            if (product && product.type === 'product' && typeof product.stock === 'number') {
+              const newStock = product.stock - item.quantity;
+              const productRef = doc(db, 'products', item.productId);
+              await updateDoc(productRef, {
+                stock: Math.max(0, newStock), // Ensure stock doesn't go negative
+                updatedAt: Timestamp.now(),
+              });
+            }
+          }
+        }
+
+        toast.success('Invoice created and stock updated successfully');
       }
 
       setIsDialogOpen(false);

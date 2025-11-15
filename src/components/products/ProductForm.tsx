@@ -260,6 +260,32 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
               <p className="text-sm text-red-500">{errors.price.message}</p>
             )}
           </div>
+
+          {/* Stock (only for products, not services) */}
+          {watch('type') === 'product' && (
+            <div className="space-y-2">
+              <Label htmlFor="stock">Stock Quantity</Label>
+              <Input
+                id="stock"
+                type="number"
+                step="1"
+                min="0"
+                {...register('stock', { valueAsNumber: true })}
+                value={watch('stock') ?? 0}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setValue('stock', val);
+                }}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Current available stock quantity
+              </p>
+              {errors.stock && (
+                <p className="text-sm text-red-500">{errors.stock.message}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

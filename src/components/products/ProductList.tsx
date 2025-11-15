@@ -138,8 +138,13 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                     <span className="text-sm">{product.gstRate}%</span>
                   </td>
                   <td className="p-3 text-center">
-                    {product.type === 'product' && product.stock !== undefined ? (
-                      <span className="text-sm">{product.stock}</span>
+                    {product.type === 'product' && typeof product.stock === 'number' ? (
+                      <Badge 
+                        variant={product.stock === 0 ? 'destructive' : product.stock < 10 ? 'secondary' : 'outline'}
+                        className={product.stock < 10 && product.stock > 0 ? 'bg-orange-100 text-orange-800 border-orange-300' : ''}
+                      >
+                        {product.stock} {product.unit}
+                      </Badge>
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
