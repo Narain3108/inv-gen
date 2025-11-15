@@ -83,23 +83,44 @@ export default function CompanySettingsPage() {
         // For now, we'll use the address state
       }
 
+      // Helper function to remove undefined values recursively
+      const removeUndefined = (obj: any): any => {
+        if (obj === null || obj === undefined) return undefined;
+        if (typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(removeUndefined);
+        
+        const cleaned: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            const cleanedValue = removeUndefined(value);
+            if (cleanedValue !== undefined) {
+              cleaned[key] = cleanedValue;
+            }
+          }
+        }
+        return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+      };
+
       const companyData = {
         ...data,
         state: state, // Store state for tax calculation
       };
 
+      // Remove undefined fields to prevent Firestore errors
+      const cleanedData = removeUndefined(companyData);
+
       if (editingCompany) {
         // Update existing company
-        console.log('Updating company:', editingCompany.id, companyData);
-        await updateDocument('companies', editingCompany.id, companyData);
-        updateCompanyInStore(editingCompany.id, companyData as Partial<Company>); // Update global store
+        console.log('Updating company:', editingCompany.id, cleanedData);
+        await updateDocument('companies', editingCompany.id, cleanedData);
+        updateCompanyInStore(editingCompany.id, cleanedData as Partial<Company>); // Update global store
         toast.success('Company updated successfully');
       } else {
         // Create new company
-        console.log('Creating new company:', companyData);
-        const id = await createDocument('companies', companyData);
+        console.log('Creating new company:', cleanedData);
+        const id = await createDocument('companies', cleanedData);
         console.log('Created company with ID:', id);
-        const newCompany = { id, ...companyData } as Company;
+        const newCompany = { id, ...cleanedData } as Company;
         addCompany(newCompany); // Add to global store
         
         // Set as selected if it's the first company
