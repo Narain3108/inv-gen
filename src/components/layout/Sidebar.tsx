@@ -40,6 +40,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
+    title: 'Clients',
+    href: '/invoices/clients',
+    icon: Users,
+  },
+  {
+    title: 'Products',
+    href: '/invoices/products',
+    icon: Package,
+  },
+  {
     title: 'Invoices',
     href: '/invoices/invoices',
     icon: FileText,
@@ -48,16 +58,6 @@ const navItems: NavItem[] = [
     title: 'Quotations',
     href: '/invoices/quotations',
     icon: FileCheck,
-  },
-  {
-    title: 'Products',
-    href: '/invoices/products',
-    icon: Package,
-  },
-  {
-    title: 'Clients',
-    href: '/invoices/clients',
-    icon: Users,
   },
   {
     title: 'Settings',

@@ -1,7 +1,10 @@
 /**
  * Firestore Helper Functions
  * 
- * Generic CRUD operations and query helpers for Firestore
+ * Generic CRUD operations and query helpers for Firestore with
+ * comprehensive error handling and type safety.
+ * 
+ * @module lib/firebase/firestore-helpers
  */
 
 import {
@@ -24,11 +27,18 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './config';
+import { handleFirebaseError, logError } from '@/lib/errors/error-handler';
 
 /**
  * Get a single document by ID
+ * 
+ * @template T - The type of document to retrieve
+ * @param collectionName - Firestore collection name
+ * @param docId - Document ID
+ * @returns The document data or null if not found
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getDocument<T>(
+export async function getDocument<T extends DocumentData>(
   collectionName: string,
   docId: string
 ): Promise<T | null> {
@@ -44,16 +54,24 @@ export async function getDocument<T>(
     }
 
     return null;
-  } catch (error) {
-    console.error(`Error getting document from ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `getDocument:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Get all documents from a collection
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param orderByField - Optional field to order by
+ * @param orderDirection - Order direction (asc/desc)
+ * @param maxResults - Maximum number of results
+ * @returns Array of documents
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getAllDocuments<T>(
+export async function getAllDocuments<T extends DocumentData>(
   collectionName: string,
   orderByField?: string,
   orderDirection: OrderByDirection = 'asc',
@@ -77,20 +95,31 @@ export async function getAllDocuments<T>(
       id: doc.id,
       ...doc.data(),
     })) as T[];
-  } catch (error) {
-    console.error(`Error getting documents from ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `getAllDocuments:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Get documents with a query filter
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param field - Field to filter by
+ * @param operator - Firestore where operator
+ * @param value - Value to filter by
+ * @param orderByField - Optional field to order by
+ * @param orderDirection - Order direction (asc/desc)
+ * @param maxResults - Maximum number of results
+ * @returns Array of filtered documents
+ * @throws {FirebaseError} If the operation fails
  */
-export async function queryDocuments<T>(
+export async function queryDocuments<T extends DocumentData>(
   collectionName: string,
   field: string,
   operator: WhereFilterOp,
-  value: any,
+  value: unknown,
   orderByField?: string,
   orderDirection: OrderByDirection = 'asc',
   maxResults?: number
@@ -113,14 +142,20 @@ export async function queryDocuments<T>(
       id: doc.id,
       ...doc.data(),
     })) as T[];
-  } catch (error) {
-    console.error(`Error querying documents from ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `queryDocuments:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Create a new document with auto-generated ID
+ * 
+ * @template T - The type of document to create
+ * @param collectionName - Firestore collection name
+ * @param data - Document data (without id, createdAt, updatedAt)
+ * @returns The generated document ID
+ * @throws {FirebaseError} If the operation fails
  */
 export async function createDocument<T extends DocumentData>(
   collectionName: string,
@@ -137,14 +172,21 @@ export async function createDocument<T extends DocumentData>(
     });
 
     return docRef.id;
-  } catch (error) {
-    console.error(`Error creating document in ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `createDocument:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Create or overwrite a document with specific ID
+ * 
+ * @template T - The type of document to set
+ * @param collectionName - Firestore collection name
+ * @param docId - Document ID
+ * @param data - Document data (without id, createdAt, updatedAt)
+ * @param merge - Whether to merge with existing data
+ * @throws {FirebaseError} If the operation fails
  */
 export async function setDocument<T extends DocumentData>(
   collectionName: string,
@@ -172,14 +214,20 @@ export async function setDocument<T extends DocumentData>(
         updatedAt: timestamp,
       });
     }
-  } catch (error) {
-    console.error(`Error setting document in ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `setDocument:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Update an existing document
+ * 
+ * @template T - The type of document to update
+ * @param collectionName - Firestore collection name
+ * @param docId - Document ID
+ * @param data - Partial document data to update
+ * @throws {FirebaseError} If the operation fails
  */
 export async function updateDocument<T extends DocumentData>(
   collectionName: string,
@@ -192,14 +240,18 @@ export async function updateDocument<T extends DocumentData>(
       ...data,
       updatedAt: serverTimestamp(),
     });
-  } catch (error) {
-    console.error(`Error updating document in ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `updateDocument:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Delete a document
+ * 
+ * @param collectionName - Firestore collection name
+ * @param docId - Document ID
+ * @throws {FirebaseError} If the operation fails
  */
 export async function deleteDocument(
   collectionName: string,
@@ -208,16 +260,24 @@ export async function deleteDocument(
   try {
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
-  } catch (error) {
-    console.error(`Error deleting document from ${collectionName}:`, error);
-    throw error;
+  } catch (error: any) {
+    logError(error, `deleteDocument:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Get all documents (no user filtering - shared public data)
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param userId - User ID (not used in shared public app)
+ * @param orderByField - Optional field to order by
+ * @param orderDirection - Order direction (asc/desc)
+ * @returns Array of documents
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getUserDocuments<T>(
+export async function getUserDocuments<T extends DocumentData>(
   collectionName: string,
   userId?: string,
   orderByField?: string,
@@ -229,8 +289,16 @@ export async function getUserDocuments<T>(
 
 /**
  * Get documents by company ID (for multi-company support)
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param companyId - Company ID to filter by
+ * @param orderByField - Optional field to order by
+ * @param orderDirection - Order direction (asc/desc)
+ * @returns Array of company documents
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getCompanyDocuments<T>(
+export async function getCompanyDocuments<T extends DocumentData>(
   collectionName: string,
   companyId: string,
   orderByField?: string,
@@ -248,8 +316,17 @@ export async function getCompanyDocuments<T>(
 
 /**
  * Get documents by companyId only (shared public app - no userId needed)
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param userId - User ID (ignored in shared public app)
+ * @param companyId - Company ID to filter by
+ * @param orderByField - Optional field to order by
+ * @param orderDirection - Order direction (asc/desc)
+ * @returns Array of company documents
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getUserCompanyDocuments<T>(
+export async function getUserCompanyDocuments<T extends DocumentData>(
   collectionName: string,
   userId: string | null,
   companyId: string,
@@ -262,6 +339,10 @@ export async function getUserCompanyDocuments<T>(
 
 /**
  * Check if a document exists
+ * 
+ * @param collectionName - Firestore collection name
+ * @param docId - Document ID
+ * @returns True if document exists, false otherwise
  */
 export async function documentExists(
   collectionName: string,
@@ -271,20 +352,26 @@ export async function documentExists(
     const docRef = doc(db, collectionName, docId);
     const docSnap = await getDoc(docRef);
     return docSnap.exists();
-  } catch (error) {
-    console.error(`Error checking document existence in ${collectionName}:`, error);
+  } catch (error: any) {
+    logError(error, `documentExists:${collectionName}`);
     return false;
   }
 }
 
 /**
  * Count documents in a collection (with optional filter)
+ * 
+ * @param collectionName - Firestore collection name
+ * @param field - Optional field to filter by
+ * @param operator - Firestore where operator
+ * @param value - Value to filter by
+ * @returns Number of documents
  */
 export async function countDocuments(
   collectionName: string,
   field?: string,
   operator?: WhereFilterOp,
-  value?: any
+  value?: unknown
 ): Promise<number> {
   try {
     const constraints: QueryConstraint[] = [];
@@ -297,48 +384,71 @@ export async function countDocuments(
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.size;
-  } catch (error) {
-    console.error(`Error counting documents in ${collectionName}:`, error);
+  } catch (error: any) {
+    logError(error, `countDocuments:${collectionName}`);
     return 0;
   }
 }
 
 /**
  * Batch get multiple documents by IDs
+ * 
+ * @template T - The type of documents to retrieve
+ * @param collectionName - Firestore collection name
+ * @param docIds - Array of document IDs
+ * @returns Array of documents (null values filtered out)
+ * @throws {FirebaseError} If the operation fails
  */
-export async function getMultipleDocuments<T>(
+export async function getMultipleDocuments<T extends DocumentData>(
   collectionName: string,
   docIds: string[]
 ): Promise<T[]> {
   try {
     const promises = docIds.map(id => getDocument<T>(collectionName, id));
     const results = await Promise.all(promises);
-    return results.filter(doc => doc !== null) as T[];
-  } catch (error) {
-    console.error(`Error getting multiple documents from ${collectionName}:`, error);
-    throw error;
+    return results.filter((doc): doc is T => doc !== null);
+  } catch (error: any) {
+    logError(error, `getMultipleDocuments:${collectionName}`);
+    throw handleFirebaseError(error);
   }
 }
 
 /**
  * Convert Firestore Timestamp to Date
+ * 
+ * @param timestamp - Firestore Timestamp or any date-like object
+ * @returns JavaScript Date object
  */
-export function timestampToDate(timestamp: Timestamp | any): Date {
+export function timestampToDate(timestamp: Timestamp | Date | { toDate(): Date } | number): Date {
   if (timestamp instanceof Timestamp) {
     return timestamp.toDate();
   }
-  if (timestamp?.toDate) {
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  if (typeof timestamp === 'object' && 'toDate' in timestamp) {
     return timestamp.toDate();
   }
-  return new Date(timestamp);
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp);
+  }
+  return new Date();
 }
 
 /**
  * Search documents by field containing text (case-insensitive)
- * Note: Firestore doesn't support full-text search natively
- * This is a basic implementation - consider using Algolia/Typesense for production
+ * 
+ * Note: Firestore doesn't support full-text search natively.
+ * This is a basic implementation - consider using Algolia/Typesense for production.
+ * 
+ * @template T - The type of documents to search
+ * @param collectionName - Firestore collection name
+ * @param field - Field to search in
+ * @param searchTerm - Search term
+ * @param userId - User ID (not used in shared public app)
+ * @returns Array of matching documents
  */
-export async function searchDocuments<T>(
+export async function searchDocuments<T extends DocumentData>(
   collectionName: string,
   field: string,
   searchTerm: string,
@@ -351,14 +461,14 @@ export async function searchDocuments<T>(
     // Client-side filtering (not ideal for large datasets)
     const searchLower = searchTerm.toLowerCase();
     return documents.filter(doc => {
-      const fieldValue = (doc as any)[field];
+      const fieldValue = (doc as Record<string, unknown>)[field];
       if (typeof fieldValue === 'string') {
         return fieldValue.toLowerCase().includes(searchLower);
       }
       return false;
     });
-  } catch (error) {
-    console.error(`Error searching documents in ${collectionName}:`, error);
+  } catch (error: any) {
+    logError(error, `searchDocuments:${collectionName}`);
     return [];
   }
 }

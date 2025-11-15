@@ -72,7 +72,7 @@ export default function LandingPage() {
                 Testimonials
               </Link>
               <Button 
-                onClick={() => router.push('/invoices')}
+                onClick={() => router.push('/invoices/clients')}
                 className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold"
               >
                 Get Started Free
@@ -115,7 +115,7 @@ export default function LandingPage() {
                   Testimonials
                 </Link>
                 <Button 
-                  onClick={() => router.push('/invoices')}
+                  onClick={() => router.push('/invoices/clients')}
                   className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 font-semibold"
                 >
                   Get Started Free
@@ -163,7 +163,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Button
                 size="lg"
-                onClick={() => router.push('/invoices')}
+                onClick={() => router.push('/invoices/clients')}
                 className="bg-gradient-to-r from-primary to-accent text-white shadow-xl shadow-primary/30 hover:shadow-2xl hover:scale-105 transition-all duration-200 font-semibold text-base px-8 py-6 group"
               >
                 Start Creating Now
@@ -485,7 +485,7 @@ export default function LandingPage() {
                   size="lg" 
                   variant="secondary" 
                   className="bg-white text-primary hover:bg-white/90 shadow-xl font-semibold text-base px-8 py-6 group"
-                  onClick={() => router.push('/invoices')}
+                  onClick={() => router.push('/invoices/clients')}
                 >
                   Get Started Now - It's Free
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />

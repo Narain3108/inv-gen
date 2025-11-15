@@ -40,7 +40,15 @@ export function InvoiceList({
   const [searchTerm, setSearchTerm] = useState('');
 
   const getClientName = (clientId: string) => {
+    // Safety check: if clients isn't loaded yet, show loading indicator
+    if (!clients || clients.length === 0) {
+      console.warn('⚠️ getClientName called but clients array is empty or undefined');
+      return 'Loading...';
+    }
     const client = clients.find(c => c.id === clientId);
+    if (!client) {
+      console.warn(`⚠️ Client not found for ID: ${clientId}. Available clients:`, clients.map(c => c.id));
+    }
     return client?.clientName || 'Unknown Client';
   };
 

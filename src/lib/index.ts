@@ -22,3 +22,10 @@ export * from './utils/number-to-words';
 // Constants & Validations
 export * from './constants';
 export * from './validations';
+
+// Services (NEW)
+export * from './services';
+
+// Error handling (NEW)
+export * from './errors/error-handler';
+export * from './errors/error-messages';

@@ -88,18 +88,39 @@ function InvoicesContent() {
   const loadData = React.useCallback(async () => {
     if (!selectedCompany) return;
 
+    console.log('🔄 Starting loadData for company:', selectedCompany.companyName);
     setLoading(true);
     try {
       // Set company
       setCompany(selectedCompany);
 
-      // Load invoices - Only filter by companyId (no orderBy to avoid index requirement)
-      const invoicesRef = collection(db, 'invoices');
-      const invoicesQuery = query(
-        invoicesRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const invoicesSnapshot = await getDocs(invoicesQuery);
+      // Load all data in parallel to avoid race conditions
+      console.log('📡 Fetching invoices, products, and clients in parallel...');
+      const [invoicesSnapshot, productsSnapshot, clientsSnapshot] = await Promise.all([
+        // Load invoices - Only filter by companyId
+        getDocs(
+          query(
+            collection(db, 'invoices'),
+            where('companyId', '==', selectedCompany.id)
+          )
+        ),
+        // Load products - Filter by companyId
+        getDocs(
+          query(
+            collection(db, 'products'),
+            where('companyId', '==', selectedCompany.id)
+          )
+        ),
+        // Load clients - Global (no company filtering)
+        getDocs(collection(db, 'clients')),
+      ]);
+
+      console.log('✅ Firestore queries completed');
+      console.log('📊 Invoices docs:', invoicesSnapshot.docs.length);
+      console.log('📦 Products docs:', productsSnapshot.docs.length);
+      console.log('👥 Clients docs:', clientsSnapshot.docs.length);
+
+      // Process invoices
       const invoicesData = invoicesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -110,29 +131,30 @@ function InvoicesContent() {
         const bTime = b.createdAt?.toMillis?.() || 0;
         return bTime - aTime;
       });
-      setInvoices(invoicesData);
 
-      // Load products - Filter by companyId
-      const productsRef = collection(db, 'products');
-      const productsQuery = query(
-        productsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const productsSnapshot = await getDocs(productsQuery);
+      // Process products
       const productsData = productsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Product[];
-      setProducts(productsData);
 
-      // Load clients - Global (no company filtering)
-      const clientsRef = collection(db, 'clients');
-      const clientsSnapshot = await getDocs(clientsRef);
+      // Process clients
       const clientsData = clientsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Client[];
+
+      console.log('✅ Processed data:');
+      console.log('  - Invoices:', invoicesData.length);
+      console.log('  - Products:', productsData.length);
+      console.log('  - Clients:', clientsData.length, clientsData.map(c => ({ id: c.id, name: c.clientName })));
+
+      // Set all state together after all data is loaded
+      setInvoices(invoicesData);
+      setProducts(productsData);
       setClients(clientsData);
+      
+      console.log('✅ All state updated successfully');
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -256,12 +278,24 @@ function InvoicesContent() {
     generateInvoicePDF(pdfData as any);
   };
 
-  if (loading) {
+  if (loading || !initialized) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
           <p className="mt-4 text-sm text-muted-foreground">Loading invoices...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render until we have clients data loaded (even if empty array)
+  if (clients === undefined) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="mt-4 text-sm text-muted-foreground">Loading client data...</p>
         </div>
       </div>
     );

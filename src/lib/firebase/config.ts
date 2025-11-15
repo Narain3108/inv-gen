@@ -1,15 +1,20 @@
 /**
  * Firebase Configuration
  * 
- * This file initializes Firebase services (Auth, Firestore, Storage)
- * using environment variables from .env.local
+ * Initializes Firebase services (Auth, Firestore, Storage)
+ * using environment variables with proper error handling.
+ * 
+ * @module lib/firebase/config
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { logError } from '@/lib/errors/error-handler';
 
-// Firebase configuration object from environment variables
+/**
+ * Firebase configuration from environment variables
+ */
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -19,6 +24,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+/**
+ * Validate Firebase configuration
+ */
+function validateFirebaseConfig(): void {
+  const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'];
+  const missingKeys = requiredKeys.filter(key => !firebaseConfig[key as keyof typeof firebaseConfig]);
+  
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `Missing Firebase configuration: ${missingKeys.join(', ')}. ` +
+      'Please check your environment variables.'
+    );
+  }
+}
+
+// Validate configuration before initialization
+validateFirebaseConfig();
 
 // Initialize Firebase (singleton pattern to prevent multiple initializations)
 let app: FirebaseApp;
@@ -30,13 +53,21 @@ if (!getApps().length) {
   auth = getAuth(app);
   db = getFirestore(app);
   
-  // Enable offline persistence
+  // Enable offline persistence (client-side only)
   if (typeof window !== 'undefined') {
-    enableIndexedDbPersistence(db).catch((err) => {
-      if (err.code === 'failed-precondition') {
-        console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-      } else if (err.code === 'unimplemented') {
-        console.warn('The current browser does not support persistence.');
+    enableIndexedDbPersistence(db).catch((error) => {
+      if (error.code === 'failed-precondition') {
+        logError(
+          new Error('Multiple tabs open. Persistence can only be enabled in one tab at a time.'),
+          'Firebase Persistence'
+        );
+      } else if (error.code === 'unimplemented') {
+        logError(
+          new Error('The current browser does not support persistence.'),
+          'Firebase Persistence'
+        );
+      } else {
+        logError(error, 'Firebase Persistence');
       }
     });
   }
