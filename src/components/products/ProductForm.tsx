@@ -281,30 +281,6 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
         </CardContent>
       </Card>
 
-      {/* Stock Information (Only for Products) */}
-      {productType === 'product' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Information</CardTitle>
-            <CardDescription>Inventory and stock management</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Current Stock */}
-            <div className="space-y-2">
-              <Label htmlFor="stock">Current Stock</Label>
-              <Input
-                id="stock"
-                type="number"
-                {...register('stock', { valueAsNumber: true })}
-                placeholder="0"
-              />
-              {errors.stock && (
-                <p className="text-sm text-red-500">{errors.stock.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Form Actions */}
       <div className="flex justify-end gap-4">

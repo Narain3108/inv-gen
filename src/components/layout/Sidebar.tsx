@@ -40,7 +40,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     title: 'Invoices',
-    href: '/invoices',
+    href: '/invoices/invoices',
     icon: FileText,
   },
   {

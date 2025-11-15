@@ -16,14 +16,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, Building2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { z } from 'zod';
-import { useCompanies } from '@/hooks/useCompanies';
-import { useCompany } from '@/hooks/useCompany';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -48,12 +46,6 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const { companies, loadCompanies } = useCompanies();
-  const { selectedCompany, setSelectedCompany } = useCompany();
-
-  useEffect(() => {
-    loadCompanies();
-  }, [loadCompanies]);
 
   const {
     register,
@@ -227,66 +219,14 @@ export function InvoiceForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* Company Selection */}
-      <Card className="border-primary/50 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Select Company
-          </CardTitle>
-          <CardDescription>Choose which company this invoice is for</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="company">Company *</Label>
-            <Select
-              value={selectedCompany?.id || ''}
-              onValueChange={(value) => {
-                const company = companies.find((c) => c.id === value);
-                if (company) setSelectedCompany(company);
-              }}
-            >
-              <SelectTrigger className="bg-background">
-                <SelectValue placeholder="Select your company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No companies found
-                  </SelectItem>
-                ) : (
-                  companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        {company.name}
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {!selectedCompany && (
-              <p className="text-sm text-muted-foreground">
-                Please select a company or{' '}
-                <a href="/invoices/settings/company" className="text-primary underline">
-                  create one
-                </a>
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-2">
       {/* Invoice Details */}
       <Card>
-        <CardHeader>
-          <CardTitle>Invoice Details</CardTitle>
-          <CardDescription>Basic invoice information</CardDescription>
+        <CardHeader className="pb-2 pt-3">
+          <CardTitle className="text-base">Invoice Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <CardContent className="space-y-2 pb-3">
+          <div className="grid grid-cols-2 gap-3">
             {/* Invoice Number */}
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number *</Label>
@@ -343,21 +283,21 @@ export function InvoiceForm({
 
       {/* Invoice Items */}
       <Card>
-        <CardHeader>
-          <CardTitle>Invoice Items</CardTitle>
-          <CardDescription>Add products/services to the invoice</CardDescription>
+        <CardHeader className="pb-2 pt-3">
+          <CardTitle className="text-base">Invoice Items</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
+        <CardContent className="space-y-2 pb-3">
+          {/* Desktop View - Hidden on Mobile */}
+          <div className="hidden lg:block">
             <table className="w-full">
               <thead className="border-b">
                 <tr className="text-sm text-muted-foreground">
                   <th className="p-2 text-left">Product/Service</th>
-                  <th className="p-2 text-center w-24">Qty</th>
-                  <th className="p-2 text-right w-32">Price</th>
-                  <th className="p-2 text-center w-24">Disc %</th>
-                  <th className="p-2 text-right w-32">Amount</th>
-                  <th className="p-2 w-12"></th>
+                  <th className="p-2 text-center w-32">Quantity</th>
+                  <th className="p-2 text-right w-36">Unit Price</th>
+                  <th className="p-2 text-center w-32">Discount %</th>
+                  <th className="p-2 text-right w-36">Amount</th>
+                  <th className="p-2 w-16"></th>
                 </tr>
               </thead>
               <tbody>
@@ -398,11 +338,11 @@ export function InvoiceForm({
                             const val = parseInt(e.target.value) || 1;
                             setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
                           }}
-                          className="text-center"
+                          className="text-center w-full text-base font-medium"
                         />
                       </td>
                       <td className="p-2 text-right">
-                        {formatCurrency(unitPrice)}
+                        <div className="font-medium text-base">{formatCurrency(unitPrice)}</div>
                       </td>
                       <td className="p-2">
                         <Input
@@ -415,10 +355,10 @@ export function InvoiceForm({
                             const val = parseFloat(e.target.value) || 0;
                             setValue(`items.${index}.discount`, val, { shouldValidate: true, shouldDirty: true });
                           }}
-                          className="text-center"
+                          className="text-center w-full text-base font-medium"
                         />
                       </td>
-                      <td className="p-2 text-right font-medium">
+                      <td className="p-2 text-right font-medium text-base">
                         {formatCurrency(amount)}
                       </td>
                       <td className="p-2">
@@ -439,6 +379,106 @@ export function InvoiceForm({
             </table>
           </div>
 
+          {/* Mobile View - Card Layout */}
+          <div className="space-y-4 lg:hidden">
+            {fields.map((field, index) => {
+              const item = watchItems?.[index];
+              const product = item?.productId ? products.find(p => p.id === item.productId) : null;
+              const quantity = Number(item?.quantity) || 0;
+              const unitPrice = Number(item?.unitPrice) || 0;
+              const discount = Number(item?.discount) || 0;
+              const amount = quantity * unitPrice * (1 - discount / 100);
+
+              return (
+                <Card key={field.id} className="relative">
+                  <CardContent className="pt-6 space-y-4">
+                    {/* Delete Button - Top Right */}
+                    <div className="absolute top-2 right-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        disabled={fields.length <= 1}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+
+                    {/* Product Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Product/Service</Label>
+                      <Select
+                        value={item?.productId || ''}
+                        onValueChange={(value) => handleProductSelect(index, value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.productName} ({product.hsn})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Quantity and Unit Price Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Quantity</Label>
+                        <Input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={item?.quantity || 1}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1;
+                            setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          className="text-center text-lg font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Unit Price</Label>
+                        <div className="h-10 flex items-center justify-center border rounded-md bg-muted px-3">
+                          <span className="font-semibold text-lg">{formatCurrency(unitPrice)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Discount and Amount Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Discount %</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={item?.discount || 0}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setValue(`items.${index}.discount`, val, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          className="text-center text-lg font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Amount</Label>
+                        <div className="h-10 flex items-center justify-center border rounded-md bg-primary/5 px-3">
+                          <span className="font-bold text-lg text-primary">{formatCurrency(amount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
           <Button
             type="button"
             variant="outline"
@@ -454,13 +494,13 @@ export function InvoiceForm({
       {/* Tax Summary */}
       {totals && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calculator className="h-4 w-4" />
               Summary
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Taxable Amount:</span>
@@ -495,36 +535,38 @@ export function InvoiceForm({
 
       {/* Payment & Notes */}
       <Card>
-        <CardHeader>
-          <CardTitle>Additional Information</CardTitle>
+        <CardHeader className="pb-2 pt-3">
+          <CardTitle className="text-base">Additional Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              {...register('notes')}
-              placeholder="Any additional notes or instructions"
-              rows={2}
-            />
-          </div>
+        <CardContent className="space-y-2 pb-3">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                {...register('notes')}
+                placeholder="Any additional notes"
+                rows={2}
+              />
+            </div>
 
-          {/* Terms */}
-          <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
-            <Textarea
-              id="terms"
-              {...register('terms')}
-              placeholder="Payment terms, delivery terms, etc."
-              rows={3}
-            />
+            {/* Terms */}
+            <div className="space-y-2">
+              <Label htmlFor="terms">Terms & Conditions</Label>
+              <Textarea
+                id="terms"
+                {...register('terms')}
+                placeholder="Payment terms, etc."
+                rows={2}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-4">
+      <div className="flex justify-end gap-3 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
