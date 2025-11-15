@@ -16,6 +16,7 @@ import {
   Settings,
   Building2,
   ChevronDown,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +43,11 @@ const navItems: NavItem[] = [
     title: 'Invoices',
     href: '/invoices/invoices',
     icon: FileText,
+  },
+  {
+    title: 'Quotations',
+    href: '/invoices/quotations',
+    icon: FileCheck,
   },
   {
     title: 'Products',

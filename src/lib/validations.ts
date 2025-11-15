@@ -112,6 +112,20 @@ export const invoiceFormSchema = z.object({
   })).min(1, 'At least one item is required'),
 });
 
+// ==================== Quotation Schema ====================
+
+export const quotationFormSchema = z.object({
+  clientId: z.string().min(1, 'Client is required'),
+  date: z.string().min(1, 'Quotation date is required'),
+  validUntil: z.string().min(1, 'Valid until date is required'),
+  items: z.array(z.object({
+    productId: z.string().min(1, 'Please select a product'),
+    quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
+    unitPrice: z.number().min(0, 'Price must be a positive number'),
+    discount: z.number().min(0).max(100).optional().default(0),
+  })).min(1, 'At least one item is required'),
+});
+
 // ==================== Login Schema ====================
 
 export const loginSchema = z.object({
@@ -137,5 +151,6 @@ export type CompanyFormValues = z.infer<typeof companyFormSchema>;
 export type ProductFormValues = z.infer<typeof productFormSchema>;
 export type ClientFormValues = z.infer<typeof clientFormSchema>;
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
+export type QuotationFormValues = z.infer<typeof quotationFormSchema>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;

@@ -187,6 +187,42 @@ export interface InvoiceFormData {
   paymentMode?: PaymentMode;
 }
 
+// ==================== Quotation Types ====================
+
+export type QuotationStatus = 
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'converted'
+  | 'expired';
+
+export interface Quotation {
+  id: string;
+  quotationNumber: string;
+  companyId: string;
+  clientId: string;
+  date: Timestamp;
+  validUntil: Timestamp; // Validity period for quotation
+  status: QuotationStatus;
+  items: InvoiceItem[]; // Same structure as invoice items
+  totalAmount: number;
+  totalAmountInWords: string;
+  taxableAmount: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  convertedToInvoiceId?: string; // Reference to invoice if converted
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface QuotationFormData {
+  clientId: string;
+  date: Date;
+  validUntil: Date;
+  items: InvoiceItem[];
+}
+
 // ==================== Enums & Constants ====================
 
 export type PaymentMode = 
