@@ -84,6 +84,7 @@ export interface Product {
   companyId: string;
   productName: string;
   description?: string;
+  itemCode?: string; // Optional 5-digit auto-generated item code
   hsn: string; // HSN for goods, SAC for services
   unit: string; // Nos, Kgs, Liters, Hours, etc.
   price: number;
@@ -99,6 +100,7 @@ export interface Product {
 export interface ProductFormData {
   productName: string;
   description?: string;
+  itemCode?: string;
   hsn: string;
   unit: string;
   price: number;
@@ -142,6 +144,7 @@ export interface ClientFormData {
 
 export interface InvoiceItem {
   productId?: string;
+  itemCode?: string; // Optional item code from product
   description: string;
   hsn: string;
   quantity: number;

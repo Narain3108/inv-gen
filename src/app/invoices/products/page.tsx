@@ -44,10 +44,16 @@ function ProductsContent() {
     if (!selectedCompany) return;
 
     try {
-      const productData = {
+      // Filter out undefined values to avoid Firebase errors
+      const productData: any = {
         ...data,
         companyId: selectedCompany.id,
       };
+
+      // Remove itemCode if it's empty or undefined
+      if (!productData.itemCode || productData.itemCode.trim() === '') {
+        delete productData.itemCode;
+      }
 
       if (editingProduct) {
         // Update existing product

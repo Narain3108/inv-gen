@@ -165,8 +165,19 @@ function InvoicesContent() {
     if (!selectedCompany) return;
 
     try {
+      // Clean up invoice items to remove undefined values
+      const cleanedItems = data.items.map((item: any) => {
+        const cleanItem = { ...item };
+        // Remove itemCode if it's undefined or empty
+        if (!cleanItem.itemCode) {
+          delete cleanItem.itemCode;
+        }
+        return cleanItem;
+      });
+
       const invoiceData = {
         ...data,
+        items: cleanedItems,
         companyId: selectedCompany.id,
         date: Timestamp.fromDate(new Date(data.date)),
         totalAmountInWords: amountToWords(data.totalAmount),

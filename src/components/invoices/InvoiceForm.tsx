@@ -174,6 +174,11 @@ export function InvoiceForm({
         lineTotal,
       };
 
+      // Only add itemCode if product has one
+      if (product.itemCode) {
+        invoiceItem.itemCode = product.itemCode;
+      }
+
       // Only add serialNumbers if product has serial numbers
       if (product.hasSerialNumber && serialNumbers[validItems.indexOf(item)]) {
         invoiceItem.serialNumbers = serialNumbers[validItems.indexOf(item)];
@@ -343,6 +348,7 @@ export function InvoiceForm({
               <thead className="border-b">
                 <tr className="text-sm text-muted-foreground">
                   <th className="p-2 text-left">Product/Service</th>
+                  <th className="p-2 text-center w-24">Item Code</th>
                   <th className="p-2 text-center w-32">Quantity</th>
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
@@ -385,6 +391,15 @@ export function InvoiceForm({
                             })}
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="p-2 text-center">
+                        {product?.itemCode ? (
+                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                            {product.itemCode}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="p-2">
                         <Input
@@ -451,7 +466,7 @@ export function InvoiceForm({
                     {/* Serial Numbers Row (if product requires serial numbers) */}
                     {product?.hasSerialNumber && (
                       <tr>
-                        <td colSpan={8} className="p-3 bg-blue-50 border-t-2 border-blue-200">
+                        <td colSpan={9} className="p-3 bg-blue-50 border-t-2 border-blue-200">
                           <div className="space-y-3">
                             <Label className="text-sm font-semibold text-blue-900">
                               Serial Numbers for {product.productName} ({quantity} required)

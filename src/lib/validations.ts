@@ -57,6 +57,7 @@ export const companyFormSchema = z.object({
 export const productFormSchema = z.object({
   productName: z.string().min(2, 'Product/Service name is required').max(200),
   description: z.string().max(500).optional(),
+  itemCode: z.string().length(5, 'Item code must be exactly 5 digits').regex(/^\d{5}$/, 'Item code must contain only digits').optional().or(z.literal('')),
   hsn: z.string().min(4, 'HSN/SAC code is required (min 4 digits)').max(8),
   unit: z.string().min(1, 'Unit is required'),
   price: z.number().min(0, 'Price must be positive'),

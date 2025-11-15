@@ -156,7 +156,7 @@ export function QuotationForm({
       totalIgst += igst;
       totalCess += cess;
 
-      return {
+      const quotationItem: any = {
         productId: product.id,
         description: product.productName,
         hsn: product.hsn,
@@ -173,6 +173,13 @@ export function QuotationForm({
         cess,
         lineTotal,
       };
+
+      // Only add itemCode if product has one
+      if (product.itemCode) {
+        quotationItem.itemCode = product.itemCode;
+      }
+
+      return quotationItem;
     }).filter(Boolean) as InvoiceItem[];
 
     const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
@@ -295,6 +302,7 @@ export function QuotationForm({
               <thead className="border-b">
                 <tr className="text-sm text-muted-foreground">
                   <th className="p-2 text-left">Product/Service</th>
+                  <th className="p-2 text-center w-24">Item Code</th>
                   <th className="p-2 text-center w-32">Quantity</th>
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
@@ -329,6 +337,15 @@ export function QuotationForm({
                             ))}
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="p-2 text-center">
+                        {product?.itemCode ? (
+                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                            {product.itemCode}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="p-2">
                         <Input

@@ -193,8 +193,19 @@ function QuotationsContent() {
     try {
       const quotationNumber = editingQuotation?.quotationNumber || await generateQuotationNumber();
       
+      // Clean up quotation items to remove undefined values
+      const cleanedItems = data.items.map((item: any) => {
+        const cleanItem = { ...item };
+        // Remove itemCode if it's undefined or empty
+        if (!cleanItem.itemCode) {
+          delete cleanItem.itemCode;
+        }
+        return cleanItem;
+      });
+
       const quotationData = {
         ...data,
+        items: cleanedItems,
         quotationNumber,
         companyId: selectedCompany.id,
         status: editingQuotation?.status || 'pending' as QuotationStatus,

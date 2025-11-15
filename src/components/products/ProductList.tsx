@@ -98,6 +98,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
             <thead className="border-b bg-muted/50">
               <tr>
                 <th className="p-3 text-left text-sm font-medium">Name</th>
+                <th className="p-3 text-left text-sm font-medium">Item Code</th>
                 <th className="p-3 text-left text-sm font-medium">Type</th>
                 <th className="p-3 text-left text-sm font-medium">HSN/SAC</th>
                 <th className="p-3 text-left text-sm font-medium">Unit</th>
@@ -119,6 +120,15 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                         </p>
                       )}
                     </div>
+                  </td>
+                  <td className="p-3">
+                    {product.itemCode ? (
+                      <span className="font-mono text-sm font-medium bg-muted px-2 py-1 rounded">
+                        {product.itemCode}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <Badge variant={product.type === 'product' ? 'default' : 'secondary'}>

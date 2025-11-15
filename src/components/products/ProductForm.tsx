@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
 import { fetchHSNDetails } from '@/lib/api/gst-api';
@@ -35,6 +35,12 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingHSN, setIsFetchingHSN] = useState(false);
 
+  // Function to generate 5-digit item code
+  const generateItemCode = () => {
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    return code;
+  };
+
   const {
     register,
     handleSubmit,
@@ -46,6 +52,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
     defaultValues: product ? {
       productName: product.productName,
       description: product.description,
+      itemCode: product.itemCode,
       hsn: product.hsn,
       type: product.type,
       unit: product.unit,
@@ -66,6 +73,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
 
   const hsn = watch('hsn');
   const productType = watch('type');
+  const itemCode = watch('itemCode');
 
   // Auto-fetch HSN details
   const handleFetchHSN = async () => {
@@ -206,6 +214,35 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
             />
             {errors.productName && (
               <p className="text-sm text-red-500">{errors.productName.message}</p>
+            )}
+          </div>
+
+          {/* Item Code (Optional) */}
+          <div className="space-y-2">
+            <Label htmlFor="itemCode">Item Code (Optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="itemCode"
+                {...register('itemCode')}
+                placeholder="e.g., 12345"
+                maxLength={5}
+                value={itemCode || ''}
+                onChange={(e) => setValue('itemCode', e.target.value || '')}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setValue('itemCode', generateItemCode())}
+                title="Generate random 5-digit code"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Optional 5-digit product identification code. Click the refresh button to auto-generate.
+            </p>
+            {errors.itemCode && (
+              <p className="text-sm text-red-500">{errors.itemCode.message}</p>
             )}
           </div>
 

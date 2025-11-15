@@ -127,11 +127,12 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
       {
         table: {
           headerRows: 1,
-          widths: ['*', 40, 30, 50, 40, 40, 40, 60],
+          widths: ['*', 45, 40, 30, 50, 40, 40, 40, 60],
           body: [
             // Header
             [
               { text: 'Description', style: 'tableHeader' },
+              { text: 'Item Code', style: 'tableHeader' },
               { text: 'HSN', style: 'tableHeader' },
               { text: 'Qty', style: 'tableHeader' },
               { text: 'Rate', style: 'tableHeader' },
@@ -151,6 +152,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
                   )
                 ],
               },
+              { text: item.itemCode || '—', fontSize: 8, alignment: 'center', color: item.itemCode ? '#000000' : '#9ca3af' },
               { text: item.hsn, fontSize: 9, alignment: 'center' },
               { text: `${item.quantity} ${item.unit}`, fontSize: 9, alignment: 'center' },
               { text: formatCurrency(item.unitPrice), fontSize: 9, alignment: 'right' },
@@ -758,11 +760,12 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
       {
         table: {
           headerRows: 1,
-          widths: ['*', 40, 30, 50, 40, 40, 40, 60],
+          widths: ['*', 45, 40, 30, 50, 40, 40, 40, 60],
           body: [
             // Header
             [
               { text: 'Description', style: 'tableHeader' },
+              { text: 'Item Code', style: 'tableHeader' },
               { text: 'HSN', style: 'tableHeader' },
               { text: 'Qty', style: 'tableHeader' },
               { text: 'Rate', style: 'tableHeader' },
@@ -782,6 +785,7 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
                   )
                 ],
               },
+              { text: item.itemCode || '—', fontSize: 8, alignment: 'center', color: item.itemCode ? '#000000' : '#9ca3af' },
               { text: item.hsn, fontSize: 9, alignment: 'center' },
               { text: `${item.quantity} ${item.unit}`, fontSize: 9, alignment: 'center' },
               { text: formatCurrency(item.unitPrice), fontSize: 9, alignment: 'right' },
