@@ -88,7 +88,6 @@ function InvoicesContent() {
   const loadData = React.useCallback(async () => {
     if (!selectedCompany) return;
 
-    console.log('🔄 Starting loadData for company:', selectedCompany.companyName);
     setLoading(true);
     try {
       // Set company

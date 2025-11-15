@@ -91,6 +91,7 @@ export interface Product {
   cessRate?: number;
   stock?: number;
   type: 'product' | 'service';
+  hasSerialNumber?: boolean; // Whether this product requires serial numbers
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -105,6 +106,7 @@ export interface ProductFormData {
   cessRate?: number;
   stock?: number;
   type: 'product' | 'service';
+  hasSerialNumber?: boolean;
 }
 
 // ==================== Client Types ====================
@@ -153,6 +155,7 @@ export interface InvoiceItem {
   igst: number;
   cess?: number;
   lineTotal: number;
+  serialNumbers?: string[]; // Serial numbers for products that require them
 }
 
 export interface TaxBreakdown {

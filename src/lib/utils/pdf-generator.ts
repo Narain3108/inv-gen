@@ -142,7 +142,15 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
             ],
             // Items
             ...invoice.items.map((item) => [
-              { text: item.description, fontSize: 9 },
+              { 
+                text: [
+                  { text: item.description, fontSize: 9 },
+                  ...(item.serialNumbers && item.serialNumbers.length > 0 
+                    ? [{ text: `\nSerial Nos: ${item.serialNumbers.join(', ')}`, fontSize: 8, color: '#1e40af', italics: true }] 
+                    : []
+                  )
+                ],
+              },
               { text: item.hsn, fontSize: 9, alignment: 'center' },
               { text: `${item.quantity} ${item.unit}`, fontSize: 9, alignment: 'center' },
               { text: formatCurrency(item.unitPrice), fontSize: 9, alignment: 'right' },
@@ -436,7 +444,15 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
             ],
             // Items
             ...invoice.items.map((item) => [
-              { text: item.description, fontSize: 9 },
+              { 
+                text: [
+                  { text: item.description, fontSize: 9 },
+                  ...(item.serialNumbers && item.serialNumbers.length > 0 
+                    ? [{ text: `\nSerial Nos: ${item.serialNumbers.join(', ')}`, fontSize: 8, color: '#1e40af', italics: true }] 
+                    : []
+                  )
+                ],
+              },
               { text: item.hsn, fontSize: 9, alignment: 'center' },
               { text: item.quantity.toString(), fontSize: 9, alignment: 'center' },
               { text: formatCurrency(item.unitPrice), fontSize: 9, alignment: 'right' },
@@ -757,7 +773,15 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
             ],
             // Items
             ...quotation.items.map((item) => [
-              { text: item.description, fontSize: 9 },
+              { 
+                text: [
+                  { text: item.description, fontSize: 9 },
+                  ...(item.serialNumbers && item.serialNumbers.length > 0 
+                    ? [{ text: `\nSerial Nos: ${item.serialNumbers.join(', ')}`, fontSize: 8, color: '#1e40af', italics: true }] 
+                    : []
+                  )
+                ],
+              },
               { text: item.hsn, fontSize: 9, alignment: 'center' },
               { text: `${item.quantity} ${item.unit}`, fontSize: 9, alignment: 'center' },
               { text: formatCurrency(item.unitPrice), fontSize: 9, alignment: 'right' },

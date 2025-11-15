@@ -53,12 +53,14 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
       gstRate: product.gstRate,
       cessRate: product.cessRate,
       stock: product.stock,
+      hasSerialNumber: product.hasSerialNumber || false,
     } : {
       type: 'product',
       unit: 'Nos',
       gstRate: 18,
       cessRate: 0,
       stock: 0,
+      hasSerialNumber: false,
     } as any,
   });
 
@@ -129,6 +131,36 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
             {errors.type && (
               <p className="text-sm text-red-500">{errors.type.message}</p>
             )}
+          </div>
+
+          {/* Serial Number Toggle */}
+          <div className="space-y-2">
+            <Label>Requires Serial Number? *</Label>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="yes"
+                  checked={watch('hasSerialNumber') === true}
+                  onChange={() => setValue('hasSerialNumber', true)}
+                  className="w-4 h-4 text-primary focus:ring-primary focus:ring-2"
+                />
+                <span className="text-sm font-medium">Yes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="no"
+                  checked={watch('hasSerialNumber') === false}
+                  onChange={() => setValue('hasSerialNumber', false)}
+                  className="w-4 h-4 text-primary focus:ring-primary focus:ring-2"
+                />
+                <span className="text-sm font-medium">No</span>
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enable this if each unit of this product has a unique serial number
+            </p>
           </div>
 
           {/* HSN/SAC Code */}

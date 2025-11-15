@@ -64,6 +64,7 @@ export const productFormSchema = z.object({
   cessRate: z.number().min(0).max(100).optional(),
   stock: z.number().min(0).optional(),
   type: z.enum(['product', 'service']),
+  hasSerialNumber: z.boolean().optional(),
 });
 
 // ==================== Client Schema ====================

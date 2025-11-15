@@ -46,6 +46,8 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [serialNumbers, setSerialNumbers] = useState<Record<number, string[]>>({});
+  const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
 
   const {
     register,
@@ -170,6 +172,7 @@ export function InvoiceForm({
         igst,
         cess,
         lineTotal,
+        serialNumbers: product.hasSerialNumber ? serialNumbers[validItems.indexOf(item)] : undefined,
       };
     }).filter(Boolean) as InvoiceItem[];
 
@@ -192,6 +195,33 @@ export function InvoiceForm({
   const handleFormSubmit = async (data: InvoiceFormData) => {
     if (!totals || totals.items.length === 0) {
       toast.error('Please add valid items to the invoice');
+      return;
+    }
+
+    // Validate serial numbers for products that require them
+    let hasSerialNumberError = false;
+    const newErrors: Record<number, string> = {};
+    
+    watchItems.forEach((item: any, index: number) => {
+      const product = products.find(p => p.id === item.productId);
+      if (product?.hasSerialNumber) {
+        const itemSerialNumbers = serialNumbers[index] || [];
+        const quantity = Number(item.quantity) || 0;
+        
+        if (itemSerialNumbers.length !== quantity) {
+          newErrors[index] = `Please enter ${quantity} serial number(s) for ${product.productName}`;
+          hasSerialNumberError = true;
+        } else if (itemSerialNumbers.some(sn => !sn || sn.trim() === '')) {
+          newErrors[index] = `Serial numbers cannot be empty`;
+          hasSerialNumberError = true;
+        }
+      }
+    });
+    
+    setSerialNumberErrors(newErrors);
+    
+    if (hasSerialNumberError) {
+      toast.error('Please fill in all required serial numbers');
       return;
     }
 
@@ -307,7 +337,8 @@ export function InvoiceForm({
                   const amount = quantity * unitPrice * (1 - discount / 100);
 
                   return (
-                    <tr key={field.id} className="border-b">
+                    <React.Fragment key={field.id}>
+                    <tr className="border-b">
                       <td className="p-2">
                         <Select
                           value={item?.productId || ''}
@@ -338,8 +369,19 @@ export function InvoiceForm({
                           className="text-center w-full text-base font-medium"
                         />
                       </td>
-                      <td className="p-2 text-right">
-                        <div className="font-medium text-base">{formatCurrency(unitPrice)}</div>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item?.unitPrice || 0}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setValue(`items.${index}.unitPrice`, val, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          className="text-right w-full text-base font-medium"
+                          placeholder="0.00"
+                        />
                       </td>
                       <td className="p-2">
                         <Input
@@ -370,8 +412,53 @@ export function InvoiceForm({
                         </Button>
                       </td>
                     </tr>
-                  );
-                })}
+                    {/* Serial Numbers Row (if product requires serial numbers) */}
+                    {product?.hasSerialNumber && (
+                      <tr>
+                        <td colSpan={8} className="p-3 bg-blue-50 border-t-2 border-blue-200">
+                          <div className="space-y-3">
+                            <Label className="text-sm font-semibold text-blue-900">
+                              Serial Numbers for {product.productName} ({quantity} required)
+                            </Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                              {Array.from({ length: quantity }, (_, i) => {
+                                const currentSerialNumbers = serialNumbers[index] || [];
+                                return (
+                                  <div key={i} className="space-y-1">
+                                    <Label className="text-xs text-blue-800">Serial #{i + 1}</Label>
+                                    <Input
+                                      type="text"
+                                      placeholder={`SN${String(i + 1).padStart(3, '0')}`}
+                                      value={currentSerialNumbers[i] || ''}
+                                      onChange={(e) => {
+                                        const newSerialNumbers = [...(serialNumbers[index] || Array(quantity).fill(''))];
+                                        newSerialNumbers[i] = e.target.value;
+                                        setSerialNumbers(prev => ({ ...prev, [index]: newSerialNumbers }));
+                                        setSerialNumberErrors(prev => {
+                                          const newErrors = { ...prev };
+                                          delete newErrors[index];
+                                          return newErrors;
+                                        });
+                                      }}
+                                      className="text-sm"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {serialNumberErrors[index] && (
+                              <p className="text-sm text-red-600 font-medium">{serialNumberErrors[index]}</p>
+                            )}
+                            <p className="text-xs text-blue-700">
+                              Filled: {(serialNumbers[index] || []).filter(sn => sn && sn.trim()).length} / {quantity}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
               </tbody>
             </table>
           </div>
@@ -440,9 +527,18 @@ export function InvoiceForm({
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Unit Price</Label>
-                        <div className="h-10 flex items-center justify-center border rounded-md bg-muted px-3">
-                          <span className="font-semibold text-lg">{formatCurrency(unitPrice)}</span>
-                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item?.unitPrice || 0}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setValue(`items.${index}.unitPrice`, val, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          className="text-right text-lg font-semibold"
+                          placeholder="0.00"
+                        />
                       </div>
                     </div>
 
@@ -470,6 +566,47 @@ export function InvoiceForm({
                         </div>
                       </div>
                     </div>
+
+                    {/* Serial Numbers Section (if product requires serial numbers) */}
+                    {product?.hasSerialNumber && (
+                      <div className="space-y-3 pt-3 border-t-2 border-blue-200 bg-blue-50 -mx-6 px-6 pb-4 mt-4">
+                        <Label className="text-sm font-semibold text-blue-900">
+                          Serial Numbers for {product.productName} ({quantity} required)
+                        </Label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {Array.from({ length: quantity }, (_, i) => {
+                            const currentSerialNumbers = serialNumbers[index] || [];
+                            return (
+                              <div key={i} className="space-y-1">
+                                <Label className="text-xs text-blue-800">Serial Number #{i + 1}</Label>
+                                <Input
+                                  type="text"
+                                  placeholder={`Enter serial number ${i + 1}`}
+                                  value={currentSerialNumbers[i] || ''}
+                                  onChange={(e) => {
+                                    const newSerialNumbers = [...(serialNumbers[index] || Array(quantity).fill(''))];
+                                    newSerialNumbers[i] = e.target.value;
+                                    setSerialNumbers(prev => ({ ...prev, [index]: newSerialNumbers }));
+                                    setSerialNumberErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[index];
+                                      return newErrors;
+                                    });
+                                  }}
+                                  className="text-base"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {serialNumberErrors[index] && (
+                          <p className="text-sm text-red-600 font-medium">{serialNumberErrors[index]}</p>
+                        )}
+                        <p className="text-xs text-blue-700 font-medium">
+                          Filled: {(serialNumbers[index] || []).filter(sn => sn && sn.trim()).length} / {quantity}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
