@@ -125,13 +125,9 @@ function InvoicesContent() {
       })) as Product[];
       setProducts(productsData);
 
-      // Load clients - Filter by companyId
+      // Load clients - Global (no company filtering)
       const clientsRef = collection(db, 'clients');
-      const clientsQuery = query(
-        clientsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const clientsSnapshot = await getDocs(clientsQuery);
+      const clientsSnapshot = await getDocs(clientsRef);
       const clientsData = clientsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

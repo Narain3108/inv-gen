@@ -53,14 +53,14 @@ function ClientsContent() {
     setIsLoading(true);
     try {
       const clientsRef = collection(db, 'clients');
-      const q = query(clientsRef, where('companyId', '==', selectedCompany.id));
-      const snapshot = await getDocs(q);
+      // Load all clients globally - no company filtering
+      const snapshot = await getDocs(clientsRef);
       const clientsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Client[];
       setClients(clientsData);
-      console.log('Loaded clients:', clientsData);
+      console.log('Loaded global clients:', clientsData);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast.error('Failed to load clients');
@@ -83,9 +83,9 @@ function ClientsContent() {
     if (!selectedCompany) return;
 
     try {
+      // Don't add companyId - clients are global
       const clientData = {
         ...data,
-        companyId: selectedCompany.id,
       };
 
       if (editingClient) {
@@ -97,7 +97,7 @@ function ClientsContent() {
         });
         toast.success('Client updated successfully');
       } else {
-        // Create new client
+        // Create new client (global - no companyId)
         await addDoc(collection(db, 'clients'), {
           ...clientData,
           createdAt: serverTimestamp(),

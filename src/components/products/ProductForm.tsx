@@ -289,7 +289,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {product ? 'Update Product' : 'Create Product'}
         </Button>

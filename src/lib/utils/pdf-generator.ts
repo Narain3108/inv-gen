@@ -121,6 +121,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
         ],
         margin: [0, 0, 0, 20],
       },
+      
 
       // Invoice Items Table
       {
@@ -243,24 +244,8 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
                       },
                     ]
                   : []),
-                // Client Bank Details
-                ...(client.bankDetails
-                  ? [
-                      {
-                        width: company.bankDetails ? '50%' : '100%',
-                        stack: [
-                          { text: 'Client Bank Details:', fontSize: 9, bold: true, margin: [0, 0, 0, 3] },
-                          { text: `Bank: ${client.bankDetails.bankName}`, fontSize: 9 },
-                          { text: `Account No: ${client.bankDetails.accountNumber}`, fontSize: 9 },
-                          { text: `IFSC: ${client.bankDetails.ifscCode}`, fontSize: 9 },
-                          {
-                            text: client.bankDetails.upiId ? `UPI: ${client.bankDetails.upiId}` : '',
-                            fontSize: 9,
-                          },
-                        ],
-                      },
-                    ]
-                  : []),
+                
+                
               ],
               margin: [0, 0, 0, 20],
             },
@@ -268,7 +253,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
         : []),
 
       // Terms and Conditions
-      ...(invoice.terms
+      ...(company.termsAndConditions
         ? [
             {
               text: 'Terms & Conditions:',
@@ -277,7 +262,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
               margin: [0, 10, 0, 5],
             },
             {
-              text: invoice.terms || '',
+              text: company.termsAndConditions || '',
               fontSize: 9,
               margin: [0, 0, 0, 10],
             },
@@ -285,7 +270,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
         : []),
 
       // Notes
-      ...(invoice.notes
+      ...(company.additionalNotes
         ? [
             {
               text: 'Notes:',
@@ -294,7 +279,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
               margin: [0, 10, 0, 5],
             },
             {
-              text: invoice.notes || '',
+              text: company.additionalNotes || '',
               fontSize: 9,
               margin: [0, 0, 0, 20],
             },
@@ -558,25 +543,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
                       },
                     ]
                   : []),
-                ...(client.bankDetails
-                  ? [
-                      {
-                        width: company.bankDetails ? '50%' : '100%',
-                        stack: [
-                          { text: 'Client Bank Details:', fontSize: 9, bold: true, margin: [0, 0, 0, 3] },
-                          { text: `Bank: ${client.bankDetails.bankName}`, fontSize: 9 },
-                          { text: `Account No: ${client.bankDetails.accountNumber}`, fontSize: 9 },
-                          { text: `IFSC: ${client.bankDetails.ifscCode}`, fontSize: 9 },
-                          ...(client.bankDetails.accountHolderName
-                            ? [{ text: `Account Holder: ${client.bankDetails.accountHolderName}`, fontSize: 9 }]
-                            : []),
-                          ...(client.bankDetails.upiId
-                            ? [{ text: `UPI: ${client.bankDetails.upiId}`, fontSize: 9 }]
-                            : []),
-                        ],
-                      },
-                    ]
-                  : []),
+             
               ],
               margin: [0, 0, 0, 20],
             },
@@ -584,7 +551,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
         : []),
 
       // Terms and Conditions
-      ...(invoice.terms
+      ...(company.termsAndConditions
         ? [
             {
               text: 'Terms & Conditions:',
@@ -593,7 +560,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
               margin: [0, 10, 0, 5],
             },
             {
-              text: invoice.terms || '',
+              text: company.termsAndConditions || '',
               fontSize: 9,
               margin: [0, 0, 0, 10],
             },
@@ -601,7 +568,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
         : []),
 
       // Notes
-      ...(invoice.notes
+      ...(company.additionalNotes
         ? [
             {
               text: 'Notes:',
@@ -610,7 +577,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
               margin: [0, 10, 0, 5],
             },
             {
-              text: invoice.notes || '',
+              text: company.additionalNotes || '',
               fontSize: 9,
               margin: [0, 0, 0, 20],
             },

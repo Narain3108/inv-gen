@@ -48,6 +48,8 @@ export const companyFormSchema = z.object({
   pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')),
   website: z.string().url('Invalid website URL').optional().or(z.literal('')),
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')),
+  termsAndConditions: z.string().max(1000, 'Terms must be less than 1000 characters').optional().or(z.literal('')),
+  additionalNotes: z.string().max(500, 'Notes must be less than 500 characters').optional().or(z.literal('')),
 });
 
 // ==================== Product Schema ====================
@@ -108,8 +110,6 @@ export const invoiceFormSchema = z.object({
     unitPrice: z.number().min(0, 'Price must be a positive number'),
     discount: z.number().min(0).max(100).optional().default(0),
   })).min(1, 'At least one item is required'),
-  notes: z.string().max(500).optional(),
-  terms: z.string().max(1000).optional(),
 });
 
 // ==================== Login Schema ====================

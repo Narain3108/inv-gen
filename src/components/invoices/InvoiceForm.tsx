@@ -66,7 +66,6 @@ export function InvoiceForm({
         unitPrice: item.unitPrice,
         discount: item.discount || 0,
       })),
-      notes: invoice.notes,
     } : {
       date: new Date().toISOString().split('T')[0],
       items: [{ productId: '', quantity: 1, unitPrice: 0, discount: 0 }],
@@ -202,8 +201,6 @@ export function InvoiceForm({
         invoiceNumber: data.invoiceNumber,
         clientId: data.clientId,
         date: data.date,
-        notes: data.notes,
-        terms: data.terms,
         companyId,
         ...totals,
       };
@@ -219,13 +216,13 @@ export function InvoiceForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-2">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3 animate-fade-in">
       {/* Invoice Details */}
-      <Card>
-        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base">Invoice Details</CardTitle>
+      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
+        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Invoice Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 pb-3">
+        <CardContent className="space-y-3 pb-4 pt-4">
           <div className="grid grid-cols-2 gap-3">
             {/* Invoice Number */}
             <div className="space-y-2">
@@ -282,11 +279,11 @@ export function InvoiceForm({
       </Card>
 
       {/* Invoice Items */}
-      <Card>
-        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base">Invoice Items</CardTitle>
+      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
+        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Invoice Items</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 pb-3">
+        <CardContent className="space-y-3 pb-4 pt-4">
           {/* Desktop View - Hidden on Mobile */}
           <div className="hidden lg:block">
             <table className="w-full">
@@ -493,14 +490,16 @@ export function InvoiceForm({
 
       {/* Tax Summary */}
       {totals && (
-        <Card>
-          <CardHeader className="pb-2 pt-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calculator className="h-4 w-4" />
+        <Card className="border-primary/30 shadow-md hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-white to-primary/5">
+          <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary to-accent border-b">
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
+              <div className="p-1.5 rounded-lg bg-white/20">
+                <Calculator className="h-5 w-5" />
+              </div>
               Summary
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-3">
+          <CardContent className="pb-4 pt-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Taxable Amount:</span>
@@ -533,48 +532,16 @@ export function InvoiceForm({
         </Card>
       )}
 
-      {/* Payment & Notes */}
-      <Card>
-        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base">Additional Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 pb-3">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                {...register('notes')}
-                placeholder="Any additional notes"
-                rows={2}
-              />
-            </div>
-
-            {/* Terms */}
-            <div className="space-y-2">
-              <Label htmlFor="terms">Terms & Conditions</Label>
-              <Textarea
-                id="terms"
-                {...register('terms')}
-                placeholder="Payment terms, etc."
-                rows={2}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex justify-end gap-3 pt-3">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} className="hover:scale-105 transition-transform">
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isLoading || !totals}>
+        <Button type="submit" disabled={isLoading || !totals} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200">
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {invoice ? 'Update Invoice' : 'Create Invoice'}
+          <span className="font-semibold">{invoice ? 'Update Invoice' : 'Create Invoice'}</span>
         </Button>
       </div>
     </form>

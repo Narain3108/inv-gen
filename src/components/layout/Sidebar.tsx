@@ -82,23 +82,27 @@ export function Sidebar({ className }: SidebarProps) {
   }, [companies, selectedCompany, setSelectedCompany]);
 
   return (
-    <div className={cn('flex h-full flex-col border-r bg-background', className)}>
+    <div className={cn('flex h-full flex-col border-r bg-gradient-to-b from-sidebar to-sidebar/80 backdrop-blur-xl', className)}>
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <FileText className="h-6 w-6 text-primary" />
-          <span className="text-xl">InvoiceHub</span>
+      <div className="flex h-16 items-center border-b border-sidebar-border/50 px-6 bg-gradient-to-r from-primary/5 to-accent/5">
+        <Link href="/" className="flex items-center gap-2 font-semibold group">
+          <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary to-accent shadow-lg group-hover:scale-110 transition-transform duration-200">
+            <FileText className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-bold">InvoiceHub</span>
         </Link>
       </div>
 
       {/* Company Selector */}
-      <div className="border-b p-4">
+      <div className="border-b border-sidebar-border/50 p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-between">
+            <Button variant="outline" className="w-full justify-between hover:shadow-md transition-all duration-200 border-primary/20 hover:border-primary/40">
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                <span className="truncate">
+                <div className="p-1 rounded bg-primary/10">
+                  <Building2 className="h-4 w-4 text-primary" />
+                </div>
+                <span className="truncate font-medium">
                   {loading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
                 </span>
               </div>
@@ -149,16 +153,21 @@ export function Sidebar({ className }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative overflow-hidden',
                 isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  ? 'bg-gradient-to-r from-primary/90 to-accent/90 text-white shadow-lg shadow-primary/30 scale-[1.02]'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:scale-[1.01] hover:shadow-sm'
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span>{item.title}</span>
+              <div className={cn(
+                "p-1.5 rounded-lg transition-colors relative z-10",
+                isActive ? "bg-white/25 backdrop-blur-sm" : "bg-primary/10 group-hover:bg-primary/20"
+              )}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <span className="font-semibold relative z-10">{item.title}</span>
               {item.badge && (
-                <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                <span className="ml-auto rounded-full bg-white/30 backdrop-blur-sm px-2 py-0.5 text-xs text-white font-bold shadow-sm relative z-10">
                   {item.badge}
                 </span>
               )}
@@ -168,10 +177,10 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-4">
-        <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-          <p className="font-medium">GST Invoice System</p>
-          <p className="mt-1">v1.0.0</p>
+      <div className="border-t border-sidebar-border/50 p-4">
+        <div className="rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 p-3 text-xs text-sidebar-foreground border border-primary/20 shadow-sm">
+          <p className="font-bold text-sm bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">GST Invoice System</p>
+          <p className="mt-1 text-muted-foreground">v1.0.0 • Professional</p>
         </div>
       </div>
     </div>

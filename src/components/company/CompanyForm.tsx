@@ -51,10 +51,14 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       address: company.address,
       contact: company.contact,
       bankDetails: company.bankDetails,
+      termsAndConditions: company.termsAndConditions || '',
+      additionalNotes: company.additionalNotes || '',
     } : {
       address: {
         country: 'India',
       },
+      termsAndConditions: '',
+      additionalNotes: '',
     } as any,
   });
 
@@ -363,6 +367,49 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
         </CardContent>
       </Card>
 
+      {/* Terms and Conditions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Invoice Defaults</CardTitle>
+          <CardDescription>Default terms and notes for all invoices</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="termsAndConditions">Terms & Conditions</Label>
+            <textarea
+              id="termsAndConditions"
+              {...register('termsAndConditions')}
+              placeholder="E.g., Payment due within 30 days, Subject to Mumbai jurisdiction, etc."
+              className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              rows={5}
+            />
+            <p className="text-xs text-muted-foreground">
+              These terms will appear on all invoices for this company
+            </p>
+            {errors.termsAndConditions && (
+              <p className="text-sm text-red-500">{errors.termsAndConditions.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="additionalNotes">Additional Notes</Label>
+            <textarea
+              id="additionalNotes"
+              {...register('additionalNotes')}
+              placeholder="E.g., Thank you for your business, Contact us for support, etc."
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              These notes will appear on all invoices for this company
+            </p>
+            {errors.additionalNotes && (
+              <p className="text-sm text-red-500">{errors.additionalNotes.message}</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Form Actions */}
       <div className="flex justify-end gap-4">
         {onCancel && (
@@ -370,7 +417,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

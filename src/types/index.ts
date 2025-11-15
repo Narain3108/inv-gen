@@ -59,6 +59,8 @@ export interface Company {
   signatureUrl?: string;
   pan?: string;
   website?: string;
+  termsAndConditions?: string; // Default terms for all invoices
+  additionalNotes?: string; // Default notes for all invoices
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -71,6 +73,8 @@ export interface CompanyFormData {
   bankDetails?: BankDetails;
   pan?: string;
   website?: string;
+  termsAndConditions?: string;
+  additionalNotes?: string;
 }
 
 // ==================== Product/Service Types ====================
@@ -172,8 +176,6 @@ export interface Invoice {
   cgst: number;
   sgst: number;
   igst: number;
-  notes?: string;
-  terms?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -182,8 +184,6 @@ export interface InvoiceFormData {
   clientId: string;
   date: Date;
   items: InvoiceItem[];
-  notes?: string;
-  terms?: string;
   paymentMode?: PaymentMode;
 }
 
