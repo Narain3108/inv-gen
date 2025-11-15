@@ -1,67 +1,103 @@
 /**
  * Recent Activity Component
- * Display recent invoices/activities
+ * Display recent invoices and quotations activity
  */
 
-import React from 'react';
+'use client';
+
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { FileText } from 'lucide-react';
-import { Timestamp } from 'firebase/firestore';
-
-interface Activity {
-  id: string;
-  type: 'invoice' | 'payment' | 'client';
-  title: string;
-  description: string;
-  amount?: number;
-  date: Date | Timestamp;
-  status?: string;
-}
+import { FileText, FileCheck, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Invoice, Quotation, Client } from '@/types';
 
 interface RecentActivityProps {
-  activities: Activity[];
+  invoices: Invoice[];
+  quotations: Quotation[];
+  clients: Client[];
 }
 
-export function RecentActivity({ activities }: RecentActivityProps) {
+export function RecentActivity({ invoices, quotations, clients }: RecentActivityProps) {
+  const activities = useMemo(() => {
+    const invActivities = invoices.map((inv) => ({
+      id: inv.id,
+      type: 'invoice' as const,
+      title: `Invoice ${inv.invoiceNumber}`,
+      clientName: clients.find(c => c.id === inv.clientId)?.clientName || 'Unknown',
+      amount: inv.totalAmount,
+      date: inv.date?.toDate ? inv.date.toDate() : new Date(inv.date),
+      status: inv.paymentStatus,
+    }));
+
+    const quotActivities = quotations.map((quot) => ({
+      id: quot.id,
+      type: 'quotation' as const,
+      title: `Quotation ${quot.quotationNumber}`,
+      clientName: clients.find(c => c.id === quot.clientId)?.clientName || 'Unknown',
+      amount: quot.totalAmount,
+      date: quot.date?.toDate ? quot.date.toDate() : new Date(quot.date),
+      status: quot.status,
+    }));
+
+    return [...invActivities, ...quotActivities]
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 10);
+  }, [invoices, quotations, clients]);
+
+  const getStatusIcon = (type: string, status: string) => {
+    if (type === 'invoice') {
+      if (status === 'paid') return <CheckCircle className="h-4 w-4 text-green-500" />;
+      if (status === 'partially_paid') return <Clock className="h-4 w-4 text-yellow-500" />;
+      return <AlertCircle className="h-4 w-4 text-orange-500" />;
+    }
+    return <FileCheck className="h-4 w-4 text-blue-500" />;
+  };
+
+  const getStatusBadge = (type: string, status: string) => {
+    if (type === 'invoice') {
+      if (status === 'paid') return <Badge className="bg-green-500">Paid</Badge>;
+      if (status === 'partially_paid') return <Badge className="bg-yellow-500">Partial</Badge>;
+      return <Badge className="bg-orange-500">Pending</Badge>;
+    }
+    if (status === 'accepted') return <Badge className="bg-green-500">Accepted</Badge>;
+    if (status === 'rejected') return <Badge variant="destructive">Rejected</Badge>;
+    return <Badge variant="secondary">Pending</Badge>;
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {activities.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent activity</p>
+            <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>
           ) : (
             activities.map((activity) => (
               <div
                 key={activity.id}
-                className="flex items-start gap-4 rounded-lg border p-3"
+                className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors"
               >
-                <div className="rounded-full bg-primary/10 p-2">
-                  <FileText className="h-4 w-4 text-primary" />
+                <div className="rounded-full bg-primary/10 p-2 mt-0.5">
+                  {getStatusIcon(activity.type, activity.status)}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    {activity.status && (
-                      <Badge variant="secondary">{activity.status}</Badge>
-                    )}
+                <div className="flex-1 space-y-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{activity.title}</p>
+                    {getStatusBadge(activity.type, activity.status)}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.description}
+                  <p className="text-xs text-muted-foreground truncate">
+                    {activity.clientName}
                   </p>
                   <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-muted-foreground">
                       {formatDate(activity.date)}
                     </p>
-                    {activity.amount && (
-                      <p className="text-sm font-medium">
-                        {formatCurrency(activity.amount)}
-                      </p>
-                    )}
+                    <p className="text-sm font-medium">
+                      {formatCurrency(activity.amount)}
+                    </p>
                   </div>
                 </div>
               </div>

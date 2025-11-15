@@ -17,6 +17,7 @@ import {
   Building2,
   ChevronDown,
   FileCheck,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +41,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  {
+    title: 'Dashboard',
+    href: '/invoices/dashboard',
+    icon: LayoutDashboard,
+  },
   {
     title: 'Clients',
     href: '/invoices/clients',

@@ -73,48 +73,127 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
         fontSize: 20,
         bold: true,
         alignment: 'center',
-        margin: [0, 20, 0, 20],
+        margin: [0, 20, 0, 15],
       },
 
-      // Invoice and Client Details
+      // Invoice Number and Date
+      {
+        columns: [
+          { width: '*', text: '' },
+          {
+            width: 'auto',
+            stack: [
+              {
+                text: [
+                  { text: 'Invoice No: ', fontSize: 10, color: '#4b5563' },
+                  { text: invoice.invoiceNumber, fontSize: 10, bold: true },
+                ],
+                alignment: 'right',
+              },
+              {
+                text: [
+                  { text: 'Date: ', fontSize: 10, color: '#4b5563' },
+                  { text: invoice.date?.toDate ? formatDate(invoice.date.toDate()) : 'N/A', fontSize: 10, bold: true },
+                ],
+                alignment: 'right',
+                margin: [0, 3, 0, 0],
+              },
+            ],
+          },
+        ],
+        margin: [0, 0, 0, 15],
+      },
+
+      // Billing and Shipping Address
       {
         columns: [
           {
-            width: '50%',
+            width: '48%',
             stack: [
-              { text: 'Bill To:', fontSize: 10, bold: true, margin: [0, 0, 0, 5] },
-              { text: client.clientName, fontSize: 11, bold: true },
-              { text: client.address.street, fontSize: 9 },
-              {
-                text: `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+              { 
+                text: 'BILLING ADDRESS', 
+                fontSize: 9, 
+                bold: true, 
+                color: '#1f2937',
+                margin: [0, 0, 0, 8] 
+              },
+              { 
+                text: client.clientName, 
+                fontSize: 11, 
+                bold: true,
+                margin: [0, 0, 0, 4]
+              },
+              { 
+                text: client.billingAddress?.street || client.address.street, 
                 fontSize: 9,
+                margin: [0, 0, 0, 2]
+              },
+              {
+                text: client.billingAddress 
+                  ? `${client.billingAddress.city}, ${client.billingAddress.state} - ${client.billingAddress.pincode}`
+                  : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+                fontSize: 9,
+                margin: [0, 0, 0, 3]
               },
               {
                 text: client.gstin ? `GSTIN: ${client.gstin}` : '',
                 fontSize: 9,
-                margin: [0, 2, 0, 0],
+                margin: [0, 0, 0, 2],
               },
-              { text: `Phone: ${client.contact.phone}`, fontSize: 9 },
-              { text: `Place of Supply: ${client.address.state}`, fontSize: 9, margin: [0, 4, 0, 0], bold: true },
+              { 
+                text: `Phone: ${client.contact.phone}`, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
+              },
+              { 
+                text: `Place of Supply: ${client.billingAddress?.state || client.address.state}`, 
+                fontSize: 9, 
+                margin: [0, 3, 0, 0], 
+                bold: true,
+                color: '#059669'
+              },
             ],
           },
+          { width: '4%', text: '' }, // Spacer
           {
-            width: '50%',
+            width: '48%',
             stack: [
-              {
-                text: [
-                  { text: 'Invoice No: ', fontSize: 9 },
-                  { text: invoice.invoiceNumber, fontSize: 9, bold: true },
-                ],
-                alignment: 'right',
+              { 
+                text: 'SHIPPING ADDRESS', 
+                fontSize: 9, 
+                bold: true, 
+                color: '#1f2937',
+                margin: [0, 0, 0, 8] 
+              },
+              { 
+                text: client.clientName, 
+                fontSize: 11, 
+                bold: true,
+                margin: [0, 0, 0, 4]
+              },
+              { 
+                text: client.shippingAddress?.street || client.billingAddress?.street || client.address.street, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
               },
               {
-                text: [
-                  { text: 'Date: ', fontSize: 9 },
-                  { text: invoice.date?.toDate ? formatDate(invoice.date.toDate()) : 'N/A', fontSize: 9, bold: true },
-                ],
-                alignment: 'right',
-                margin: [0, 2, 0, 0],
+                text: client.shippingAddress 
+                  ? `${client.shippingAddress.city}, ${client.shippingAddress.state} - ${client.shippingAddress.pincode}`
+                  : client.billingAddress
+                    ? `${client.billingAddress.city}, ${client.billingAddress.state} - ${client.billingAddress.pincode}`
+                    : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+                fontSize: 9,
+                margin: [0, 0, 0, 3]
+              },
+              {
+                text: client.gstin ? `GSTIN: ${client.gstin}` : '',
+                fontSize: 9,
+                margin: [0, 0, 0, 2],
+              },
+              { 
+                text: `Phone: ${client.contact.phone}`, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
               },
             ],
           },
@@ -700,55 +779,128 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
         alignment: 'center',
         color: '#dc2626',
         italics: true,
-        margin: [0, 0, 0, 20],
+        margin: [0, 0, 0, 15],
       },
 
-      // Quotation and Client Details
+      // Quotation Number, Date, and Valid Until
+      {
+        columns: [
+          { width: '*', text: '' },
+          {
+            width: 'auto',
+            stack: [
+              {
+                text: [
+                  { text: 'Quotation No: ', fontSize: 10, color: '#4b5563' },
+                  { text: quotation.quotationNumber, fontSize: 10, bold: true },
+                ],
+                alignment: 'right',
+              },
+              {
+                text: [
+                  { text: 'Date: ', fontSize: 10, color: '#4b5563' },
+                  { text: quotation.date?.toDate ? formatDate(quotation.date.toDate()) : 'N/A', fontSize: 10, bold: true },
+                ],
+                alignment: 'right',
+                margin: [0, 3, 0, 0],
+              },
+              {
+                text: [
+                  { text: 'Valid Until: ', fontSize: 10, color: '#dc2626' },
+                  { text: quotation.validUntil?.toDate ? formatDate(quotation.validUntil.toDate()) : 'N/A', fontSize: 10, bold: true, color: '#dc2626' },
+                ],
+                alignment: 'right',
+                margin: [0, 3, 0, 0],
+              },
+            ],
+          },
+        ],
+        margin: [0, 0, 0, 15],
+      },
+
+      // Billing and Shipping Address
       {
         columns: [
           {
-            width: '50%',
+            width: '48%',
             stack: [
-              { text: 'Quotation For:', fontSize: 10, bold: true, margin: [0, 0, 0, 5] },
-              { text: client.clientName, fontSize: 11, bold: true },
-              { text: client.address.street, fontSize: 9 },
-              {
-                text: `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+              { 
+                text: 'BILLING ADDRESS', 
+                fontSize: 9, 
+                bold: true, 
+                color: '#1f2937',
+                margin: [0, 0, 0, 8] 
+              },
+              { 
+                text: client.clientName, 
+                fontSize: 11, 
+                bold: true,
+                margin: [0, 0, 0, 4]
+              },
+              { 
+                text: client.billingAddress?.street || client.address.street, 
                 fontSize: 9,
+                margin: [0, 0, 0, 2]
+              },
+              {
+                text: client.billingAddress 
+                  ? `${client.billingAddress.city}, ${client.billingAddress.state} - ${client.billingAddress.pincode}`
+                  : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+                fontSize: 9,
+                margin: [0, 0, 0, 3]
               },
               {
                 text: client.gstin ? `GSTIN: ${client.gstin}` : '',
                 fontSize: 9,
-                margin: [0, 2, 0, 0],
+                margin: [0, 0, 0, 2],
               },
-              { text: `Phone: ${client.contact.phone}`, fontSize: 9 },
+              { 
+                text: `Phone: ${client.contact.phone}`, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
+              },
             ],
           },
+          { width: '4%', text: '' }, // Spacer
           {
-            width: '50%',
+            width: '48%',
             stack: [
-              {
-                text: [
-                  { text: 'Quotation No: ', fontSize: 9 },
-                  { text: quotation.quotationNumber, fontSize: 9, bold: true },
-                ],
-                alignment: 'right',
+              { 
+                text: 'SHIPPING ADDRESS', 
+                fontSize: 9, 
+                bold: true, 
+                color: '#1f2937',
+                margin: [0, 0, 0, 8] 
+              },
+              { 
+                text: client.clientName, 
+                fontSize: 11, 
+                bold: true,
+                margin: [0, 0, 0, 4]
+              },
+              { 
+                text: client.shippingAddress?.street || client.billingAddress?.street || client.address.street, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
               },
               {
-                text: [
-                  { text: 'Date: ', fontSize: 9 },
-                  { text: quotation.date?.toDate ? formatDate(quotation.date.toDate()) : 'N/A', fontSize: 9, bold: true },
-                ],
-                alignment: 'right',
-                margin: [0, 2, 0, 0],
+                text: client.shippingAddress 
+                  ? `${client.shippingAddress.city}, ${client.shippingAddress.state} - ${client.shippingAddress.pincode}`
+                  : client.billingAddress
+                    ? `${client.billingAddress.city}, ${client.billingAddress.state} - ${client.billingAddress.pincode}`
+                    : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+                fontSize: 9,
+                margin: [0, 0, 0, 3]
               },
               {
-                text: [
-                  { text: 'Valid Until: ', fontSize: 9, color: '#dc2626' },
-                  { text: quotation.validUntil?.toDate ? formatDate(quotation.validUntil.toDate()) : 'N/A', fontSize: 9, bold: true, color: '#dc2626' },
-                ],
-                alignment: 'right',
-                margin: [0, 2, 0, 0],
+                text: client.gstin ? `GSTIN: ${client.gstin}` : '',
+                fontSize: 9,
+                margin: [0, 0, 0, 2],
+              },
+              { 
+                text: `Phone: ${client.contact.phone}`, 
+                fontSize: 9,
+                margin: [0, 0, 0, 2]
               },
             ],
           },

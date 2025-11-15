@@ -1,0 +1,436 @@
+/**
+ * Dashboard Page
+ * Comprehensive analytics and insights dashboard
+ */
+
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { DashboardLayout } from '@/components/layout';
+import PageHeader from '@/components/shared/PageHeader';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  FileText,
+  Users,
+  Package,
+  Calendar,
+  Download,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  BarChart3,
+  PieChart,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  Filter,
+  RefreshCw,
+} from 'lucide-react';
+import { useCompany } from '@/hooks/useCompany';
+import { useAppData } from '@/contexts/AppDataContext';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import { Invoice, Quotation, Product, Client } from '@/types';
+import { formatCurrency } from '@/utils/formatters';
+import { toast } from 'sonner';
+import {
+  PaymentStatusChart,
+  RecentActivity,
+  RecentInvoices,
+  StatsCard,
+  TopClients,
+} from '@/components/dashboard';
+
+type TimeFilter = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
+
+interface DashboardStats {
+  totalRevenue: number;
+  revenueGrowth: number;
+  totalInvoices: number;
+  invoicesGrowth: number;
+  pendingAmount: number;
+  paidAmount: number;
+  totalClients: number;
+  clientsGrowth: number;
+  totalProducts: number;
+  lowStockProducts: number;
+  totalQuotations: number;
+  quotationsGrowth: number;
+  averageInvoiceValue: number;
+  paymentRate: number;
+}
+
+function DashboardContent() {
+  const { selectedCompany } = useCompany();
+  const { clients, products } = useAppData();
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load invoices and quotations
+  const loadData = async () => {
+    if (!selectedCompany) return;
+
+    try {
+      setLoading(true);
+
+      // Load invoices
+      const invoicesRef = collection(db, 'invoices');
+      const invoicesQuery = query(invoicesRef, where('companyId', '==', selectedCompany.id));
+      const invoicesSnapshot = await getDocs(invoicesQuery);
+      const invoicesData = invoicesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Invoice[];
+      setInvoices(invoicesData);
+
+      // Load quotations
+      const quotationsRef = collection(db, 'quotations');
+      const quotationsQuery = query(quotationsRef, where('companyId', '==', selectedCompany.id));
+      const quotationsSnapshot = await getDocs(quotationsQuery);
+      const quotationsData = quotationsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Quotation[];
+      setQuotations(quotationsData);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [selectedCompany]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+    toast.success('Dashboard refreshed');
+  };
+
+  // Filter data based on time period
+  const getFilteredData = (data: any[], dateField: string = 'date') => {
+    const now = new Date();
+    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    return data.filter((item) => {
+      if (!item[dateField]) return false;
+      
+      const itemDate = item[dateField].toDate ? item[dateField].toDate() : new Date(item[dateField]);
+      
+      switch (timeFilter) {
+        case 'today':
+          return itemDate >= startOfDay;
+        case 'week':
+          return itemDate >= startOfWeek;
+        case 'month':
+          return itemDate >= startOfMonth;
+        case 'quarter':
+          return itemDate >= startOfQuarter;
+        case 'year':
+          return itemDate >= startOfYear;
+        case 'all':
+        default:
+          return true;
+      }
+    });
+  };
+
+  // Calculate dashboard statistics
+  const stats: DashboardStats = useMemo(() => {
+    const filteredInvoices = getFilteredData(invoices);
+    const filteredQuotations = getFilteredData(quotations);
+
+    // Total revenue
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    
+    // Paid and pending amounts
+    const paidAmount = filteredInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+    const pendingAmount = filteredInvoices.reduce((sum, inv) => sum + (inv.amountPending || 0), 0);
+
+    // Average invoice value
+    const averageInvoiceValue = filteredInvoices.length > 0 
+      ? totalRevenue / filteredInvoices.length 
+      : 0;
+
+    // Payment rate
+    const paymentRate = totalRevenue > 0 
+      ? (paidAmount / totalRevenue) * 100 
+      : 0;
+
+    // Growth calculations (compare with previous period)
+    const getPreviousPeriod = () => {
+      const now = new Date();
+      switch (timeFilter) {
+        case 'today':
+          return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        case 'week':
+          return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        case 'month':
+          return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        case 'quarter':
+          return new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        case 'year':
+          return new Date(now.getFullYear() - 1, 0, 1);
+        default:
+          return new Date(0);
+      }
+    };
+
+    const previousPeriodStart = getPreviousPeriod();
+    const previousInvoices = invoices.filter((inv) => {
+      if (!inv.date) return false;
+      const invDate = (inv.date && typeof (inv.date as any).toDate === 'function')
+        ? (inv.date as any).toDate()
+        : (inv.date instanceof Date ? inv.date : new Date(inv.date as any));
+      return invDate < previousPeriodStart;
+    });
+
+    const previousRevenue = previousInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const revenueGrowth = previousRevenue > 0 
+      ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
+      : 0;
+
+    const invoicesGrowth = previousInvoices.length > 0 
+      ? ((filteredInvoices.length - previousInvoices.length) / previousInvoices.length) * 100 
+      : 0;
+
+    // Low stock products
+    const lowStockProducts = products.filter(
+      (p) => p.type === 'product' && typeof p.stock === 'number' && p.stock < 10
+    ).length;
+
+    return {
+      totalRevenue,
+      revenueGrowth,
+      totalInvoices: filteredInvoices.length,
+      invoicesGrowth,
+      pendingAmount,
+      paidAmount,
+      totalClients: clients.length,
+      clientsGrowth: 0, // Can be calculated similarly
+      totalProducts: products.length,
+      lowStockProducts,
+      totalQuotations: filteredQuotations.length,
+      quotationsGrowth: 0,
+      averageInvoiceValue,
+      paymentRate,
+    };
+  }, [invoices, quotations, clients, products, timeFilter]);
+
+  if (!selectedCompany) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          description="Analytics and insights for your business"
+        />
+        <Card className="p-12 text-center">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            Please select a company to view dashboard
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          description="Analytics and insights for your business"
+        />
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        description={`Analytics for ${selectedCompany.name}`}
+      >
+        <div className="flex items-center gap-3">
+          <Select value={timeFilter} onValueChange={(value: TimeFilter) => setTimeFilter(value)}>
+            <SelectTrigger className="w-[160px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="quarter">This Quarter</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      </PageHeader>
+
+      {/* Key Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Total Revenue"
+          value={formatCurrency(stats.totalRevenue)}
+          change={stats.revenueGrowth}
+          icon={DollarSign}
+          trend={stats.revenueGrowth >= 0 ? 'up' : 'down'}
+        />
+        <StatsCard
+          title="Total Invoices"
+          value={stats.totalInvoices.toString()}
+          change={stats.invoicesGrowth}
+          icon={FileText}
+          trend={stats.invoicesGrowth >= 0 ? 'up' : 'down'}
+        />
+        <StatsCard
+          title="Amount Pending"
+          value={formatCurrency(stats.pendingAmount)}
+          icon={Clock}
+          iconColor="text-orange-500"
+        />
+        <StatsCard
+          title="Amount Received"
+          value={formatCurrency(stats.paidAmount)}
+          icon={CheckCircle2}
+          iconColor="text-green-500"
+        />
+      </div>
+
+      {/* Secondary Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalClients}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Active clients
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Products</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+            {stats.lowStockProducts > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                <AlertCircle className="h-3 w-3 text-orange-500" />
+                <p className="text-xs text-orange-500">
+                  {stats.lowStockProducts} low stock
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Invoice Value</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(stats.averageInvoiceValue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Per invoice
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Payment Rate</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.paymentRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Collection efficiency
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts and Tables */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Payment Status</CardTitle>
+            <CardDescription>
+              Overview of invoice payment statuses
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PaymentStatusChart invoices={getFilteredData(invoices)} />
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Top Clients</CardTitle>
+            <CardDescription>
+              Clients by total invoice value
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TopClients invoices={getFilteredData(invoices)} clients={clients} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity and Invoices */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <RecentInvoices 
+          invoices={invoices.slice(0, 5)} 
+          clients={clients} 
+        />
+        <RecentActivity 
+          invoices={invoices}
+          quotations={quotations}
+          clients={clients}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <DashboardLayout>
+      <DashboardContent />
+    </DashboardLayout>
+  );
+}
