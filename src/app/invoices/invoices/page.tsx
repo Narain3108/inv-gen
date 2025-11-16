@@ -21,8 +21,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
-import { InvoiceForm, InvoiceList, PaymentDialog } from '@/components/invoices';
+import { InvoiceForm, InvoiceList, PaymentDialog, CustomizationDialog } from '@/components/invoices';
 import { Button } from '@/components/ui/button';
+import { loadCustomization } from '@/lib/services/customization-service';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
@@ -79,6 +80,7 @@ function InvoicesContent() {
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isCustomizationDialogOpen, setIsCustomizationDialogOpen] = useState(false);
 
   // Set company when selectedCompany changes
   useEffect(() => {
@@ -251,7 +253,7 @@ function InvoicesContent() {
     }
   };
 
-  const handleViewInvoice = (invoice: Invoice) => {
+  const handleViewInvoice = async (invoice: Invoice) => {
     if (!company) return;
     const client = clients.find(c => c.id === invoice.clientId);
     if (!client) {
@@ -259,11 +261,16 @@ function InvoicesContent() {
       return;
     }
 
-    const pdfData = { invoice, company, client };
+    // Load and debug customization
+    console.log('📥 Loading customization for company:', company.id);
+    const customization = await loadCustomization(company.id, 'invoice');
+    console.log('📋 Loaded customization:', JSON.stringify(customization?.table?.columns, null, 2));
+    
+    const pdfData = { invoice, company, client, customization };
     previewInvoicePDF(pdfData as any);
   };
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
+  const handleDownloadInvoice = async (invoice: Invoice) => {
     if (!company) return;
     const client = clients.find(c => c.id === invoice.clientId);
     if (!client) {
@@ -271,7 +278,12 @@ function InvoicesContent() {
       return;
     }
     
-    const pdfData = { invoice, company, client };
+    // Load and debug customization
+    console.log('📥 Loading customization for company:', company.id);
+    const customization = await loadCustomization(company.id, 'invoice');
+    console.log('📋 Loaded customization:', JSON.stringify(customization?.table?.columns, null, 2));
+    
+    const pdfData = { invoice, company, client, customization };
     generateInvoicePDF(pdfData as any);
   };
 
@@ -359,10 +371,16 @@ function InvoicesContent() {
             Create and manage your invoices
           </p>
         </div>
-        <Button onClick={handleAddInvoice}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Invoice
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCustomizationDialogOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            Customize Bill
+          </Button>
+          <Button onClick={handleAddInvoice}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Invoice
+          </Button>
+        </div>
       </div>
 
       {/* Invoice List */}
@@ -427,6 +445,17 @@ function InvoicesContent() {
         invoice={paymentInvoice}
         onSubmit={handleRecordPayment}
       />
+
+      {/* Customization Dialog */}
+      {selectedCompany && (
+        <CustomizationDialog
+          open={isCustomizationDialogOpen}
+          onOpenChange={setIsCustomizationDialogOpen}
+          companyId={selectedCompany.id}
+          type="invoice"
+          onSave={loadInvoices}
+        />
+      )}
     </div>
   );
 }

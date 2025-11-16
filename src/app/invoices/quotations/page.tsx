@@ -22,7 +22,9 @@ import { db } from '@/lib/firebase/config';
 import { Quotation, Product, Client, Company, QuotationStatus } from '@/types';
 import { QuotationForm } from '@/components/quotations/QuotationForm';
 import { QuotationList } from '@/components/quotations/QuotationList';
+import { CustomizationDialog } from '@/components/invoices';
 import { Button } from '@/components/ui/button';
+import { loadCustomization } from '@/lib/services/customization-service';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,10 +44,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Settings } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
-import { generateQuotationPDF } from '@/lib/utils/pdf-generator';
+import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
@@ -66,6 +68,7 @@ function QuotationsContent() {
   const [convertingQuotation, setConvertingQuotation] = useState<Quotation | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [initialized, setInitialized] = useState(false);
+  const [isCustomizationDialogOpen, setIsCustomizationDialogOpen] = useState(false);
 
   // Load companies on mount
   useEffect(() => {
@@ -253,16 +256,41 @@ function QuotationsContent() {
     }
   };
 
-  const handleViewQuotation = (quotation: Quotation) => {
+  const handleViewQuotation = async (quotation: Quotation) => {
     if (!company) return;
     const client = clients.find(c => c.id === quotation.clientId);
     if (client) {
-      generateQuotationPDF({ quotation, company, client });
+      console.log('📥 Loading customization for quotation:', company.id);
+      
+      // Load customization settings
+      const customization = await loadCustomization(company.id, 'quotation');
+      
+      console.log('📋 Loaded quotation customization:', {
+        hasCustomization: !!customization,
+        pageSize: customization?.pageSize,
+        margins: customization?.margins,
+        columnsCount: customization?.table?.columns?.filter(c => c.enabled).length,
+        termsText: customization?.footer?.termsText ? 'Yes' : 'No',
+        thankYouText: customization?.footer?.thankYouText ? 'Yes' : 'No',
+      });
+      
+      previewQuotationPDF({ quotation, company, client, customization });
     }
   };
 
-  const handleDownloadQuotation = (quotation: Quotation) => {
-    handleViewQuotation(quotation);
+  const handleDownloadQuotation = async (quotation: Quotation) => {
+    if (!company) return;
+    const client = clients.find(c => c.id === quotation.clientId);
+    if (client) {
+      console.log('📥 Loading customization for quotation download:', company.id);
+      
+      // Load customization settings
+      const customization = await loadCustomization(company.id, 'quotation');
+      
+      console.log('📋 Loaded quotation customization for download');
+      
+      generateQuotationPDF({ quotation, company, client, customization });
+    }
   };
 
   const handleConvertToInvoice = async (quotation: Quotation) => {
@@ -374,13 +402,22 @@ function QuotationsContent() {
             Create and manage price estimates for clients
           </p>
         </div>
-        <Button 
-          onClick={handleAddQuotation} 
-          className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Quotation
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setIsCustomizationDialogOpen(true)}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Customize Bill
+          </Button>
+          <Button 
+            onClick={handleAddQuotation} 
+            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Quotation
+          </Button>
+        </div>
       </div>
 
       {/* Quotations List */}
@@ -484,6 +521,17 @@ function QuotationsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Customization Dialog */}
+      {selectedCompany && (
+        <CustomizationDialog
+          open={isCustomizationDialogOpen}
+          onOpenChange={setIsCustomizationDialogOpen}
+          companyId={selectedCompany.id}
+          type="quotation"
+          onSave={loadData}
+        />
+      )}
     </div>
   );
 }
