@@ -21,7 +21,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
-import { InvoiceForm, InvoiceList, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
+import { InvoiceForm, InvoiceList, InvoiceFilters, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
+import { FilterBar } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
 import {
@@ -45,6 +46,7 @@ import { Plus, Settings } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { DashboardLayout } from '@/components/layout';
@@ -83,6 +85,65 @@ function InvoicesContent() {
   const [isCustomizationDialogOpen, setIsCustomizationDialogOpen] = useState(false);
   const [isCopyTypeDialogOpen, setIsCopyTypeDialogOpen] = useState(false);
   const [downloadInvoice, setDownloadInvoice] = useState<Invoice | null>(null);
+
+  // Filter configuration
+  const filterConfig: FilterConfig<Invoice> = {
+    paymentStatus: (invoice, value) => invoice.paymentStatus === value,
+    datePeriod: (invoice, value) => {
+      if (!invoice.date) return false;
+      const invoiceDate = invoice.date.toDate();
+      const now = new Date();
+      
+      switch (value) {
+        case 'this-week': {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return invoiceDate >= weekAgo;
+        }
+        case 'last-week': {
+          const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return invoiceDate >= twoWeeksAgo && invoiceDate < weekAgo;
+        }
+        case 'this-month': {
+          return invoiceDate.getMonth() === now.getMonth() && 
+                 invoiceDate.getFullYear() === now.getFullYear();
+        }
+        case 'last-month': {
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+          return invoiceDate.getMonth() === lastMonth.getMonth() && 
+                 invoiceDate.getFullYear() === lastMonth.getFullYear();
+        }
+        case 'this-year': {
+          return invoiceDate.getFullYear() === now.getFullYear();
+        }
+        case 'last-year': {
+          return invoiceDate.getFullYear() === now.getFullYear() - 1;
+        }
+        default:
+          return true;
+      }
+    },
+    month: (invoice, value) => {
+      if (!invoice.date) return false;
+      const invoiceDate = invoice.date.toDate();
+      const monthYear = invoiceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+      return monthYear === value;
+    },
+    year: (invoice, value) => {
+      if (!invoice.date) return false;
+      return invoice.date.toDate().getFullYear() === parseInt(value);
+    },
+    minAmount: (invoice, value) => invoice.totalAmount >= value,
+    maxAmount: (invoice, value) => invoice.totalAmount <= value,
+  };
+
+  const {
+    filters,
+    filteredData: filteredInvoices,
+    updateFilter,
+    clearFilters,
+    activeFilterCount,
+  } = useFilters(invoices, filterConfig);
 
   // Set company when selectedCompany changes
   useEffect(() => {
@@ -442,9 +503,23 @@ function InvoicesContent() {
         </div>
       </div>
 
+      {/* Filter Bar */}
+      <FilterBar 
+        activeFilterCount={activeFilterCount} 
+        onClearFilters={clearFilters}
+        resultsCount={filteredInvoices.length}
+        totalCount={invoices.length}
+      >
+        <InvoiceFilters
+          invoices={invoices}
+          onFilterChange={updateFilter}
+          filters={filters}
+        />
+      </FilterBar>
+
       {/* Invoice List */}
       <InvoiceList
-        invoices={invoices}
+        invoices={filteredInvoices}
         clients={clients}
         onEdit={handleEditInvoice}
         onDelete={setDeleteInvoice}

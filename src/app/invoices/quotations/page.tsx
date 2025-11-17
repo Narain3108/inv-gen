@@ -20,9 +20,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Quotation, Product, Client, Company, QuotationStatus } from '@/types';
-import { QuotationForm } from '@/components/quotations/QuotationForm';
-import { QuotationList } from '@/components/quotations/QuotationList';
+import { QuotationForm, QuotationList, QuotationFilters } from '@/components/quotations';
 import { CustomizationDialog } from '@/components/invoices';
+import { FilterBar } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,7 @@ import {
 import { Plus, Loader2, Settings } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { DashboardLayout } from '@/components/layout';
@@ -69,6 +70,37 @@ function QuotationsContent() {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [initialized, setInitialized] = useState(false);
   const [isCustomizationDialogOpen, setIsCustomizationDialogOpen] = useState(false);
+
+  // Filter configuration
+  const filterConfig: FilterConfig<Quotation> = {
+    status: (quotation, value) => quotation.status === value,
+    converted: (quotation, value) => {
+      if (value === 'converted') return quotation.status === 'converted';
+      if (value === 'not-converted') return quotation.status !== 'converted';
+      return true;
+    },
+    validity: (quotation, value) => {
+      if (!quotation.validUntil) return false;
+      const validDate = quotation.validUntil.toDate();
+      const now = new Date();
+      const daysUntilExpiry = Math.ceil((validDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (value === 'valid') return daysUntilExpiry > 0;
+      if (value === 'expired') return daysUntilExpiry <= 0;
+      if (value === 'expiring-soon') return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+      return true;
+    },
+    minAmount: (quotation, value) => quotation.totalAmount >= value,
+    maxAmount: (quotation, value) => quotation.totalAmount <= value,
+  };
+
+  const {
+    filters,
+    filteredData: filteredQuotations,
+    updateFilter,
+    clearFilters,
+    activeFilterCount,
+  } = useFilters(quotations, filterConfig);
 
   // Load companies on mount
   useEffect(() => {
@@ -437,9 +469,23 @@ function QuotationsContent() {
         </div>
       </div>
 
+      {/* Filter Bar */}
+      <FilterBar 
+        activeFilterCount={activeFilterCount} 
+        onClearFilters={clearFilters}
+        resultsCount={filteredQuotations.length}
+        totalCount={quotations.length}
+      >
+        <QuotationFilters
+          quotations={quotations}
+          onFilterChange={updateFilter}
+          filters={filters}
+        />
+      </FilterBar>
+
       {/* Quotations List */}
       <QuotationList
-        quotations={quotations}
+        quotations={filteredQuotations}
         clients={clients}
         onEdit={handleEditQuotation}
         onDelete={setDeleteQuotation}

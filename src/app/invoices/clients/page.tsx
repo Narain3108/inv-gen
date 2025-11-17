@@ -7,10 +7,11 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
+import { FilterBar } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserPlus } from 'lucide-react';
-import { ClientForm, ClientList } from '@/components/clients';
+import { ClientForm, ClientList, ClientFilters } from '@/components/clients';
 import { Client } from '@/types';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import { clientFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
@@ -29,6 +31,20 @@ function ClientsContent() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+
+  // Filter configuration
+  const filterConfig: FilterConfig<Client> = {
+    state: (client, value) => client.address?.state === value,
+    city: (client, value) => client.address?.city === value,
+  };
+
+  const {
+    filters,
+    filteredData: filteredClients,
+    updateFilter,
+    clearFilters,
+    activeFilterCount,
+  } = useFilters(clients, filterConfig);
 
   const handleOpenForm = (client?: Client) => {
     setEditingClient(client);
@@ -122,11 +138,25 @@ function ClientsContent() {
         </Button>
       </PageHeader>
 
+      {/* Filter Bar */}
+      <FilterBar 
+        activeFilterCount={activeFilterCount} 
+        onClearFilters={clearFilters}
+        resultsCount={filteredClients.length}
+        totalCount={clients.length}
+      >
+        <ClientFilters
+          clients={clients}
+          onFilterChange={updateFilter}
+          filters={filters}
+        />
+      </FilterBar>
+
       {clientsLoading ? (
         <div className="text-center py-12">Loading clients...</div>
       ) : (
         <ClientList
-          clients={clients}
+          clients={filteredClients}
           onEdit={handleOpenForm}
           onDelete={(client) => setDeletingClient(client)}
         />

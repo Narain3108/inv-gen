@@ -7,10 +7,11 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
+import { FilterBar } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
-import { ProductForm, ProductList } from '@/components/products';
+import { ProductForm, ProductList, ProductFilters } from '@/components/products';
 import { Product } from '@/types';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -29,6 +31,30 @@ function ProductsContent() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // Filter configuration
+  const filterConfig: FilterConfig<Product> = {
+    unit: (product, value) => product.unit === value,
+    gstRate: (product, value) => product.gstRate === parseFloat(value),
+    stockStatus: (product, value) => {
+      if (product.type === 'service') return value === 'service';
+      const stock = product.stock || 0;
+      if (value === 'in-stock') return stock > 10;
+      if (value === 'low-stock') return stock > 0 && stock <= 10;
+      if (value === 'out-of-stock') return stock === 0;
+      return true;
+    },
+    minPrice: (product, value) => product.price >= value,
+    maxPrice: (product, value) => product.price <= value,
+  };
+
+  const {
+    filters,
+    filteredData: filteredProducts,
+    updateFilter,
+    clearFilters,
+    activeFilterCount,
+  } = useFilters(products, filterConfig);
 
   const handleOpenForm = (product?: Product) => {
     setEditingProduct(product);
@@ -131,11 +157,25 @@ function ProductsContent() {
         </Button>
       </PageHeader>
 
+      {/* Filter Bar */}
+      <FilterBar 
+        activeFilterCount={activeFilterCount} 
+        onClearFilters={clearFilters}
+        resultsCount={filteredProducts.length}
+        totalCount={products.length}
+      >
+        <ProductFilters
+          products={products}
+          onFilterChange={updateFilter}
+          filters={filters}
+        />
+      </FilterBar>
+
       {productsLoading ? (
         <div className="text-center py-12">Loading products...</div>
       ) : (
         <ProductList
-          products={products}
+          products={filteredProducts}
           onEdit={handleOpenForm}
           onDelete={(product) => setDeletingProduct(product)}
         />
