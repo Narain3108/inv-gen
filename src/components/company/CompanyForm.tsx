@@ -20,6 +20,7 @@ import { INDIAN_STATES } from '@/lib/constants';
 import { fetchGSTINDetails } from '@/lib/api/gst-api';
 import Image from 'next/image';
 import { z } from 'zod';
+import { ImageUpload } from '@/components/shared/ImageUpload';
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 
@@ -33,6 +34,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>(company?.logoUrl || '');
+  const [signatureUrl, setSignatureUrl] = useState<string>(company?.signatureUrl || '');
 
   const {
     register,
@@ -92,7 +94,13 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
   const handleFormSubmit = async (data: CompanyFormData) => {
     setIsLoading(true);
     try {
-      await onSubmit(data);
+      // Include logo and signature URLs in the data
+      const submitData = {
+        ...data,
+        logoUrl: logoUrl || '',
+        signatureUrl: signatureUrl || '',
+      };
+      await onSubmit(submitData as CompanyFormData);
       toast.success(company ? 'Company updated successfully' : 'Company created successfully');
     } catch (error) {
       toast.error('Failed to save company');
@@ -111,7 +119,33 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           <CardDescription>Enter your company's basic details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Company Logo URL */}
+          {/* Company Logo Upload */}
+          <ImageUpload
+            label="Company Logo"
+            currentImageUrl={logoUrl}
+            onImageUploaded={(url) => {
+              setLogoUrl(url);
+              setValue('logoUrl', url);
+            }}
+            onImageRemoved={() => {
+              setLogoUrl('');
+              setValue('logoUrl', '');
+            }}
+          />
+
+          {/* Company Signature Upload */}
+          <ImageUpload
+            label="Authorized Signature"
+            currentImageUrl={signatureUrl}
+            onImageUploaded={(url) => {
+              setSignatureUrl(url);
+              setValue('signatureUrl', url);
+            }}
+            onImageRemoved={() => {
+              setSignatureUrl('');
+              setValue('signatureUrl', '');
+            }}
+          />
        
           {/* GSTIN */}
           <div className="space-y-2">

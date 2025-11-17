@@ -113,7 +113,16 @@ export default function CompanySettingsPage() {
         // Update existing company
         console.log('Updating company:', editingCompany.id, cleanedData);
         await updateDocument('companies', editingCompany.id, cleanedData);
+        
+        const updatedCompany = { ...editingCompany, ...cleanedData } as Company;
         updateCompanyInStore(editingCompany.id, cleanedData as Partial<Company>); // Update global store
+        
+        // CRITICAL FIX: Update selectedCompany if it's the one being edited
+        if (selectedCompany?.id === editingCompany.id) {
+          console.log('✅ Updating selected company with new images');
+          setSelectedCompany(updatedCompany);
+        }
+        
         toast.success('Company updated successfully');
       } else {
         // Create new company

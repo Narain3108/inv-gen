@@ -257,13 +257,18 @@ function QuotationsContent() {
   };
 
   const handleViewQuotation = async (quotation: Quotation) => {
-    if (!company) return;
+    // Get fresh company data from selectedCompany context
+    const currentCompany = selectedCompany || company;
+    if (!currentCompany) return;
+    
     const client = clients.find(c => c.id === quotation.clientId);
     if (client) {
-      console.log('📥 Loading customization for quotation:', company.id);
+      console.log('📥 Loading customization for quotation:', currentCompany.id);
+      console.log('🖼️ Logo URL:', currentCompany.logoUrl);
+      console.log('✍️ Signature URL:', currentCompany.signatureUrl);
       
       // Load customization settings
-      const customization = await loadCustomization(company.id, 'quotation');
+      const customization = await loadCustomization(currentCompany.id, 'quotation');
       
       console.log('📋 Loaded quotation customization:', {
         hasCustomization: !!customization,
@@ -274,22 +279,27 @@ function QuotationsContent() {
         thankYouText: customization?.footer?.thankYouText ? 'Yes' : 'No',
       });
       
-      previewQuotationPDF({ quotation, company, client, customization });
+      await previewQuotationPDF({ quotation, company: currentCompany, client, customization });
     }
   };
 
   const handleDownloadQuotation = async (quotation: Quotation) => {
-    if (!company) return;
+    // Get fresh company data from selectedCompany context
+    const currentCompany = selectedCompany || company;
+    if (!currentCompany) return;
+    
     const client = clients.find(c => c.id === quotation.clientId);
     if (client) {
-      console.log('📥 Loading customization for quotation download:', company.id);
+      console.log('📥 Loading customization for quotation download:', currentCompany.id);
+      console.log('🖼️ Logo URL:', currentCompany.logoUrl);
+      console.log('✍️ Signature URL:', currentCompany.signatureUrl);
       
       // Load customization settings
-      const customization = await loadCustomization(company.id, 'quotation');
+      const customization = await loadCustomization(currentCompany.id, 'quotation');
       
       console.log('📋 Loaded quotation customization for download');
       
-      generateQuotationPDF({ quotation, company, client, customization });
+      await generateQuotationPDF({ quotation, company: currentCompany, client, customization });
     }
   };
 

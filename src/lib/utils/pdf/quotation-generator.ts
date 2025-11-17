@@ -12,6 +12,8 @@ import { buildItemsTable } from './items-table-builder';
 import { buildTotalsSection } from './totals-builder';
 import { buildTermsAndConditions, buildNotesSection, buildSignature } from './footer-builder';
 import { formatDate } from '@/utils/formatters';
+import { Company } from '@/types';
+import { cloudinaryUrlToBase64 } from '@/lib/services/cloudinary-service';
 
 // Initialize pdfMake fonts
 if (pdfMake.vfs === undefined) {
@@ -19,10 +21,66 @@ if (pdfMake.vfs === undefined) {
 }
 
 /**
+ * Convert company images (logo and signature) to base64
+ */
+async function convertCompanyImagesToBase64(company: Company): Promise<Company> {
+  const companyWithImages = { ...company };
+
+  // Convert logo URL to base64
+  if (company.logoUrl && company.logoUrl.startsWith('http')) {
+    try {
+      console.log('\n🖼️ LOGO CONVERSION STARTING');
+      console.log('Original URL:', company.logoUrl);
+      
+      const base64Logo = await cloudinaryUrlToBase64(company.logoUrl);
+      companyWithImages.logoUrl = base64Logo;
+      
+      console.log('✅ LOGO CONVERTED');
+      console.log('Format:', base64Logo.substring(0, 30));
+      console.log('Size:', Math.round(base64Logo.length / 1024), 'KB\n');
+    } catch (error) {
+      console.error('\n❌ LOGO CONVERSION FAILED');
+      console.error('Error:', error);
+      console.error('Proceeding without logo\n');
+      companyWithImages.logoUrl = undefined;
+    }
+  } else if (company.logoUrl?.startsWith('data:image/')) {
+    console.log('✅ Logo already in base64 format');
+  }
+
+  // Convert signature URL to base64
+  if (company.signatureUrl && company.signatureUrl.startsWith('http')) {
+    try {
+      console.log('\n✍️ SIGNATURE CONVERSION STARTING');
+      console.log('Original URL:', company.signatureUrl);
+      
+      const base64Signature = await cloudinaryUrlToBase64(company.signatureUrl);
+      companyWithImages.signatureUrl = base64Signature;
+      
+      console.log('✅ SIGNATURE CONVERTED');
+      console.log('Format:', base64Signature.substring(0, 30));
+      console.log('Size:', Math.round(base64Signature.length / 1024), 'KB\n');
+    } catch (error) {
+      console.error('\n❌ SIGNATURE CONVERSION FAILED');
+      console.error('Error:', error);
+      console.error('Proceeding without signature\n');
+      companyWithImages.signatureUrl = undefined;
+    }
+  } else if (company.signatureUrl?.startsWith('data:image/')) {
+    console.log('✅ Signature already in base64 format');
+  }
+
+  return companyWithImages;
+}
+
+/**
  * Generate and download quotation PDF
  */
-export function generateQuotationPDF(data: QuotationPDFData): void {
+export async function generateQuotationPDF(data: QuotationPDFData): Promise<void> {
   const { quotation, company, client, customization } = data;
+
+  // Convert image URLs to base64
+  const companyWithImages = await convertCompanyImagesToBase64(company);
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
@@ -33,7 +91,7 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
     content: [
       // Header with company logo and details
-      buildCompanyHeader(company, customization),
+      buildCompanyHeader(companyWithImages, customization),
 
       // Quotation Title
       buildInvoiceTitle(customization, 'quotation'),
@@ -70,7 +128,7 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
       ...buildNotesSection(customization),
 
       // Signature
-      buildSignature(company, customization),
+      buildSignature(companyWithImages, customization),
     ],
     styles: {
       tableHeader: {
@@ -93,8 +151,11 @@ export function generateQuotationPDF(data: QuotationPDFData): void {
 /**
  * Preview quotation PDF in new window
  */
-export function previewQuotationPDF(data: QuotationPDFData): void {
+export async function previewQuotationPDF(data: QuotationPDFData): Promise<void> {
   const { quotation, company, client, customization } = data;
+
+  // Convert image URLs to base64
+  const companyWithImages = await convertCompanyImagesToBase64(company);
 
   console.log('📥 Previewing quotation with customization:', {
     hasCustomization: !!customization,
@@ -112,7 +173,7 @@ export function previewQuotationPDF(data: QuotationPDFData): void {
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
     content: [
       // Header with company logo and details
-      buildCompanyHeader(company, customization),
+      buildCompanyHeader(companyWithImages, customization),
 
       // Quotation Title
       buildInvoiceTitle(customization, 'quotation'),
@@ -149,7 +210,7 @@ export function previewQuotationPDF(data: QuotationPDFData): void {
       ...buildNotesSection(customization),
 
       // Signature
-      buildSignature(company, customization),
+      buildSignature(companyWithImages, customization),
     ],
     styles: {
       tableHeader: {

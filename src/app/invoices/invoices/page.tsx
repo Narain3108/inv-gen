@@ -257,18 +257,24 @@ function InvoicesContent() {
 
   const handleViewInvoice = async (invoice: Invoice) => {
     if (!company) return;
+    
+    // Get fresh company data from selectedCompany context
+    const currentCompany = selectedCompany || company;
+    
     const client = clients.find(c => c.id === invoice.clientId);
     if (!client) {
       toast.error('Client not found for this invoice.');
       return;
     }
 
-    // Load and debug customization
-    console.log('📥 Loading customization for company:', company.id);
-    const customization = await loadCustomization(company.id, 'invoice');
+    console.log('📥 Loading customization for company:', currentCompany.id);
+    console.log('🖼️ Logo URL:', currentCompany.logoUrl);
+    console.log('✍️ Signature URL:', currentCompany.signatureUrl);
+    
+    const customization = await loadCustomization(currentCompany.id, 'invoice');
     console.log('📋 Loaded customization:', JSON.stringify(customization?.table?.columns, null, 2));
     
-    const pdfData = { invoice, company, client, customization };
+    const pdfData = { invoice, company: currentCompany, client, customization };
     previewInvoicePDF(pdfData as any);
   };
 
@@ -279,7 +285,14 @@ function InvoicesContent() {
   };
 
   const handleCopyTypeSelected = async (copyType: 'original' | 'duplicate') => {
-    if (!company || !downloadInvoice) return;
+    if (!downloadInvoice) return;
+    
+    // Get fresh company data from selectedCompany context
+    const currentCompany = selectedCompany || company;
+    if (!currentCompany) {
+      toast.error('Company not found.');
+      return;
+    }
     
     const client = clients.find(c => c.id === downloadInvoice.clientId);
     if (!client) {
@@ -287,16 +300,44 @@ function InvoicesContent() {
       return;
     }
     
-    // Load and debug customization
-    console.log('📥 Loading customization for company:', company.id);
-    console.log('📄 Copy Type:', copyType);
-    const customization = await loadCustomization(company.id, 'invoice');
-    console.log('📋 Loaded customization:', JSON.stringify(customization?.table?.columns, null, 2));
+    // Show loading toast with details
+    const hasImages = !!(currentCompany.logoUrl || currentCompany.signatureUrl);
+    if (hasImages) {
+      toast.loading('Converting images for PDF...', { id: 'pdf-generation' });
+    } else {
+      toast.loading('Generating PDF...', { id: 'pdf-generation' });
+    }
     
-    const pdfData = { invoice: downloadInvoice, company, client, customization, copyType };
-    generateInvoicePDF(pdfData as any);
+    try {
+      console.log('\n═══════════════════════════════════════');
+      console.log('📄 PDF GENERATION STARTED');
+      console.log('Company:', currentCompany.name);
+      console.log('Invoice:', downloadInvoice.invoiceNumber);
+      console.log('Copy Type:', copyType);
+      console.log('Has Logo:', !!currentCompany.logoUrl);
+      console.log('Logo URL:', currentCompany.logoUrl);
+      console.log('Has Signature:', !!currentCompany.signatureUrl);
+      console.log('Signature URL:', currentCompany.signatureUrl);
+      console.log('═══════════════════════════════════════\n');
+      
+      const customization = await loadCustomization(currentCompany.id, 'invoice');
+      const pdfData = { invoice: downloadInvoice, company: currentCompany, client, customization, copyType };
+      
+      await generateInvoicePDF(pdfData as any);
+      
+      console.log('\n✅ PDF GENERATION COMPLETED');
+      console.log('═══════════════════════════════════════\n');
+      
+      toast.success('PDF generated successfully!', { id: 'pdf-generation' });
+    } catch (error) {
+      console.error('\n❌ PDF GENERATION FAILED');
+      console.error('Error:', error);
+      console.error('═══════════════════════════════════════\n');
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`PDF generation failed: ${errorMessage}`, { id: 'pdf-generation' });
+    }
     
-    // Reset state
     setDownloadInvoice(null);
   };
 

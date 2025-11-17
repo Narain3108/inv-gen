@@ -106,15 +106,50 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
     return { text: '', margin: [0, 20, 0, 0] };
   }
 
+  // Build signature content - image if available, otherwise text
+  const signatureContent: any[] = [];
+
+  // Add signature image if available
+  if (company.signatureUrl) {
+    signatureContent.push({
+      image: company.signatureUrl,
+      width: 120,
+      height: 40,
+      alignment: 'center',
+      margin: [0, 0, 0, 5],
+    });
+  } else {
+    // Add space for manual signature if no image
+    signatureContent.push({
+      text: '____________________',
+      fontSize: 9,
+      alignment: 'center',
+      margin: [0, 30, 0, 5],
+    });
+  }
+
+  // Add signature label
+  signatureContent.push({
+    text: signatureLabel,
+    fontSize: 9,
+    alignment: 'center',
+    margin: [0, 0, 0, 2],
+  });
+
+  // Add company name
+  signatureContent.push({
+    text: company.name,
+    fontSize: 9,
+    bold: true,
+    alignment: 'center',
+  });
+
   return {
     columns: [
       { width: '*', text: '' },
       {
         width: 150,
-        stack: [
-          { text: signatureLabel, fontSize: 9, alignment: 'center', margin: [0, 40, 0, 0] },
-          { text: company.name, fontSize: 9, bold: true, alignment: 'center' },
-        ],
+        stack: signatureContent,
       },
     ],
     margin: [0, 20, 0, 0],

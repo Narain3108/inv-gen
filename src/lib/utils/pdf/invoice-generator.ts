@@ -12,6 +12,8 @@ import { buildItemsTable } from './items-table-builder';
 import { buildTotalsSection } from './totals-builder';
 import { buildBankDetails, buildTermsAndConditions, buildNotesSection, buildSignature } from './footer-builder';
 import { getPageWatermark } from './watermark-builder';
+import { Company } from '@/types';
+import { cloudinaryUrlToBase64 } from '@/lib/services/cloudinary-service';
 
 // Initialize pdfMake fonts
 if (pdfMake.vfs === undefined) {
@@ -19,10 +21,66 @@ if (pdfMake.vfs === undefined) {
 }
 
 /**
+ * Convert company images (logo and signature) to base64
+ */
+async function convertCompanyImagesToBase64(company: Company): Promise<Company> {
+  const companyWithImages = { ...company };
+
+  // Convert logo URL to base64
+  if (company.logoUrl && company.logoUrl.startsWith('http')) {
+    try {
+      console.log('\n🖼️ LOGO CONVERSION STARTING');
+      console.log('Original URL:', company.logoUrl);
+      
+      const base64Logo = await cloudinaryUrlToBase64(company.logoUrl);
+      companyWithImages.logoUrl = base64Logo;
+      
+      console.log('✅ LOGO CONVERTED');
+      console.log('Format:', base64Logo.substring(0, 30));
+      console.log('Size:', Math.round(base64Logo.length / 1024), 'KB\n');
+    } catch (error) {
+      console.error('\n❌ LOGO CONVERSION FAILED');
+      console.error('Error:', error);
+      console.error('Proceeding without logo\n');
+      companyWithImages.logoUrl = undefined;
+    }
+  } else if (company.logoUrl?.startsWith('data:image/')) {
+    console.log('✅ Logo already in base64 format');
+  }
+
+  // Convert signature URL to base64
+  if (company.signatureUrl && company.signatureUrl.startsWith('http')) {
+    try {
+      console.log('\n✍️ SIGNATURE CONVERSION STARTING');
+      console.log('Original URL:', company.signatureUrl);
+      
+      const base64Signature = await cloudinaryUrlToBase64(company.signatureUrl);
+      companyWithImages.signatureUrl = base64Signature;
+      
+      console.log('✅ SIGNATURE CONVERTED');
+      console.log('Format:', base64Signature.substring(0, 30));
+      console.log('Size:', Math.round(base64Signature.length / 1024), 'KB\n');
+    } catch (error) {
+      console.error('\n❌ SIGNATURE CONVERSION FAILED');
+      console.error('Error:', error);
+      console.error('Proceeding without signature\n');
+      companyWithImages.signatureUrl = undefined;
+    }
+  } else if (company.signatureUrl?.startsWith('data:image/')) {
+    console.log('✅ Signature already in base64 format');
+  }
+
+  return companyWithImages;
+}
+
+/**
  * Generate and download invoice PDF
  */
-export function generateInvoicePDF(data: InvoicePDFData): void {
+export async function generateInvoicePDF(data: InvoicePDFData): Promise<void> {
   const { invoice, company, client, customization, copyType } = data;
+
+  // Convert image URLs to base64
+  const companyWithImages = await convertCompanyImagesToBase64(company);
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
@@ -36,7 +94,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
       ...getPageWatermark(copyType),
 
       // Header with company logo and details
-      buildCompanyHeader(company, customization),
+      buildCompanyHeader(companyWithImages, customization),
 
       // Invoice Title
       buildInvoiceTitle(customization, 'invoice'),
@@ -54,7 +112,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
       ...buildTotalsSection(invoice, customization),
 
       // Bank Details
-      ...buildBankDetails(company, customization),
+      ...buildBankDetails(companyWithImages, customization),
 
       // Terms and Conditions
       ...buildTermsAndConditions(customization),
@@ -63,7 +121,7 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
       ...buildNotesSection(customization),
 
       // Signature
-      buildSignature(company, customization),
+      buildSignature(companyWithImages, customization),
     ],
     styles: {
       tableHeader: {
@@ -87,8 +145,11 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
 /**
  * Preview invoice PDF in new window
  */
-export function previewInvoicePDF(data: InvoicePDFData): void {
+export async function previewInvoicePDF(data: InvoicePDFData): Promise<void> {
   const { invoice, company, client, customization } = data;
+
+  // Convert image URLs to base64
+  const companyWithImages = await convertCompanyImagesToBase64(company);
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
@@ -99,7 +160,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
     content: [
       // Header with company logo and details
-      buildCompanyHeader(company, customization),
+      buildCompanyHeader(companyWithImages, customization),
 
       // Invoice Title
       buildInvoiceTitle(customization, 'invoice'),
@@ -117,7 +178,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
       ...buildTotalsSection(invoice, customization),
 
       // Bank Details
-      ...buildBankDetails(company, customization),
+      ...buildBankDetails(companyWithImages, customization),
 
       // Terms and Conditions
       ...buildTermsAndConditions(customization),
@@ -126,7 +187,7 @@ export function previewInvoicePDF(data: InvoicePDFData): void {
       ...buildNotesSection(customization),
 
       // Signature
-      buildSignature(company, customization),
+      buildSignature(companyWithImages, customization),
     ],
     styles: {
       tableHeader: {

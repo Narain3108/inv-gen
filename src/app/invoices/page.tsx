@@ -244,7 +244,7 @@ function InvoicesContent() {
     }
 
     const pdfData = { invoice, company, client };
-    previewInvoicePDF(pdfData as any);
+    await previewInvoicePDF(pdfData as any);
   };
 
   const handleDownloadInvoice = (invoice: Invoice) => {
@@ -256,7 +256,7 @@ function InvoicesContent() {
     }
     
     const pdfData = { invoice, company, client };
-    generateInvoicePDF(pdfData as any);
+    await generateInvoicePDF(pdfData as any);
   };
 
   if (loading) {

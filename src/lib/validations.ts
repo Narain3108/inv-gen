@@ -48,6 +48,7 @@ export const companyFormSchema = z.object({
   pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')),
   website: z.string().url('Invalid website URL').optional().or(z.literal('')),
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')),
+  signatureUrl: z.string().url('Invalid signature URL').optional().or(z.literal('')),
   termsAndConditions: z.string().max(1000, 'Terms must be less than 1000 characters').optional().or(z.literal('')),
   additionalNotes: z.string().max(500, 'Notes must be less than 500 characters').optional().or(z.literal('')),
 });
