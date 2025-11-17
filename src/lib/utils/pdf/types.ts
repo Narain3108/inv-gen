@@ -10,6 +10,7 @@ export interface InvoicePDFData {
   company: Company;
   client: Client;
   customization?: InvoiceCustomization;
+  copyType?: 'original' | 'duplicate'; // Invoice copy type
 }
 
 export interface QuotationPDFData {

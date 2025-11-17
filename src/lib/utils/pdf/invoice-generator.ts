@@ -11,6 +11,7 @@ import { buildAddressSection } from './address-builder';
 import { buildItemsTable } from './items-table-builder';
 import { buildTotalsSection } from './totals-builder';
 import { buildBankDetails, buildTermsAndConditions, buildNotesSection, buildSignature } from './footer-builder';
+import { getPageWatermark } from './watermark-builder';
 
 // Initialize pdfMake fonts
 if (pdfMake.vfs === undefined) {
@@ -21,7 +22,7 @@ if (pdfMake.vfs === undefined) {
  * Generate and download invoice PDF
  */
 export function generateInvoicePDF(data: InvoicePDFData): void {
-  const { invoice, company, client, customization } = data;
+  const { invoice, company, client, customization, copyType } = data;
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
@@ -31,6 +32,9 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
     pageSize,
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
     content: [
+      // Watermark for duplicate copy (top right corner)
+      ...getPageWatermark(copyType),
+
       // Header with company logo and details
       buildCompanyHeader(company, customization),
 
@@ -75,7 +79,8 @@ export function generateInvoicePDF(data: InvoicePDFData): void {
   };
 
   // Generate and download PDF
-  const fileName = `Invoice_${invoice.invoiceNumber}_${Date.now()}.pdf`;
+  const copyLabel = copyType === 'duplicate' ? '_DUPLICATE' : '';
+  const fileName = `Invoice_${invoice.invoiceNumber}${copyLabel}_${Date.now()}.pdf`;
   pdfMake.createPdf(docDefinition as any).download(fileName);
 }
 

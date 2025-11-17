@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
-import { InvoiceForm, InvoiceList, PaymentDialog, CustomizationDialog } from '@/components/invoices';
+import { InvoiceForm, InvoiceList, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
 import {
@@ -81,6 +81,8 @@ function InvoicesContent() {
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isCustomizationDialogOpen, setIsCustomizationDialogOpen] = useState(false);
+  const [isCopyTypeDialogOpen, setIsCopyTypeDialogOpen] = useState(false);
+  const [downloadInvoice, setDownloadInvoice] = useState<Invoice | null>(null);
 
   // Set company when selectedCompany changes
   useEffect(() => {
@@ -271,8 +273,15 @@ function InvoicesContent() {
   };
 
   const handleDownloadInvoice = async (invoice: Invoice) => {
-    if (!company) return;
-    const client = clients.find(c => c.id === invoice.clientId);
+    // Open copy type dialog
+    setDownloadInvoice(invoice);
+    setIsCopyTypeDialogOpen(true);
+  };
+
+  const handleCopyTypeSelected = async (copyType: 'original' | 'duplicate') => {
+    if (!company || !downloadInvoice) return;
+    
+    const client = clients.find(c => c.id === downloadInvoice.clientId);
     if (!client) {
       toast.error('Client not found for this invoice.');
       return;
@@ -280,11 +289,15 @@ function InvoicesContent() {
     
     // Load and debug customization
     console.log('📥 Loading customization for company:', company.id);
+    console.log('📄 Copy Type:', copyType);
     const customization = await loadCustomization(company.id, 'invoice');
     console.log('📋 Loaded customization:', JSON.stringify(customization?.table?.columns, null, 2));
     
-    const pdfData = { invoice, company, client, customization };
+    const pdfData = { invoice: downloadInvoice, company, client, customization, copyType };
     generateInvoicePDF(pdfData as any);
+    
+    // Reset state
+    setDownloadInvoice(null);
   };
 
   const handleOpenPaymentDialog = (invoice: Invoice) => {
@@ -456,6 +469,13 @@ function InvoicesContent() {
           onSave={loadInvoices}
         />
       )}
+
+      {/* Copy Type Dialog */}
+      <CopyTypeDialog
+        open={isCopyTypeDialogOpen}
+        onOpenChange={setIsCopyTypeDialogOpen}
+        onSelectCopyType={handleCopyTypeSelected}
+      />
     </div>
   );
 }
