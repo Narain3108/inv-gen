@@ -16,10 +16,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Search, RefreshCw, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
 import { fetchHSNDetails } from '@/lib/api/gst-api';
+import { getSuggestedGSTRate, findCategoryByHSN, findCategoryByProductName } from '@/lib/services/product-category-service';
 import { z } from 'zod';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -34,6 +35,7 @@ interface ProductFormProps {
 export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingHSN, setIsFetchingHSN] = useState(false);
+  const [autoFilledFrom, setAutoFilledFrom] = useState<string | null>(null);
 
   // Function to generate 5-digit item code
   const generateItemCode = () => {
@@ -74,8 +76,71 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   const hsn = watch('hsn');
   const productType = watch('type');
   const itemCode = watch('itemCode');
+  const productName = watch('productName');
+  const currentGstRate = watch('gstRate');
 
-  // Auto-fetch HSN details
+  // Auto-check categories when HSN changes - auto-fill name and GST
+  React.useEffect(() => {
+    if (!product && hsn && hsn.length >= 4) {
+      autoFillFromCategory();
+    }
+  }, [hsn]);
+
+  // Separate check for product name changes (only updates GST, not name)
+  React.useEffect(() => {
+    if (!product && productName && productName.length >= 3 && !autoFilledFrom) {
+      const debounce = setTimeout(() => {
+        checkGSTRateByName();
+      }, 500);
+      return () => clearTimeout(debounce);
+    }
+  }, [productName]);
+
+  // Auto-fill product name, item code, and GST rate from HSN match
+  const autoFillFromCategory = async () => {
+    try {
+      const hsnMatch = await findCategoryByHSN(hsn);
+      if (hsnMatch) {
+        // Auto-fill product name
+        setValue('productName', hsnMatch.product.name);
+        
+        // Auto-fill GST rate
+        setValue('gstRate', hsnMatch.category.defaultGstRate);
+        
+        // Auto-fill item code if available
+        if (hsnMatch.product.itemCode) {
+          setValue('itemCode', hsnMatch.product.itemCode);
+        }
+        
+        setAutoFilledFrom(hsnMatch.category.categoryName);
+        toast.success(
+          `Auto-filled product details from category: ${hsnMatch.category.categoryName}`,
+          { duration: 3000 }
+        );
+      }
+    } catch (error) {
+      console.error('Error auto-filling from category:', error);
+    }
+  };
+
+  // Check GST rate by product name (doesn't change name, only GST)
+  const checkGSTRateByName = async () => {
+    try {
+      const nameMatch = await findCategoryByProductName(productName);
+      if (nameMatch && currentGstRate !== nameMatch.category.defaultGstRate) {
+        setValue('gstRate', nameMatch.category.defaultGstRate);
+        setAutoFilledFrom(nameMatch.category.categoryName);
+        toast.success(
+          `GST rate (${nameMatch.category.defaultGstRate}%) auto-filled from category: ${nameMatch.category.categoryName}`,
+          { duration: 3000 }
+        );
+      }
+    } catch (error) {
+      console.error('Error checking GST rate by name:', error);
+    }
+  };
+
+  // Auto-fetch HSN details and check categories
   const handleFetchHSN = async () => {
     if (!hsn || (hsn.length !== 4 && hsn.length !== 6 && hsn.length !== 8)) {
       toast.error('Please enter a valid HSN code (4, 6, or 8 digits)');
@@ -84,6 +149,21 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
 
     setIsFetchingHSN(true);
     try {
+      // First, check if HSN matches a category
+      const categoryMatch = await findCategoryByHSN(hsn);
+      if (categoryMatch) {
+        setValue('productName', categoryMatch.product.name);
+        setValue('gstRate', categoryMatch.category.defaultGstRate);
+        if (categoryMatch.product.itemCode) {
+          setValue('itemCode', categoryMatch.product.itemCode);
+        }
+        setAutoFilledFrom(categoryMatch.category.categoryName);
+        toast.success(`Auto-filled from category: ${categoryMatch.category.categoryName}`);
+        setIsFetchingHSN(false);
+        return;
+      }
+
+      // If no category match, try GST API
       const details = await fetchHSNDetails(hsn);
       if (details) {
         setValue('productName', details.description);
@@ -114,6 +194,23 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {/* Auto-filled Notice */}
+      {autoFilledFrom && !product && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Tag className="h-5 w-5 text-green-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-green-900 mb-1">
+                Product Details Auto-filled
+              </h3>
+              <p className="text-sm text-green-700">
+                Product name, HSN code, and GST rate have been automatically filled from category: <strong>{autoFilledFrom}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Basic Information */}
       <Card>
         <CardHeader>

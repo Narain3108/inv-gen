@@ -79,6 +79,29 @@ export interface CompanyFormData {
 
 // ==================== Product/Service Types ====================
 
+export interface ProductCategory {
+  id: string;
+  categoryName: string;
+  description?: string;
+  products: CategoryProduct[];
+  defaultGstRate: number; // Default GST rate for this category
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface CategoryProduct {
+  name: string;
+  hsn: string;
+  itemCode?: string;
+}
+
+export interface ProductCategoryFormData {
+  categoryName: string;
+  description?: string;
+  products: CategoryProduct[];
+  defaultGstRate: number;
+}
+
 export interface Product {
   id: string;
   companyId: string;
@@ -93,6 +116,7 @@ export interface Product {
   stock?: number;
   type: 'product' | 'service';
   hasSerialNumber?: boolean; // Whether this product requires serial numbers
+  categoryId?: string; // Reference to global product category
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
