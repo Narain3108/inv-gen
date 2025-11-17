@@ -6,6 +6,7 @@ import { Invoice, Quotation } from '@/types';
 import { InvoiceCustomization } from '@/types/customization';
 import { safeCurrency } from './helpers';
 import { amountToWords } from '@/lib/utils/number-to-words';
+import { buildGSTBreakdownTable, buildSummaryTotals } from './gst-breakdown-builder';
 
 /**
  * Build tax summary/totals section
@@ -19,7 +20,28 @@ export const buildTotalsSection = (
   const showSGST = customization?.totals?.showSGST !== false;
   const showIGST = customization?.totals?.showIGST !== false;
   const showAmountInWords = customization?.totals?.showAmountInWords !== false;
+  const showGSTBreakdown = customization?.totals?.showGSTBreakdown !== false;
 
+  // If GST breakdown is enabled and available, show detailed breakdown
+  if (showGSTBreakdown && data.taxBreakdown && data.taxBreakdown.length > 0) {
+    return [
+      // Detailed GST Breakdown Table
+      ...buildGSTBreakdownTable(data, customization),
+      
+      // Summary Totals (just grand total)
+      ...buildSummaryTotals(data, customization),
+
+      // Amount in Words
+      ...(showAmountInWords ? [{
+        text: `Amount in Words: ${data.totalAmountInWords || amountToWords(data.totalAmount)}`,
+        fontSize: 9,
+        bold: true,
+        margin: [0, 10, 0, 20],
+      }] : []),
+    ];
+  }
+
+  // Otherwise, show simple totals (legacy format)
   return [
     // Tax Summary
     {

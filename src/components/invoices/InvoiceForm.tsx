@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
-import { calculateInvoiceTotals } from '@/lib/utils/tax-calculator';
+import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { z } from 'zod';
@@ -190,6 +190,18 @@ export function InvoiceForm({
     const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
     const grandTotal = totalTaxableAmount + totalTax;
 
+    // Calculate tax breakdown by GST rate
+    const taxBreakdown = calculateTaxBreakdown(
+      validItems.map(item => ({
+        amount: Number(item.unitPrice) || 0,
+        quantity: Number(item.quantity) || 0,
+        gstRate: products.find(p => p.id === item.productId)?.gstRate || 0,
+        discount: Number(item.discount) || 0,
+      })),
+      companyState,
+      selectedClient.address.state
+    );
+
     return {
       items: processedItems,
       taxableAmount: totalTaxableAmount,
@@ -198,6 +210,7 @@ export function InvoiceForm({
       igst: totalIgst,
       totalAmount: grandTotal,
       totalAmountInWords: '', // This will be generated on the server
+      taxBreakdown, // Add GST breakdown by rate
     };
   };
 

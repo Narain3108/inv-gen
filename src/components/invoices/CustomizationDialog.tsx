@@ -448,6 +448,7 @@ export function CustomizationDialog({
                 <CardContent className="space-y-3">
                   {Object.entries({
                     showTaxableAmount: 'Show Taxable Amount',
+                    showGSTBreakdown: 'Show GST Breakdown by Rate',
                     showCGST: 'Show CGST',
                     showSGST: 'Show SGST',
                     showIGST: 'Show IGST',

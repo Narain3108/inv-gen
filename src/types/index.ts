@@ -162,6 +162,8 @@ export interface InvoiceItem {
 }
 
 export interface TaxBreakdown {
+  rate: number; // GST rate (5, 12, 18, 28, etc.)
+  taxableAmount: number; // Taxable amount for this rate
   cgst: number;
   sgst: number;
   igst: number;
@@ -194,6 +196,7 @@ export interface Invoice {
   cgst: number;
   sgst: number;
   igst: number;
+  taxBreakdown?: TaxBreakdown[]; // GST breakdown by rate (5%, 12%, 18%, 28%, etc.)
   // Payment tracking fields
   paymentStatus: InvoicePaymentStatus;
   amountPaid: number;
@@ -234,6 +237,7 @@ export interface Quotation {
   cgst: number;
   sgst: number;
   igst: number;
+  taxBreakdown?: TaxBreakdown[]; // GST breakdown by rate (5%, 12%, 18%, 28%, etc.)
   convertedToInvoiceId?: string; // Reference to invoice if converted
   createdAt: Timestamp;
   updatedAt: Timestamp;

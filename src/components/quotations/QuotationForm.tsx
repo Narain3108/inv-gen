@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, Trash2, Calculator, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/utils/formatters';
+import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { z } from 'zod';
 
 type QuotationFormData = z.infer<typeof quotationFormSchema>;
@@ -185,6 +186,18 @@ export function QuotationForm({
     const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
     const grandTotal = totalTaxableAmount + totalTax;
 
+    // Calculate tax breakdown by GST rate
+    const taxBreakdown = calculateTaxBreakdown(
+      validItems.map(item => ({
+        amount: Number(item.unitPrice) || 0,
+        quantity: Number(item.quantity) || 0,
+        gstRate: products.find(p => p.id === item.productId)?.gstRate || 0,
+        discount: Number(item.discount) || 0,
+      })),
+      companyState,
+      selectedClient.address.state
+    );
+
     return {
       items: processedItems,
       taxableAmount: totalTaxableAmount,
@@ -193,6 +206,7 @@ export function QuotationForm({
       igst: totalIgst,
       totalAmount: grandTotal,
       totalAmountInWords: '',
+      taxBreakdown, // Add GST breakdown by rate
     };
   };
 

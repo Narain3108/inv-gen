@@ -66,6 +66,7 @@ export interface TotalsFormat {
   showDiscount: boolean;
   showRoundOff: boolean;
   showAmountInWords: boolean;
+  showGSTBreakdown: boolean; // Show CGST/SGST/IGST breakdown by GST rate
 }
 
 export interface FooterFormat {
@@ -200,6 +201,7 @@ export const DEFAULT_INVOICE_CUSTOMIZATION: Omit<InvoiceCustomization, 'id' | 'c
     showDiscount: false,
     showRoundOff: false,
     showAmountInWords: true,
+    showGSTBreakdown: true, // Show detailed GST breakdown by rate
   },
 
   footer: {
@@ -235,7 +237,11 @@ export const DEFAULT_QUOTATION_CUSTOMIZATION: Omit<InvoiceCustomization, 'id' | 
   },
   footer: {
     ...DEFAULT_INVOICE_CUSTOMIZATION.footer,
-    termsText: 'This quotation is valid for 30 days from the date of issue.\nPrices are subject to change without notice.',
+    termsText: 'This quotation is valid for 30 days from the date of issue.\\nPrices are subject to change without notice.',
     thankYouText: 'We look forward to serving you!',
+  },
+  totals: {
+    ...DEFAULT_INVOICE_CUSTOMIZATION.totals,
+    showGSTBreakdown: true,
   },
 };
