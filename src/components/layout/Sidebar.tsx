@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   Package,
@@ -79,15 +79,38 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, companiesLoading } = useAppData();
+  const [hasAutoSelected, setHasAutoSelected] = React.useState(false);
 
   useEffect(() => {
-    // If no company is selected and we have companies, select the first one
-    if (!selectedCompany && companies.length > 0) {
-      setSelectedCompany(companies[0]);
-    }
-  }, [companies, selectedCompany, setSelectedCompany]);
+    // Only run this logic once when companies are loaded
+    if (hasAutoSelected || companies.length === 0 || companiesLoading) return;
+    
+    // Give Zustand persist time to hydrate from localStorage
+    const timer = setTimeout(() => {
+      if (selectedCompany) {
+        // Company already selected (from localStorage persistence)
+        console.log('✅ Using persisted company:', selectedCompany.name, '(ID:', selectedCompany.id + ')');
+        
+        // Verify the selected company still exists in the loaded companies
+        const companyStillExists = companies.find(c => c.id === selectedCompany.id);
+        if (!companyStillExists) {
+          console.warn('⚠️ Persisted company no longer exists, selecting first available');
+          setSelectedCompany(companies[0]);
+        }
+      } else {
+        // No company selected, auto-select the first one
+        console.log('📌 No persisted company found, auto-selecting first company:', companies[0].name, '(ID:', companies[0].id + ')');
+        setSelectedCompany(companies[0]);
+      }
+      
+      setHasAutoSelected(true);
+    }, 150); // 150ms delay to ensure Zustand persist completes
+
+    return () => clearTimeout(timer);
+  }, [companies, companiesLoading, selectedCompany, setSelectedCompany, hasAutoSelected]);
 
   return (
     <div className={cn('flex h-full flex-col border-r bg-gradient-to-b from-sidebar to-sidebar/80 backdrop-blur-xl', className)}>

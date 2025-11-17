@@ -70,11 +70,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setCompanies(data);
       console.log('✅ Companies loaded:', data.length);
       
-      // Auto-select first company if none selected
-      if (data.length > 0 && !selectedCompany) {
-        console.log('🎯 Auto-selecting first company:', data[0].name);
-        setSelectedCompany(data[0]);
-      }
+      // DO NOT auto-select here - let Sidebar handle company selection
+      // This prevents overriding persisted company from Zustand localStorage
       
       setCompaniesInitialized(true);
     } catch (error) {
@@ -82,7 +79,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setCompaniesLoading(false);
     }
-  }, [companiesInitialized, companiesLoading, selectedCompany, setSelectedCompany]);
+  }, [companiesInitialized, companiesLoading]);
 
   // Load clients once on mount (global - not company-specific)
   const loadClients = useCallback(async () => {

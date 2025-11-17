@@ -156,21 +156,28 @@ function QuotationsContent() {
     }
   }, [selectedCompany]);
 
+  // Check for companies on mount only
+  // Load data when company is selected
   useEffect(() => {
     if (!initialized) return;
 
-    if (companies.length === 0) {
-      router.push('/invoices/settings/company');
-      toast.error('Please create a company first.');
+    if (companies.length === 0 && selectedCompany === null) {
       return;
     }
 
-    if (selectedCompany) {
+    if (selectedCompany && companies.length > 0) {
       loadData();
     }
-  }, [selectedCompany, initialized, companies.length, loadData, router]);
+  }, [selectedCompany, initialized, companies.length, loadData]);
 
   const handleAddQuotation = () => {
+    // Check if company exists
+    if (companies.length === 0) {
+      toast.error('Please create a company first');
+      router.push('/invoices/settings/company');
+      return;
+    }
+
     if (products.length === 0) {
       toast.error('Please add products first');
       return;

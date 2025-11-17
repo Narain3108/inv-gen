@@ -111,6 +111,7 @@ function DashboardContent() {
   };
 
   useEffect(() => {
+    if (!selectedCompany) return;
     loadData();
   }, [selectedCompany]);
 

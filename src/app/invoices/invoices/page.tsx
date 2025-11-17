@@ -128,24 +128,29 @@ function InvoicesContent() {
     }
   }, [selectedCompany]);
 
-  // Load invoices when company is selected and global data is ready
+  // Load invoices when company is selected and data is ready
   useEffect(() => {
     if (!companiesInitialized || !clientsInitialized) {
       return; // Wait for global data to load
     }
 
-    if (companies.length === 0) {
-      router.push('/invoices/settings/company');
-      toast.error('Please create a company first.');
+    if (companies.length === 0 && selectedCompany === null) {
       return;
     }
 
-    if (selectedCompany) {
+    if (selectedCompany && companies.length > 0) {
       loadInvoices();
     }
-  }, [selectedCompany, companiesInitialized, clientsInitialized, companies.length, loadInvoices, router]);
+  }, [selectedCompany, companiesInitialized, clientsInitialized, companies.length, loadInvoices]);
 
   const handleAddInvoice = () => {
+    // Check if company exists
+    if (companies.length === 0) {
+      toast.error('Please create a company first');
+      router.push('/invoices/settings/company');
+      return;
+    }
+
     if (products.length === 0) {
       toast.error('Please add products first');
       return;
