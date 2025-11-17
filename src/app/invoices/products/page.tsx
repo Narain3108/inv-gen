@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
-import { FilterBar } from '@/components/shared';
+import { FilterBar, ExportButton } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
@@ -21,6 +21,7 @@ import { productFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
+import { exportToExcel, exportToCSV, formatProductsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -124,6 +125,16 @@ function ProductsContent() {
     }
   };
 
+  const handleExportExcel = async () => {
+    const data = formatProductsForExport(filteredProducts);
+    return exportToExcel(data, `products-${new Date().toISOString().split('T')[0]}`, 'Products');
+  };
+
+  const handleExportCSV = async () => {
+    const data = formatProductsForExport(filteredProducts);
+    return exportToCSV(data, `products-${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (!selectedCompany) {
     return (
       <div className="space-y-6">
@@ -151,10 +162,16 @@ function ProductsContent() {
         title="Products & Services"
         description="Manage your products and services catalog"
       >
-        <Button onClick={() => handleOpenForm()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton
+            onExportExcel={handleExportExcel}
+            onExportCSV={handleExportCSV}
+          />
+          <Button onClick={() => handleOpenForm()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filter Bar */}

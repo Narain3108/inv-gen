@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
-import { FilterBar } from '@/components/shared';
+import { FilterBar, ExportButton } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserPlus } from 'lucide-react';
@@ -21,6 +21,7 @@ import { clientFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
+import { exportToExcel, exportToCSV, formatClientsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
@@ -105,6 +106,16 @@ function ClientsContent() {
     }
   };
 
+  const handleExportExcel = async () => {
+    const data = formatClientsForExport(filteredClients);
+    return exportToExcel(data, `clients-${new Date().toISOString().split('T')[0]}`, 'Clients');
+  };
+
+  const handleExportCSV = async () => {
+    const data = formatClientsForExport(filteredClients);
+    return exportToCSV(data, `clients-${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (!selectedCompany) {
     return (
       <div className="space-y-6">
@@ -132,10 +143,16 @@ function ClientsContent() {
         title="Clients"
         description="Manage your client relationships"
       >
-        <Button onClick={() => handleOpenForm()}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Client
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton
+            onExportExcel={handleExportExcel}
+            onExportCSV={handleExportCSV}
+          />
+          <Button onClick={() => handleOpenForm()}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Client
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filter Bar */}

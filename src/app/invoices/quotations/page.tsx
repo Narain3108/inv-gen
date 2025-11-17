@@ -22,7 +22,8 @@ import { db } from '@/lib/firebase/config';
 import { Quotation, Product, Client, Company, QuotationStatus } from '@/types';
 import { QuotationForm, QuotationList, QuotationFilters } from '@/components/quotations';
 import { CustomizationDialog } from '@/components/invoices';
-import { FilterBar } from '@/components/shared';
+import { FilterBar, ExportButton } from '@/components/shared';
+import { exportToExcel, exportToCSV, formatQuotationsForExport } from '@/lib/utils/export-utils';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
 import { Input } from '@/components/ui/input';
@@ -431,6 +432,16 @@ function QuotationsContent() {
     }
   };
 
+  const handleExportExcel = async () => {
+    const data = formatQuotationsForExport(filteredQuotations, clients);
+    return exportToExcel(data, `quotations-${new Date().toISOString().split('T')[0]}`, 'Quotations');
+  };
+
+  const handleExportCSV = async () => {
+    const data = formatQuotationsForExport(filteredQuotations, clients);
+    return exportToCSV(data, `quotations-${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (loading || companiesLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -452,6 +463,10 @@ function QuotationsContent() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportButton
+            onExportExcel={handleExportExcel}
+            onExportCSV={handleExportCSV}
+          />
           <Button 
             variant="outline"
             onClick={() => setIsCustomizationDialogOpen(true)}

@@ -22,7 +22,8 @@ import {
 import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
 import { InvoiceForm, InvoiceList, InvoiceFilters, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
-import { FilterBar } from '@/components/shared';
+import { FilterBar, ExportButton } from '@/components/shared';
+import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils/export-utils';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
 import {
@@ -470,6 +471,16 @@ function InvoicesContent() {
     }
   };
 
+  const handleExportExcel = async () => {
+    const data = formatInvoicesForExport(filteredInvoices, clients);
+    return exportToExcel(data, `invoices-${new Date().toISOString().split('T')[0]}`, 'Invoices');
+  };
+
+  const handleExportCSV = async () => {
+    const data = formatInvoicesForExport(filteredInvoices, clients);
+    return exportToCSV(data, `invoices-${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (loading || !companiesInitialized || !clientsInitialized) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -492,6 +503,10 @@ function InvoicesContent() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportButton
+            onExportExcel={handleExportExcel}
+            onExportCSV={handleExportCSV}
+          />
           <Button variant="outline" onClick={() => setIsCustomizationDialogOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
             Customize Bill

@@ -46,7 +46,12 @@ import {
   RecentInvoices,
   StatsCard,
   TopClients,
+  RevenueChart,
+  GSTSummary,
+  QuotationMetrics,
 } from '@/components/dashboard';
+import { ExportButton } from '@/components/shared';
+import { generateDashboardReport, downloadTextReport } from '@/lib/utils/dashboard-report';
 
 type TimeFilter = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
@@ -120,6 +125,35 @@ function DashboardContent() {
     await loadData();
     setRefreshing(false);
     toast.success('Dashboard refreshed');
+  };
+
+  const handleExportReport = async () => {
+    if (!selectedCompany) return false;
+    
+    try {
+      const report = generateDashboardReport({
+        company: selectedCompany,
+        stats,
+        invoices: getFilteredData(invoices),
+        quotations: getFilteredData(quotations),
+        clients,
+        products,
+        timeFilter,
+      });
+      
+      const filename = `dashboard-report-${selectedCompany.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`;
+      downloadTextReport(report, filename);
+      return true;
+    } catch (error) {
+      console.error('Error generating report:', error);
+      return false;
+    }
+  };
+
+  const handleExportExcel = async () => {
+    // For Excel, we'll create a placeholder - you can enhance this
+    toast.info('Excel export coming soon for dashboard');
+    return false;
   };
 
   // Filter data based on time period
@@ -274,6 +308,15 @@ function DashboardContent() {
         description={`Analytics for ${selectedCompany.name}`}
       >
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExportReport}
+            className="text-primary hover:text-primary"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Report
+          </Button>
           <Select value={timeFilter} onValueChange={(value: TimeFilter) => setTimeFilter(value)}>
             <SelectTrigger className="w-[160px]">
               <Calendar className="h-4 w-4 mr-2" />
@@ -411,6 +454,47 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Revenue and GST Analysis */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Revenue Trend</CardTitle>
+            <CardDescription>
+              Monthly revenue for the last 6 months
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RevenueChart invoices={invoices} />
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>GST Collection</CardTitle>
+            <CardDescription>
+              Tax collection breakdown
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GSTSummary invoices={getFilteredData(invoices)} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quotation Metrics */}
+      {quotations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Quotation Performance</CardTitle>
+            <CardDescription>
+              Quotation conversion and status metrics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QuotationMetrics quotations={getFilteredData(quotations)} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Activity and Invoices */}
       <div className="grid gap-4 md:grid-cols-2">
