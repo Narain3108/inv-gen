@@ -51,7 +51,7 @@ import {
   QuotationMetrics,
 } from '@/components/dashboard';
 import { ExportButton } from '@/components/shared';
-import { generateDashboardReport, downloadTextReport } from '@/lib/utils/dashboard-report';
+import { generateDashboardPDFReport, previewDashboardPDFReport } from '@/lib/utils/dashboard-pdf';
 
 type TimeFilter = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
@@ -131,7 +131,7 @@ function DashboardContent() {
     if (!selectedCompany) return false;
     
     try {
-      const report = generateDashboardReport({
+      await generateDashboardPDFReport({
         company: selectedCompany,
         stats,
         invoices: getFilteredData(invoices),
@@ -141,19 +141,32 @@ function DashboardContent() {
         timeFilter,
       });
       
-      const filename = `dashboard-report-${selectedCompany.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}`;
-      downloadTextReport(report, filename);
+      toast.success('Dashboard report generated successfully');
       return true;
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error('Error generating PDF report:', error);
+      toast.error('Failed to generate PDF report');
       return false;
     }
   };
 
-  const handleExportExcel = async () => {
-    // For Excel, we'll create a placeholder - you can enhance this
-    toast.info('Excel export coming soon for dashboard');
-    return false;
+  const handlePreviewReport = async () => {
+    if (!selectedCompany) return;
+    
+    try {
+      await previewDashboardPDFReport({
+        company: selectedCompany,
+        stats,
+        invoices: getFilteredData(invoices),
+        quotations: getFilteredData(quotations),
+        clients,
+        products,
+        timeFilter,
+      });
+    } catch (error) {
+      console.error('Error previewing PDF report:', error);
+      toast.error('Failed to preview PDF report');
+    }
   };
 
   // Filter data based on time period
@@ -309,13 +322,21 @@ function DashboardContent() {
       >
         <div className="flex items-center gap-3">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={handleExportReport}
+            onClick={handlePreviewReport}
             className="text-primary hover:text-primary"
           >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Preview Report
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExportReport}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Download Report
+            Download PDF Report
           </Button>
           <Select value={timeFilter} onValueChange={(value: TimeFilter) => setTimeFilter(value)}>
             <SelectTrigger className="w-[160px]">

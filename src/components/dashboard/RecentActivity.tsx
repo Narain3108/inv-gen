@@ -20,26 +20,43 @@ interface RecentActivityProps {
 
 export function RecentActivity({ invoices, quotations, clients }: RecentActivityProps) {
   const activities = useMemo(() => {
-    const invActivities = invoices.map((inv) => ({
-      id: inv.id,
-      type: 'invoice' as const,
-      title: `Invoice ${inv.invoiceNumber}`,
-      clientName: clients.find(c => c.id === inv.clientId)?.clientName || 'Unknown',
-      amount: inv.totalAmount,
-      date: inv.date?.toDate ? inv.date.toDate() : new Date(inv.date),
-      status: inv.paymentStatus,
-    }));
+    // Helper function to safely convert Firestore Timestamp to Date
+    const toDate = (timestamp: any): Date => {
+      if (!timestamp) return new Date();
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate();
+      }
+      if (timestamp instanceof Date) return timestamp;
+      return new Date(timestamp);
+    };
 
-    const quotActivities = quotations.map((quot) => ({
-      id: quot.id,
-      type: 'quotation' as const,
-      title: `Quotation ${quot.quotationNumber}`,
-      clientName: clients.find(c => c.id === quot.clientId)?.clientName || 'Unknown',
-      amount: quot.totalAmount,
-      date: quot.date?.toDate ? quot.date.toDate() : new Date(quot.date),
-      status: quot.status,
-    }));
+    // Get last 5 invoices
+    const invActivities = invoices
+      .slice(0, 5)
+      .map((inv) => ({
+        id: inv.id,
+        type: 'invoice' as const,
+        title: `Invoice ${inv.invoiceNumber}`,
+        clientName: clients.find(c => c.id === inv.clientId)?.clientName || 'Unknown',
+        amount: inv.totalAmount,
+        date: toDate(inv.date),
+        status: inv.paymentStatus,
+      }));
 
+    // Get last 5 quotations
+    const quotActivities = quotations
+      .slice(0, 5)
+      .map((quot) => ({
+        id: quot.id,
+        type: 'quotation' as const,
+        title: `Quotation ${quot.quotationNumber}`,
+        clientName: clients.find(c => c.id === quot.clientId)?.clientName || 'Unknown',
+        amount: quot.totalAmount,
+        date: toDate(quot.date),
+        status: quot.status,
+      }));
+
+    // Combine and sort by date, then take top 10 most recent
     return [...invActivities, ...quotActivities]
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 10);
