@@ -1,0 +1,31 @@
+# Django Backend for Invoice Generator
+# Windows-compatible dependencies
+
+# Core Django
+Django==5.0.1
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# Database
+dj-database-url==2.1.0
+
+# Security
+python-decouple==3.8
+
+# Cloudinary Integration
+cloudinary==1.41.0
+
+# API Documentation
+drf-spectacular==0.27.1
+
+# Utilities
+python-dotenv==1.0.1
+Pillow>=10.0.0
+requests==2.31.0
+
+# Production Server
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Date/Time Utilities
+python-dateutil==2.8.2
