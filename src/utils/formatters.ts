@@ -10,6 +10,7 @@
 import { format } from 'date-fns';
 import { CURRENCY, DATE_FORMAT, DATE_TIME_FORMAT, INVOICE_DATE_FORMAT } from '@/lib/constants';
 import { Timestamp } from 'firebase/firestore';
+import { Address, Client } from '@/types';
 
 // ==================== Currency Formatting ====================
 
@@ -306,4 +307,32 @@ export const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+};
+
+const buildAddressSegments = (address?: Address): string[] => {
+  if (!address) return [];
+  return [
+    address.street,
+    address.city,
+    address.state,
+    address.pincode,
+    address.country,
+  ]
+    .filter(Boolean)
+    .map((segment) => segment?.trim()) as string[];
+};
+
+export const formatAddressLabel = (address?: Address): string => {
+  const segments = buildAddressSegments(address);
+  return segments.join(', ');
+};
+
+export const formatClientDropdownLabel = (
+  client: Client,
+  options?: { maxLength?: number }
+): string => {
+  const addressLabel = formatAddressLabel(client.address);
+  const label = `${client.clientName}${addressLabel ? ` (${addressLabel})` : ''}`;
+  const maxLength = options?.maxLength ?? 68;
+  return truncateText(label, maxLength);
 };

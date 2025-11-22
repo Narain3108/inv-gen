@@ -11,6 +11,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Invoice Billing System - GST Compliant",
   description: "Modern invoice billing system for Indian businesses with GST compliance",
+  icons: {
+    icon: "/loo.jpg",
+    shortcut: "/loo.jpg",
+    apple: "/loo.jpg",
+  },
 };
 
 export default function RootLayout({

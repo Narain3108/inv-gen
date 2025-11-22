@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatClientDropdownLabel } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { z } from 'zod';
 
@@ -315,13 +315,15 @@ export function InvoiceForm({
                 value={watch('clientId') || ''}
                 onValueChange={(value) => setValue('clientId', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="min-w-[260px] sm:min-w-[320px] md:min-w-[360px]">
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-[320px] sm:w-[380px]">
                   {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.clientName}
+                    <SelectItem key={client.id} value={client.id} className="text-sm">
+                      <span className="block max-w-[300px] truncate">
+                        {formatClientDropdownLabel(client, { maxLength: 64 })}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

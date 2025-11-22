@@ -262,7 +262,7 @@ function DashboardContent() {
 
     // Low stock products
     const lowStockProducts = products.filter(
-      (p) => p.type === 'product' && typeof p.stock === 'number' && p.stock < 10
+      (p) => p.type === 'product' && typeof p.stock === 'number' && p.stock < 5
     ).length;
 
     return {
@@ -424,30 +424,8 @@ function DashboardContent() {
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Invoice Value</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.averageInvoiceValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per invoice
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Payment Rate</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.paymentRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Collection efficiency
-            </p>
-          </CardContent>
-        </Card>
+
+        
       </div>
 
       {/* Charts and Tables */}

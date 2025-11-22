@@ -169,14 +169,7 @@ export default function LandingPage() {
                 Start Creating Now
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 transition-all duration-200 font-semibold text-base px-8 py-6"
-                onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                See How It Works
-              </Button>
+              
             </div>
 
             {/* Trust Indicators */}
@@ -493,7 +486,7 @@ export default function LandingPage() {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  className="border-2 border-white text-white hover:bg-white/10 font-semibold text-base px-8 py-6"
+                  className="border-2 border-white/20 text-white bg-transparent hover:bg-white/5 hover:border-white/30 transition-all duration-200 font-semibold text-base px-8 py-6 backdrop-blur-sm"
                   onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   Learn More
