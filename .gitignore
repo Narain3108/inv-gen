@@ -12,7 +12,11 @@
 
 # testing
 /coverage
-
+/Backend/venv
+/Backend/__pycache__
+/Backend/*.pyc
+/Backend/logs
+/Backend/db.sqlite3
 # next.js
 /.next/
 /out/
