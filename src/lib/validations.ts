@@ -104,7 +104,7 @@ export const invoiceItemSchema = z.object({
 // ==================== Invoice Schema ====================
 
 export const invoiceFormSchema = z.object({
-  invoiceNumber: z.string().min(1, 'Invoice number is required'),
+  invoiceNumber: z.string().optional(),
   clientId: z.string().min(1, 'Client is required'),
   date: z.string().min(1, 'Invoice date is required'), // Store as string, convert to Date in handler
   items: z.array(z.object({
@@ -118,6 +118,7 @@ export const invoiceFormSchema = z.object({
 // ==================== Quotation Schema ====================
 
 export const quotationFormSchema = z.object({
+  quotationNumber: z.string().optional(),
   clientId: z.string().min(1, 'Client is required'),
   date: z.string().min(1, 'Quotation date is required'),
   validUntil: z.string().min(1, 'Valid until date is required'),

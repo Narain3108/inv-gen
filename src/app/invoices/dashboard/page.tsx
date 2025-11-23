@@ -320,26 +320,10 @@ function DashboardContent() {
         title="Dashboard"
         description={`Analytics for ${selectedCompany.name}`}
       >
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePreviewReport}
-            className="text-primary hover:text-primary"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Preview Report
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleExportReport}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF Report
-          </Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {/* Mobile: Full-width select */}
           <Select value={timeFilter} onValueChange={(value: TimeFilter) => setTimeFilter(value)}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px] h-10">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -352,25 +336,50 @@ function DashboardContent() {
               <SelectItem value="all">All Time</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          
+          {/* Mobile: Horizontal button group */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePreviewReport}
+              className="flex-1 sm:flex-initial text-primary hover:text-primary dark:border-primary/30 dark:hover:border-primary/50 h-10"
+            >
+              <BarChart3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Preview</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExportReport}
+              className="flex-1 sm:flex-initial h-10"
+            >
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">Export</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="dark:border-primary/30 dark:hover:border-primary/50 h-10 w-10 shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </PageHeader>
 
       {/* Key Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatsCard
           title="Total Revenue"
           value={formatCurrency(stats.totalRevenue)}
           change={stats.revenueGrowth}
           icon={DollarSign}
           trend={stats.revenueGrowth >= 0 ? 'up' : 'down'}
+          className="col-span-2 lg:col-span-1"
         />
         <StatsCard
           title="Total Invoices"
@@ -378,46 +387,47 @@ function DashboardContent() {
           change={stats.invoicesGrowth}
           icon={FileText}
           trend={stats.invoicesGrowth >= 0 ? 'up' : 'down'}
+          className="col-span-2 lg:col-span-1"
         />
         <StatsCard
           title="Amount Pending"
           value={formatCurrency(stats.pendingAmount)}
           icon={Clock}
-          iconColor="text-orange-500"
+          iconColor="text-orange-500 dark:text-orange-400"
         />
         <StatsCard
           title="Amount Received"
           value={formatCurrency(stats.paidAmount)}
           icon={CheckCircle2}
-          iconColor="text-green-500"
+          iconColor="text-green-500 dark:text-green-400"
         />
       </div>
 
       {/* Secondary Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 transition-all duration-200 hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Clients</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalClients}</div>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{stats.totalClients}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Active clients
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Products</CardTitle>
+        <Card className="border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 transition-all duration-200 hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Products</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{stats.totalProducts}</div>
             {stats.lowStockProducts > 0 && (
               <div className="flex items-center gap-1 mt-1">
-                <AlertCircle className="h-3 w-3 text-orange-500" />
-                <p className="text-xs text-orange-500">
+                <AlertCircle className="h-3 w-3 text-orange-500 dark:text-orange-400" />
+                <p className="text-xs text-orange-500 dark:text-orange-400">
                   {stats.lowStockProducts} low stock
                 </p>
               </div>
@@ -429,26 +439,26 @@ function DashboardContent() {
       </div>
 
       {/* Charts and Tables */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Payment Status</CardTitle>
-            <CardDescription>
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-7">
+        <Card className="lg:col-span-4 border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Payment Status</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Overview of invoice payment statuses
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <PaymentStatusChart invoices={getFilteredData(invoices)} />
           </CardContent>
         </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Top Clients</CardTitle>
-            <CardDescription>
+        <Card className="lg:col-span-3 border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Top Clients</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Clients by total invoice value
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <TopClients invoices={getFilteredData(invoices)} clients={clients} />
           </CardContent>
         </Card>

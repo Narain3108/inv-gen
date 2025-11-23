@@ -50,6 +50,7 @@ import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
+import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { DashboardLayout } from '@/components/layout';
 import { z } from 'zod';
 import { invoiceFormSchema } from '@/lib/validations';
@@ -153,6 +154,29 @@ function InvoicesContent() {
     }
   }, [selectedCompany]);
 
+  // Reload fresh company data from Firebase
+  const reloadCompanyData = React.useCallback(async () => {
+    if (!selectedCompany?.id) return;
+    
+    try {
+      const companyDoc = await getDocs(
+        query(collection(db, 'companies'), where('__name__', '==', selectedCompany.id))
+      );
+      
+      if (!companyDoc.empty) {
+        const freshCompanyData = {
+          id: companyDoc.docs[0].id,
+          ...companyDoc.docs[0].data(),
+        } as Company;
+        console.log('🔄 Reloaded company data:', freshCompanyData.invoiceNumbering);
+        setCompany(freshCompanyData);
+        setSelectedCompany(freshCompanyData);
+      }
+    } catch (error) {
+      console.error('Error reloading company data:', error);
+    }
+  }, [selectedCompany, setSelectedCompany]);
+
   // Define loadData function - only loads invoices now
   const loadInvoices = React.useCallback(async () => {
     if (!selectedCompany) return;
@@ -205,7 +229,7 @@ function InvoicesContent() {
     }
   }, [selectedCompany, companiesInitialized, clientsInitialized, companies.length, loadInvoices]);
 
-  const handleAddInvoice = () => {
+  const handleAddInvoice = async () => {
     // Check if company exists
     if (companies.length === 0) {
       toast.error('Please create a company first');
@@ -223,6 +247,9 @@ function InvoicesContent() {
       return;
     }
 
+    // Reload fresh company data to get latest invoiceNumbering config
+    await reloadCompanyData();
+
     setEditingInvoice(undefined);
     setIsDialogOpen(true);
   };
@@ -233,9 +260,18 @@ function InvoicesContent() {
   };
 
   const handleSubmit = async (data: any) => {
-    if (!selectedCompany) return;
+    if (!selectedCompany || !company) return;
 
     try {
+      // Auto-generate invoice number if not provided
+      let invoiceNumber = data.invoiceNumber?.trim();
+      if (!invoiceNumber) {
+        // Count existing invoices for this company
+        const invoiceCount = invoices.length;
+        invoiceNumber = generateInvoiceNumber(company, invoiceCount);
+        console.log(`🔢 Auto-generated invoice number: ${invoiceNumber} (based on ${invoiceCount} existing invoices)`);
+      }
+
       // Clean up invoice items to remove undefined values
       const cleanedItems = data.items.map((item: any) => {
         const cleanItem = { ...item };
@@ -248,6 +284,7 @@ function InvoicesContent() {
 
       const invoiceData = {
         ...data,
+        invoiceNumber,
         items: cleanedItems,
         companyId: selectedCompany.id,
         date: Timestamp.fromDate(new Date(data.date)),
@@ -278,6 +315,17 @@ function InvoicesContent() {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
+
+        // Increment invoice counter in company if auto-generated
+        if (!data.invoiceNumber?.trim() && company.invoiceNumbering) {
+          const companyRef = doc(db, 'companies', selectedCompany.id);
+          const newNextNumber = invoices.length + 2; // +2 because we just added one
+          await updateDoc(companyRef, {
+            'invoiceNumbering.nextNumber': newNextNumber,
+            updatedAt: Timestamp.now(),
+          });
+          console.log(`📈 Updated company invoice counter to: ${newNextNumber}`);
+        }
 
         // Deduct stock for each product in the invoice
         for (const item of data.items) {
@@ -560,9 +608,11 @@ function InvoicesContent() {
             <InvoiceForm
               invoice={editingInvoice}
               companyId={selectedCompany!.id}
+              company={company}
               products={products}
               clients={clients}
               companyState={company.state || company.address.state}
+              invoiceCount={invoices.length}
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
             />

@@ -13,6 +13,8 @@ class CompanySerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
     bank_details = serializers.SerializerMethodField()
+    invoice_numbering = serializers.SerializerMethodField()
+    quotation_numbering = serializers.SerializerMethodField()
     
     class Meta:
         model = Company
@@ -45,6 +47,22 @@ class CompanySerializer(serializers.ModelSerializer):
             'branch': obj.bank_branch,
             'upi_id': obj.bank_upi_id,
         }
+    
+    def get_invoice_numbering(self, obj):
+        return {
+            'prefix': obj.invoice_prefix or '',
+            'suffix': obj.invoice_suffix or '',
+            'order': obj.invoice_number_order,
+            'nextNumber': obj.invoice_next_number,
+        }
+    
+    def get_quotation_numbering(self, obj):
+        return {
+            'prefix': obj.quotation_prefix or '',
+            'suffix': obj.quotation_suffix or '',
+            'order': obj.quotation_number_order,
+            'nextNumber': obj.quotation_next_number,
+        }
 
 
 class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
@@ -53,13 +71,16 @@ class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
     address = serializers.JSONField(write_only=True)
     contact = serializers.JSONField(write_only=True)
     bank_details = serializers.JSONField(write_only=True, required=False)
+    invoice_numbering = serializers.JSONField(write_only=True, required=False)
+    quotation_numbering = serializers.JSONField(write_only=True, required=False)
     
     class Meta:
         model = Company
         fields = [
             'id', 'name', 'gstin', 'pan', 'state', 'address', 'contact',
             'bank_details', 'logo_url', 'signature_url', 'terms_and_conditions',
-            'additional_notes', 'created_at', 'updated_at'
+            'additional_notes', 'invoice_numbering', 'quotation_numbering',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
@@ -67,6 +88,8 @@ class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
         address = validated_data.pop('address')
         contact = validated_data.pop('contact')
         bank_details = validated_data.pop('bank_details', None)
+        invoice_numbering = validated_data.pop('invoice_numbering', None)
+        quotation_numbering = validated_data.pop('quotation_numbering', None)
         
         # Map nested objects to flat fields
         validated_data.update({
@@ -90,12 +113,28 @@ class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
                 'bank_upi_id': bank_details.get('upi_id'),
             })
         
+        if invoice_numbering:
+            validated_data.update({
+                'invoice_prefix': invoice_numbering.get('prefix', ''),
+                'invoice_suffix': invoice_numbering.get('suffix', ''),
+                'invoice_number_order': invoice_numbering.get('order', 'prefix,number,suffix'),
+            })
+        
+        if quotation_numbering:
+            validated_data.update({
+                'quotation_prefix': quotation_numbering.get('prefix', ''),
+                'quotation_suffix': quotation_numbering.get('suffix', ''),
+                'quotation_number_order': quotation_numbering.get('order', 'prefix,number,suffix'),
+            })
+        
         return super().create(validated_data)
     
     def update(self, instance, validated_data):
         address = validated_data.pop('address', None)
         contact = validated_data.pop('contact', None)
         bank_details = validated_data.pop('bank_details', None)
+        invoice_numbering = validated_data.pop('invoice_numbering', None)
+        quotation_numbering = validated_data.pop('quotation_numbering', None)
         
         if address:
             instance.address_street = address.get('street', instance.address_street)
@@ -116,6 +155,16 @@ class CompanyCreateUpdateSerializer(serializers.ModelSerializer):
             instance.bank_account_holder_name = bank_details.get('account_holder_name', instance.bank_account_holder_name)
             instance.bank_branch = bank_details.get('branch', instance.bank_branch)
             instance.bank_upi_id = bank_details.get('upi_id', instance.bank_upi_id)
+        
+        if invoice_numbering is not None:
+            instance.invoice_prefix = invoice_numbering.get('prefix', '')
+            instance.invoice_suffix = invoice_numbering.get('suffix', '')
+            instance.invoice_number_order = invoice_numbering.get('order', 'prefix,number,suffix')
+        
+        if quotation_numbering is not None:
+            instance.quotation_prefix = quotation_numbering.get('prefix', '')
+            instance.quotation_suffix = quotation_numbering.get('suffix', '')
+            instance.quotation_number_order = quotation_numbering.get('order', 'prefix,number,suffix')
         
         return super().update(instance, validated_data)
     

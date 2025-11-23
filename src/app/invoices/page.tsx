@@ -235,7 +235,7 @@ function InvoicesContent() {
     }
   };
 
-  const handleViewInvoice = (invoice: Invoice) => {
+  const handleViewInvoice = async (invoice: Invoice) => {
     if (!company) return;
     const client = clients.find(c => c.id === invoice.clientId);
     if (!client) {
@@ -247,7 +247,7 @@ function InvoicesContent() {
     await previewInvoicePDF(pdfData as any);
   };
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
+  const handleDownloadInvoice = async (invoice: Invoice) => {
     if (!company) return;
     const client = clients.find(c => c.id === invoice.clientId);
     if (!client) {

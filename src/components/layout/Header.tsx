@@ -1,35 +1,79 @@
 /**
  * Header Component
- * Top header with menu toggle
+ * Responsive top header with theme toggle and mobile menu
  */
 
 'use client';
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Bell, Menu } from 'lucide-react';
+import { Bell, Menu, Search } from 'lucide-react';
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   onMenuClick?: () => void;
+  className?: string;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick, className }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background px-6">
+    <header className={cn(
+      'sticky top-0 z-40 flex h-14 sm:h-16 items-center gap-2 sm:gap-4',
+      'border-b bg-background/80 backdrop-blur-xl px-3 sm:px-6',
+      'transition-all duration-300 mobile-safe-top',
+      className
+    )}>
       {/* Mobile Menu Button */}
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="md:hidden shrink-0 hover:bg-primary/10 transition-colors"
         onClick={onMenuClick}
+        aria-label="Toggle menu"
       >
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Search Bar - Hidden on small mobile */}
+      <div className="hidden sm:flex flex-1 max-w-md relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input 
+          placeholder="Search..." 
+          className="pl-10 bg-muted/30 border-border/50 focus-visible:ring-primary/50 transition-all"
+        />
+      </div>
 
+      {/* Spacer for mobile */}
+      <div className="flex-1 sm:hidden" />
 
+      {/* Actions */}
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Search Button - Mobile Only */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden shrink-0 hover:bg-primary/10 transition-colors"
+          aria-label="Search"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+
+        {/* Notifications */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative shrink-0 hover:bg-primary/10 transition-colors hidden sm:inline-flex"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+        </Button>
+
+        {/* Theme Toggle */}
+        <ThemeToggle className="shrink-0" />
+      </div>
     </header>
   );
 }

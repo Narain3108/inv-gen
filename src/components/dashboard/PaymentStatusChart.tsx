@@ -31,7 +31,9 @@ export function PaymentStatusChart({ invoices }: PaymentStatusChartProps) {
         count: paid.length,
         amount: paidAmount,
         percentage: totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0,
-        color: 'bg-green-500',
+        color: 'bg-green-500 dark:bg-green-400',
+        bgColor: 'bg-green-50 dark:bg-green-500/10',
+        textColor: 'text-green-600 dark:text-green-400',
       },
       {
         status: 'partially_paid',
@@ -39,7 +41,9 @@ export function PaymentStatusChart({ invoices }: PaymentStatusChartProps) {
         count: partiallyPaid.length,
         amount: partiallyPaidAmount,
         percentage: totalAmount > 0 ? (partiallyPaidAmount / totalAmount) * 100 : 0,
-        color: 'bg-yellow-500',
+        color: 'bg-yellow-500 dark:bg-yellow-400',
+        bgColor: 'bg-yellow-50 dark:bg-yellow-500/10',
+        textColor: 'text-yellow-600 dark:text-yellow-400',
       },
       {
         status: 'pending',
@@ -47,31 +51,35 @@ export function PaymentStatusChart({ invoices }: PaymentStatusChartProps) {
         count: pending.length,
         amount: pendingAmount,
         percentage: totalAmount > 0 ? (pendingAmount / totalAmount) * 100 : 0,
-        color: 'bg-orange-500',
+        color: 'bg-orange-500 dark:bg-orange-400',
+        bgColor: 'bg-orange-50 dark:bg-orange-500/10',
+        textColor: 'text-orange-600 dark:text-orange-400',
       },
     ];
   }, [invoices]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {stats.map((item) => (
-        <div key={item.status} className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <div className={`h-3 w-3 rounded-full ${item.color}`} />
-              <span className="font-medium">{item.label}</span>
+        <div key={item.status} className={`space-y-2 p-3 sm:p-4 rounded-xl ${item.bgColor} border border-transparent hover:border-current transition-all duration-300 group`}>
+          <div className="flex items-center justify-between text-xs sm:text-sm">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full ${item.color} shadow-sm group-hover:scale-110 transition-transform`} />
+              <span className="font-semibold text-foreground">{item.label}</span>
             </div>
-            <span className="text-muted-foreground">{item.count} invoices</span>
+            <span className={`text-xs sm:text-sm font-medium ${item.textColor}`}>
+              {item.count} {item.count === 1 ? 'invoice' : 'invoices'}
+            </span>
           </div>
-          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+          <div className="h-2 sm:h-2.5 w-full bg-background dark:bg-muted/30 rounded-full overflow-hidden shadow-inner">
             <div
-              className={`h-full ${item.color} transition-all duration-300`}
+              className={`h-full ${item.color} transition-all duration-500 ease-out group-hover:shadow-lg rounded-full`}
               style={{ width: `${item.percentage}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{item.percentage.toFixed(1)}%</span>
-            <span>{formatCurrency(item.amount)}</span>
+          <div className="flex justify-between text-xs sm:text-sm font-medium">
+            <span className={item.textColor}>{item.percentage.toFixed(1)}%</span>
+            <span className="text-foreground tabular-nums">{formatCurrency(item.amount)}</span>
           </div>
         </div>
       ))}

@@ -47,6 +47,13 @@ export interface BankDetails {
 
 // ==================== Company Types ====================
 
+export interface NumberingConfig {
+  prefix: string;
+  suffix: string;
+  order: string;
+  nextNumber: number;
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -61,6 +68,8 @@ export interface Company {
   website?: string;
   termsAndConditions?: string; // Default terms for all invoices
   additionalNotes?: string; // Default notes for all invoices
+  invoiceNumbering?: NumberingConfig;
+  quotationNumbering?: NumberingConfig;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -75,6 +84,16 @@ export interface CompanyFormData {
   website?: string;
   termsAndConditions?: string;
   additionalNotes?: string;
+  invoiceNumbering?: {
+    prefix: string;
+    suffix: string;
+    order: string;
+  };
+  quotationNumbering?: {
+    prefix: string;
+    suffix: string;
+    order: string;
+  };
 }
 
 // ==================== Product/Service Types ====================

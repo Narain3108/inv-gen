@@ -1,6 +1,6 @@
 /**
  * Sidebar Component
- * Main navigation sidebar with company selector
+ * Mobile-first navigation sidebar with dark mode support
  */
 
 'use client';
@@ -18,6 +18,7 @@ import {
   ChevronDown,
   FileCheck,
   LayoutDashboard,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -85,67 +86,73 @@ export function Sidebar({ className }: SidebarProps) {
   const [hasAutoSelected, setHasAutoSelected] = React.useState(false);
 
   useEffect(() => {
-    // Only run this logic once when companies are loaded
     if (hasAutoSelected || companies.length === 0 || companiesLoading) return;
     
-    // Give Zustand persist time to hydrate from localStorage
     const timer = setTimeout(() => {
       if (selectedCompany) {
-        // Company already selected (from localStorage persistence)
-        console.log('✅ Using persisted company:', selectedCompany.name, '(ID:', selectedCompany.id + ')');
-        
-        // Verify the selected company still exists in the loaded companies
         const companyStillExists = companies.find(c => c.id === selectedCompany.id);
         if (!companyStillExists) {
-          console.warn('⚠️ Persisted company no longer exists, selecting first available');
           setSelectedCompany(companies[0]);
         }
       } else {
-        // No company selected, auto-select the first one
-        console.log('📌 No persisted company found, auto-selecting first company:', companies[0].name, '(ID:', companies[0].id + ')');
         setSelectedCompany(companies[0]);
       }
       
       setHasAutoSelected(true);
-    }, 150); // 150ms delay to ensure Zustand persist completes
+    }, 150);
 
     return () => clearTimeout(timer);
   }, [companies, companiesLoading, selectedCompany, setSelectedCompany, hasAutoSelected]);
 
   return (
-    <div className={cn('flex h-full flex-col border-r bg-gradient-to-b from-sidebar to-sidebar/80 backdrop-blur-xl', className)}>
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b border-sidebar-border/50 px-6 bg-gradient-to-r from-primary/5 to-accent/5">
+    <div className={cn(
+      'flex h-full flex-col',
+      'bg-sidebar border-r border-sidebar-border/50',
+      'transition-colors duration-300',
+      className
+    )}>
+      {/* Logo Section */}
+      <div className="flex h-14 sm:h-16 items-center border-b border-sidebar-border/50 px-4 sm:px-6 bg-gradient-to-r from-primary/5 to-accent/5">
         <Link href="/" className="flex items-center gap-2 font-semibold group">
-          <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary to-accent shadow-lg group-hover:scale-110 transition-transform duration-200">
-            <FileText className="h-5 w-5 text-white" />
+          <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary to-accent shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-200">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           </div>
-          <span className="text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-bold">InvoiceHub</span>
+          <span className="text-lg sm:text-xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent font-bold">
+            InvoiceHub
+          </span>
         </Link>
       </div>
 
       {/* Company Selector */}
-      <div className="border-b border-sidebar-border/50 p-4">
+      <div className="border-b border-sidebar-border/50 p-3 sm:p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-between hover:shadow-md transition-all duration-200 border-primary/20 hover:border-primary/40">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-primary/10">
+            <Button 
+              variant="outline" 
+              className={cn(
+                'w-full justify-between h-auto py-2.5 px-3',
+                'hover:shadow-md hover:border-primary/40 active:scale-[0.98]',
+                'transition-all duration-200 border-sidebar-border/50',
+                'dark:hover:bg-sidebar-accent'
+              )}
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="p-1 rounded bg-primary/10 shrink-0">
                   <Building2 className="h-4 w-4 text-primary" />
                 </div>
-                <span className="truncate font-medium">
+                <span className="truncate font-medium text-sm">
                   {companiesLoading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
                 </span>
               </div>
-              <ChevronDown className="h-4 w-4 opacity-50" />
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[240px]">
-            <DropdownMenuLabel>Select Company</DropdownMenuLabel>
+          <DropdownMenuContent align="start" className="w-[240px] dark:bg-popover dark:border-border">
+            <DropdownMenuLabel className="text-xs">Select Company</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {companies.length === 0 ? (
               <DropdownMenuItem disabled>
-                <span className="text-muted-foreground">No companies found</span>
+                <span className="text-muted-foreground text-sm">No companies found</span>
               </DropdownMenuItem>
             ) : (
               companies.map((company) => (
@@ -153,8 +160,8 @@ export function Sidebar({ className }: SidebarProps) {
                   key={company.id}
                   onClick={() => setSelectedCompany(company)}
                   className={cn(
-                    'cursor-pointer',
-                    selectedCompany?.id === company.id && 'bg-accent'
+                    'cursor-pointer text-sm',
+                    selectedCompany?.id === company.id && 'bg-accent dark:bg-sidebar-accent'
                   )}
                 >
                   <Building2 className="mr-2 h-4 w-4" />
@@ -164,7 +171,7 @@ export function Sidebar({ className }: SidebarProps) {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/invoices/settings/company" className="flex w-full items-center cursor-pointer">
+              <Link href="/invoices/settings/company" className="flex w-full items-center cursor-pointer text-sm">
                 <Settings className="mr-2 h-4 w-4" />
                 Manage Companies
               </Link>
@@ -174,7 +181,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-3 sm:p-4 overflow-y-auto hide-scrollbar">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -184,21 +191,25 @@ export function Sidebar({ className }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative overflow-hidden',
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                'transition-all duration-200 group relative overflow-hidden',
+                'active:scale-[0.97]',
                 isActive
-                  ? 'bg-gradient-to-r from-primary/90 to-accent/90 text-white shadow-lg shadow-primary/30 scale-[1.02]'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:scale-[1.01] hover:shadow-sm'
+                  ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
               )}
             >
               <div className={cn(
-                "p-1.5 rounded-lg transition-colors relative z-10",
-                isActive ? "bg-white/25 backdrop-blur-sm" : "bg-primary/10 group-hover:bg-primary/20"
+                "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                isActive 
+                  ? "bg-white/20 backdrop-blur-sm" 
+                  : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
               )}>
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <span className="font-semibold relative z-10">{item.title}</span>
+              <span className="font-semibold relative z-10 truncate">{item.title}</span>
               {item.badge && (
-                <span className="ml-auto rounded-full bg-white/30 backdrop-blur-sm px-2 py-0.5 text-xs text-white font-bold shadow-sm relative z-10">
+                <span className="ml-auto rounded-full bg-white/30 backdrop-blur-sm px-2 py-0.5 text-xs text-white font-bold shadow-sm relative z-10 shrink-0">
                   {item.badge}
                 </span>
               )}
@@ -208,10 +219,15 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border/50 p-4">
-        <div className="rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 p-3 text-xs text-sidebar-foreground border border-primary/20 shadow-sm">
-          <p className="font-bold text-sm bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">GST Invoice System</p>
-          <p className="mt-1 text-muted-foreground">v1.0.0 • Professional</p>
+      <div className="border-t border-sidebar-border/50 p-3 sm:p-4 mobile-safe-bottom">
+        <div className="rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 p-3 text-xs border border-primary/20 dark:border-primary/30 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <p className="font-bold text-sm bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              InvoiceHub Pro
+            </p>
+          </div>
+          <p className="text-muted-foreground">v1.0.0 • GST Compliant</p>
         </div>
       </div>
     </div>

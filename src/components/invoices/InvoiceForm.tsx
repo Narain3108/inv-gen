@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate, formatClientDropdownLabel } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
+import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
@@ -28,9 +29,11 @@ type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 interface InvoiceFormProps {
   invoice?: Invoice;
   companyId: string;
+  company?: Company;
   products: Product[];
   clients: Client[];
   companyState: string;
+  invoiceCount?: number;
   onSubmit: (data: InvoiceFormData) => Promise<void>;
   onCancel?: () => void;
 }
@@ -38,9 +41,11 @@ interface InvoiceFormProps {
 export function InvoiceForm({
   invoice,
   companyId,
+  company,
   products,
   clients,
   companyState,
+  invoiceCount = 0,
   onSubmit,
   onCancel,
 }: InvoiceFormProps) {
@@ -81,6 +86,41 @@ export function InvoiceForm({
 
   const watchItems = watch('items');
   const watchClientId = watch('clientId');
+
+  const generateInvoiceNumberPreview = () => {
+    if (!company?.invoiceNumbering) {
+      return 'INV0001';
+    }
+    
+    const { prefix, suffix, order, nextNumber } = company.invoiceNumbering;
+    const components: Record<string, string> = {
+      prefix: prefix || '',
+      number: String(nextNumber).padStart(3, '0'),
+      suffix: suffix || '',
+    };
+    
+    const orderParts = order.split(',').map(p => p.trim());
+    const numberParts = orderParts.map(part => components[part] || '');
+    
+    const result = numberParts.join('');
+    
+    if (!result || result.trim() === '') {
+      return `INV${String(nextNumber).padStart(4, '0')}`;
+    }
+    
+    return result;
+  };
+
+  // Auto-fill invoice number for new invoices
+  useEffect(() => {
+    if (!invoice && company) {
+      console.log('Auto-filling invoice number, company config:', company.invoiceNumbering);
+      console.log('Current invoice count:', invoiceCount);
+      const autoNumber = generateInvoiceNumber(company, invoiceCount);
+      console.log('Generated invoice number:', autoNumber);
+      setValue('invoiceNumber', autoNumber);
+    }
+  }, [invoice, company, invoiceCount, setValue]);
 
   // Update selected client when client ID changes
   useEffect(() => {
@@ -297,12 +337,15 @@ export function InvoiceForm({
           <div className="grid grid-cols-2 gap-3">
             {/* Invoice Number */}
             <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number *</Label>
+              <Label htmlFor="invoiceNumber">Invoice Number</Label>
               <Input
                 id="invoiceNumber"
                 {...register('invoiceNumber')}
-                placeholder="INV-0001"
+                placeholder={generateInvoiceNumberPreview()}
               />
+              <p className="text-xs text-muted-foreground">
+                Auto-filled, editable
+              </p>
               {errors.invoiceNumber && (
                 <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>
               )}

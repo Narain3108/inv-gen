@@ -26,14 +26,16 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
 
   if (invoices.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Invoices</CardTitle>
+      <Card className="border-2 border-primary/10 dark:border-primary/20">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No invoices yet</p>
+        <CardContent className="p-4 sm:p-6 pt-0">
+          <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center">
+            <div className="p-3 sm:p-4 rounded-full bg-gradient-to-br from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 mb-3">
+              <FileText className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground" />
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground">No invoices yet</p>
           </div>
         </CardContent>
       </Card>
@@ -41,29 +43,39 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Invoices</CardTitle>
+    <Card className="border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+      <CardContent className="p-4 sm:p-6 pt-0">
+        <div className="space-y-2 sm:space-y-3">
           {invoices.slice(0, 5).map((invoice) => (
             <div
               key={invoice.id}
-              className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 bg-gradient-to-r from-muted/30 to-transparent dark:from-muted/20 hover:from-muted/50 dark:hover:from-muted/30 cursor-pointer transition-all duration-300 group hover-lift"
               onClick={() => onViewInvoice?.(invoice)}
             >
-              <div className="space-y-1">
-                <div className="font-medium">{invoice.invoiceNumber}</div>
-                <div className="text-sm text-muted-foreground">
+              <div className="space-y-1 flex-1 min-w-0">
+                <div className="font-semibold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors truncate">
+                  {invoice.invoiceNumber}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
                   {getClientName(invoice.clientId)}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {formatDate(invoice.date)}
                 </div>
               </div>
-              <div className="text-right space-y-1">
-                <div className="font-semibold">{formatCurrency(invoice.totalAmount)}</div>
+              <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-1 shrink-0">
+                <div className="font-bold text-sm sm:text-base text-foreground tabular-nums">
+                  {formatCurrency(invoice.totalAmount)}
+                </div>
+                <Badge 
+                  variant={invoice.paymentStatus === 'paid' ? 'default' : invoice.paymentStatus === 'partially_paid' ? 'secondary' : 'outline'}
+                  className="text-xs"
+                >
+                  {invoice.paymentStatus === 'paid' ? 'Paid' : invoice.paymentStatus === 'partially_paid' ? 'Partial' : 'Pending'}
+                </Badge>
               </div>
             </div>
           ))}

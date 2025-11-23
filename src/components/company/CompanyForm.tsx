@@ -21,6 +21,7 @@ import { fetchGSTINDetails } from '@/lib/api/gst-api';
 import Image from 'next/image';
 import { z } from 'zod';
 import { ImageUpload } from '@/components/shared/ImageUpload';
+import { NumberingConfig } from '@/components/shared/NumberingConfig';
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 
@@ -35,6 +36,14 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>(company?.logoUrl || '');
   const [signatureUrl, setSignatureUrl] = useState<string>(company?.signatureUrl || '');
+  
+  const [invoicePrefix, setInvoicePrefix] = useState(company?.invoiceNumbering?.prefix || '');
+  const [invoiceSuffix, setInvoiceSuffix] = useState(company?.invoiceNumbering?.suffix || '');
+  const [invoiceOrder, setInvoiceOrder] = useState(company?.invoiceNumbering?.order || 'prefix,number,suffix');
+  
+  const [quotationPrefix, setQuotationPrefix] = useState(company?.quotationNumbering?.prefix || '');
+  const [quotationSuffix, setQuotationSuffix] = useState(company?.quotationNumbering?.suffix || '');
+  const [quotationOrder, setQuotationOrder] = useState(company?.quotationNumbering?.order || 'prefix,number,suffix');
 
   const {
     register,
@@ -99,6 +108,16 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
         ...data,
         logoUrl: logoUrl || '',
         signatureUrl: signatureUrl || '',
+        invoiceNumbering: {
+          prefix: invoicePrefix,
+          suffix: invoiceSuffix,
+          order: invoiceOrder,
+        },
+        quotationNumbering: {
+          prefix: quotationPrefix,
+          suffix: quotationSuffix,
+          order: quotationOrder,
+        },
       };
       await onSubmit(submitData as CompanyFormData);
       toast.success(company ? 'Company updated successfully' : 'Company created successfully');
@@ -400,6 +419,32 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Invoice Numbering Configuration */}
+      <NumberingConfig
+        title="Invoice Numbering"
+        description="Configure how invoice numbers are generated automatically"
+        prefix={invoicePrefix}
+        suffix={invoiceSuffix}
+        order={invoiceOrder}
+        nextNumber={company?.invoiceNumbering?.nextNumber || 1}
+        onPrefixChange={setInvoicePrefix}
+        onSuffixChange={setInvoiceSuffix}
+        onOrderChange={setInvoiceOrder}
+      />
+
+      {/* Quotation Numbering Configuration */}
+      <NumberingConfig
+        title="Quotation Numbering"
+        description="Configure how quotation numbers are generated automatically"
+        prefix={quotationPrefix}
+        suffix={quotationSuffix}
+        order={quotationOrder}
+        nextNumber={company?.quotationNumbering?.nextNumber || 1}
+        onPrefixChange={setQuotationPrefix}
+        onSuffixChange={setQuotationSuffix}
+        onOrderChange={setQuotationOrder}
+      />
 
       {/* Terms and Conditions */}
       <Card>

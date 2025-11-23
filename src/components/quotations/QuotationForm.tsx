@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { quotationFormSchema } from '@/lib/validations';
-import { Quotation, Product, Client, InvoiceItem } from '@/types';
+import { Quotation, Product, Client, InvoiceItem, Company } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ import { Loader2, Plus, Trash2, Calculator, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatClientDropdownLabel } from '@/utils/formatters';
 import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
+import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 
 type QuotationFormData = z.infer<typeof quotationFormSchema>;
@@ -26,9 +27,11 @@ type QuotationFormData = z.infer<typeof quotationFormSchema>;
 interface QuotationFormProps {
   quotation?: Quotation;
   companyId: string;
+  company?: Company;
   products: Product[];
   clients: Client[];
   companyState: string;
+  quotationCount?: number;
   onSubmit: (data: QuotationFormData) => Promise<void>;
   onCancel?: () => void;
 }
@@ -36,9 +39,11 @@ interface QuotationFormProps {
 export function QuotationForm({
   quotation,
   companyId,
+  company,
   products,
   clients,
   companyState,
+  quotationCount = 0,
   onSubmit,
   onCancel,
 }: QuotationFormProps) {
@@ -62,6 +67,7 @@ export function QuotationForm({
   } = useForm<QuotationFormData>({
     resolver: zodResolver(quotationFormSchema) as any,
     defaultValues: quotation ? {
+      quotationNumber: quotation.quotationNumber,
       clientId: quotation.clientId,
       date: quotation.date?.toDate ? new Date(quotation.date.toDate()).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       validUntil: quotation.validUntil?.toDate ? new Date(quotation.validUntil.toDate()).toISOString().split('T')[0] : getDefaultValidUntil(),
@@ -85,6 +91,17 @@ export function QuotationForm({
 
   const watchItems = watch('items');
   const watchClientId = watch('clientId');
+
+  // Auto-fill quotation number for new quotations
+  useEffect(() => {
+    if (!quotation && company) {
+      console.log('Auto-filling quotation number, company config:', company.quotationNumbering);
+      console.log('Current quotation count:', quotationCount);
+      const autoNumber = generateQuotationNumber(company, quotationCount);
+      console.log('Generated quotation number:', autoNumber);
+      setValue('quotationNumber', autoNumber);
+    }
+  }, [quotation, company, quotationCount, setValue]);
 
   // Update selected client when client ID changes
   useEffect(() => {
@@ -250,6 +267,22 @@ export function QuotationForm({
         </CardHeader>
         <CardContent className="space-y-3 pb-4 pt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Quotation Number */}
+            <div className="space-y-2">
+              <Label htmlFor="quotationNumber">Quotation Number</Label>
+              <Input
+                id="quotationNumber"
+                {...register('quotationNumber')}
+                placeholder="QUO0001"
+              />
+              <p className="text-xs text-muted-foreground">
+                Auto-filled, editable
+              </p>
+              {errors.quotationNumber && (
+                <p className="text-sm text-red-500">{errors.quotationNumber.message}</p>
+              )}
+            </div>
+
             {/* Client Selection */}
             <div className="space-y-2">
               <Label htmlFor="clientId">Client *</Label>

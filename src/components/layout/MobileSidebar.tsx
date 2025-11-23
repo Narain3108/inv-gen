@@ -1,6 +1,6 @@
 /**
  * Mobile Sidebar Component
- * Mobile navigation drawer
+ * Enhanced mobile navigation drawer with dark mode support
  */
 
 'use client';
@@ -17,9 +17,12 @@ interface MobileSidebarProps {
 export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="left" className="w-[280px] p-0">
+      <SheetContent 
+        side="left" 
+        className="w-[280px] sm:w-[320px] p-0 bg-sidebar dark:bg-sidebar border-r border-sidebar-border/50"
+      >
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-        <Sidebar />
+        <Sidebar className="border-none" />
       </SheetContent>
     </Sheet>
   );

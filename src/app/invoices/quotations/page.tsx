@@ -51,6 +51,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
+import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
 
@@ -120,17 +121,34 @@ function QuotationsContent() {
   }, [companies, selectedCompany, initialized, setSelectedCompany]);
 
   // Generate auto quotation number
-  const generateQuotationNumber = async (): Promise<string> => {
-    if (!selectedCompany) return 'QUO-0001';
+  const generateQuotationNumberAuto = async (): Promise<string> => {
+    if (!selectedCompany || !company) return 'QUO0001';
     
-    const quotationsRef = collection(db, 'quotations');
-    const q = query(quotationsRef, where('companyId', '==', selectedCompany.id));
-    const snapshot = await getDocs(q);
-    
-    const number = snapshot.size + 1;
-    const year = new Date().getFullYear();
-    return `QUO-${year}-${String(number).padStart(4, '0')}`;
+    return generateQuotationNumber(company);
   };
+
+  // Reload fresh company data from Firebase
+  const reloadCompanyData = React.useCallback(async () => {
+    if (!selectedCompany?.id) return;
+    
+    try {
+      const companyDoc = await getDocs(
+        query(collection(db, 'companies'), where('__name__', '==', selectedCompany.id))
+      );
+      
+      if (!companyDoc.empty) {
+        const freshCompanyData = {
+          id: companyDoc.docs[0].id,
+          ...companyDoc.docs[0].data(),
+        } as Company;
+        console.log('🔄 Reloaded company data:', freshCompanyData.quotationNumbering);
+        setCompany(freshCompanyData);
+        setSelectedCompany(freshCompanyData);
+      }
+    } catch (error) {
+      console.error('Error reloading company data:', error);
+    }
+  }, [selectedCompany, setSelectedCompany]);
 
   // Load data
   const loadData = React.useCallback(async () => {
@@ -203,7 +221,7 @@ function QuotationsContent() {
     }
   }, [selectedCompany, initialized, companies.length, loadData]);
 
-  const handleAddQuotation = () => {
+  const handleAddQuotation = async () => {
     // Check if company exists
     if (companies.length === 0) {
       toast.error('Please create a company first');
@@ -221,6 +239,9 @@ function QuotationsContent() {
       return;
     }
 
+    // Reload fresh company data to get latest quotationNumbering config
+    await reloadCompanyData();
+
     setEditingQuotation(undefined);
     setIsDialogOpen(true);
   };
@@ -231,10 +252,17 @@ function QuotationsContent() {
   };
 
   const handleSubmit = async (data: any) => {
-    if (!selectedCompany) return;
+    if (!selectedCompany || !company) return;
 
     try {
-      const quotationNumber = editingQuotation?.quotationNumber || await generateQuotationNumber();
+      // Use quotation number from form (already auto-filled) or generate if somehow empty
+      let quotationNumber = data.quotationNumber?.trim();
+      if (!quotationNumber) {
+        // Count existing quotations for this company
+        const quotationCount = quotations.length;
+        quotationNumber = generateQuotationNumber(company, quotationCount);
+        console.log(`🔢 Auto-generated quotation number: ${quotationNumber} (based on ${quotationCount} existing quotations)`);
+      }
       
       // Clean up quotation items to remove undefined values
       const cleanedItems = data.items.map((item: any) => {
@@ -270,6 +298,18 @@ function QuotationsContent() {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
+        
+        // Increment quotation counter in company if using auto-numbering
+        if (!editingQuotation && !data.quotationNumber?.trim() && company.quotationNumbering) {
+          const companyRef = doc(db, 'companies', selectedCompany.id);
+          const newNextNumber = quotations.length + 2; // +2 because we just added one
+          await updateDoc(companyRef, {
+            'quotationNumbering.nextNumber': newNextNumber,
+            updatedAt: Timestamp.now(),
+          });
+          console.log(`📈 Updated company quotation counter to: ${newNextNumber}`);
+        }
+        
         toast.success('Quotation created successfully');
       }
 
@@ -526,9 +566,11 @@ function QuotationsContent() {
           <QuotationForm
             quotation={editingQuotation}
             companyId={selectedCompany?.id || ''}
+            company={company}
             products={products}
             clients={clients}
             companyState={selectedCompany?.address?.state || ''}
+            quotationCount={quotations.length}
             onSubmit={handleSubmit}
             onCancel={() => {
               setIsDialogOpen(false);

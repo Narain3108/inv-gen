@@ -104,6 +104,18 @@ export default function CompanySettingsPage() {
       const companyData = {
         ...data,
         state: state, // Store state for tax calculation
+        invoiceNumbering: data.invoiceNumbering || {
+          prefix: '',
+          suffix: '',
+          order: 'prefix,number,suffix',
+          nextNumber: 1,
+        },
+        quotationNumbering: data.quotationNumbering || {
+          prefix: '',
+          suffix: '',
+          order: 'prefix,number,suffix',
+          nextNumber: 1,
+        },
       };
 
       // Remove undefined fields to prevent Firestore errors
