@@ -29,11 +29,28 @@ import {
   Sparkles
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { Splash } from '@/components/shared';
 
 export default function LandingPage() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if splash has been shown in this session
+    const splashShown = sessionStorage.getItem('splashShown');
+    
+    if (splashShown === 'true') {
+      setShowSplash(false);
+      setIsLoading(false);
+    } else {
+      // Mark splash as shown for this session
+      sessionStorage.setItem('splashShown', 'true');
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,6 +59,19 @@ export default function LandingPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSplashFinish = () => {
+    setShowSplash(false);
+  };
+
+  // Show splash screen if needed
+  if (isLoading) {
+    return null; // Prevent flash of content while checking session storage
+  }
+
+  if (showSplash) {
+    return <Splash durationMs={4000} logoSrc="/loo.jpg" onFinish={handleSplashFinish} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5 dark:from-background dark:via-primary/10 dark:to-accent/10 transition-colors duration-300">

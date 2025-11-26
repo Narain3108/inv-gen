@@ -10,3 +10,4 @@ export { ExportButton } from './ExportButton';
 
 // New components
 export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary';
+export { default as Splash } from './Splash';
