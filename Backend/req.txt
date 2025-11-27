@@ -1,0 +1,40 @@
+fastapi
+uvicorn[standard]
+gunicorn
+
+# HTTP utilities
+starlette
+httpx
+requests
+
+
+google-cloud-storage
+PyJWT
+passlib[bcrypt]
+authlib
+cryptography
+
+# Password/email utilities
+bcrypt
+
+websockets
+socketio
+python-socketio
+uvicorn
+docker
+
+orjson
+redis            # sync Redis client
+aioredis         # async Redis client
+google-cloud-firestore
+firebase-admin
+
+# ASYNC / concurrency utilities
+anyio
+asyncstdlib
+
+# data validation / settings
+pydantic
+python-dotenv
+email-validator
+typing-extensions
