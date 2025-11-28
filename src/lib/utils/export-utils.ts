@@ -114,7 +114,7 @@ export function formatInvoicesForExport(invoices: Invoice[], clients: Client[]) 
 export function formatQuotationsForExport(quotations: Quotation[], clients: Client[]) {
   return quotations.map(quotation => {
     const client = clients.find(c => c.id === quotation.clientId);
-    const validUntil = quotation.validUntil?.toDate ? quotation.validUntil.toDate() : null;
+    const validUntil = quotation.validUntil ? (typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil) : quotation.validUntil) : null;
     const isExpired = validUntil ? validUntil < new Date() : false;
     
     return {

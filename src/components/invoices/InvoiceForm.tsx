@@ -66,7 +66,12 @@ export function InvoiceForm({
     defaultValues: invoice ? {
       invoiceNumber: invoice.invoiceNumber,
       clientId: invoice.clientId,
-      date: invoice.date?.toDate ? new Date(invoice.date.toDate()).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      date: (() => {
+        if (!invoice.date) return new Date().toISOString().split('T')[0];
+        if (typeof invoice.date === 'string') return invoice.date.split('T')[0];
+        const dateObj = invoice.date instanceof Date ? invoice.date : new Date(invoice.date);
+        return isNaN(dateObj.getTime()) ? new Date().toISOString().split('T')[0] : dateObj.toISOString().split('T')[0];
+      })(),
       items: invoice.items.map((item) => ({
         productId: item.productId || '',
         quantity: item.quantity,

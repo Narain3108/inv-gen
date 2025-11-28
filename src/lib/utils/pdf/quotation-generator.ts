@@ -113,7 +113,7 @@ export async function generateQuotationPDF(data: QuotationPDFData): Promise<void
         text: [
           { text: 'Note: ', bold: true, fontSize: 9, color: '#dc2626' },
           { text: 'This quotation is valid until ', fontSize: 9 },
-          { text: quotation.validUntil?.toDate ? formatDate(quotation.validUntil.toDate()) : 'N/A', fontSize: 9, bold: true, color: '#dc2626' },
+          { text: formatDate(quotation.validUntil), fontSize: 9, bold: true, color: '#dc2626' },
           { text: '. Prices and availability are subject to change after this date.', fontSize: 9 },
         ],
         margin: [0, 10, 0, 10],
@@ -195,7 +195,7 @@ export async function previewQuotationPDF(data: QuotationPDFData): Promise<void>
         text: [
           { text: 'Note: ', bold: true, fontSize: 9, color: '#dc2626' },
           { text: 'This quotation is valid until ', fontSize: 9 },
-          { text: quotation.validUntil?.toDate ? formatDate(quotation.validUntil.toDate()) : 'N/A', fontSize: 9, bold: true, color: '#dc2626' },
+          { text: formatDate(quotation.validUntil), fontSize: 9, bold: true, color: '#dc2626' },
           { text: '. Prices and availability are subject to change after this date.', fontSize: 9 },
         ],
         margin: [0, 10, 0, 10],

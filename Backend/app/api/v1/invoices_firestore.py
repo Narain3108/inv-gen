@@ -5,7 +5,7 @@ Invoices is a SUBCOLLECTION under companies: companies/{companyId}/invoices
 
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from datetime import datetime
 
@@ -33,52 +33,71 @@ class InvoiceItemCreate(BaseModel):
     hsn: Optional[str] = None
     quantity: float
     unit: Optional[str] = "Nos"
-    unit_price: float
+    unit_price: float = Field(..., alias="unitPrice")
     discount: float = 0
-    gst_rate: float = 18.0
-    product_id: Optional[str] = None
+    gst_rate: float = Field(18.0, alias="gstRate")
+    cess_rate: float = Field(0.0, alias="cessRate")
+    product_id: Optional[str] = Field(None, alias="productId")
+    item_code: Optional[str] = Field(None, alias="itemCode")
+    serial_numbers: Optional[List[str]] = Field(None, alias="serialNumbers")
+    
+    # Calculated fields that might be sent
+    cgst: Optional[float] = None
+    sgst: Optional[float] = None
+    igst: Optional[float] = None
+    cess: Optional[float] = None
+    line_total: Optional[float] = Field(None, alias="lineTotal")
+
+    class Config:
+        populate_by_name = True
 
 
 class InvoiceCreate(BaseModel):
-    client_id: str
-    company_id: Optional[str] = None
-    companyId: Optional[str] = None
-    invoice_number: Optional[str] = None
+    client_id: str = Field(..., alias="clientId")
+    company_id: Optional[str] = Field(None, alias="companyId")
+    invoice_number: Optional[str] = Field(None, alias="invoiceNumber")
     date: Optional[str] = None
-    invoice_date: Optional[str] = None
-    due_date: Optional[str] = None
+    due_date: Optional[str] = Field(None, alias="dueDate")
     items: List[InvoiceItemCreate]
     notes: Optional[str] = None
     status: Optional[str] = "draft"
+    payment_status: Optional[str] = Field("unpaid", alias="paymentStatus")
+    
+    # Totals
+    total_amount: Optional[float] = Field(None, alias="totalAmount")
+    total_amount_in_words: Optional[str] = Field(None, alias="totalAmountInWords")
+    taxable_amount: Optional[float] = Field(None, alias="taxableAmount")
+    cgst: Optional[float] = None
+    sgst: Optional[float] = None
+    igst: Optional[float] = None
+    tax_breakdown: Optional[List[Dict[str, Any]]] = Field(None, alias="taxBreakdown")
+
+    class Config:
+        populate_by_name = True
 
 
 class InvoiceOut(BaseModel):
     id: str
-    company_id: Optional[str] = None
-    companyId: Optional[str] = None
-    client_id: Optional[str] = None
-    clientId: Optional[str] = None
-    invoice_number: Optional[str] = None
-    invoiceNumber: Optional[str] = None
+    company_id: Optional[str] = Field(None, alias="companyId")
+    client_id: Optional[str] = Field(None, alias="clientId")
+    invoice_number: Optional[str] = Field(None, alias="invoiceNumber")
     date: Optional[str] = None
-    due_date: Optional[str] = None
-    dueDate: Optional[str] = None
+    due_date: Optional[str] = Field(None, alias="dueDate")
     items: Optional[List[dict]] = None
     subtotal: Optional[float] = None
-    tax_total: Optional[float] = None
-    taxTotal: Optional[float] = None
-    grand_total: Optional[float] = None
-    grandTotal: Optional[float] = None
+    tax_total: Optional[float] = Field(None, alias="taxTotal")
+    grand_total: Optional[float] = Field(None, alias="grandTotal")
+    total_amount: Optional[float] = Field(None, alias="totalAmount")
     total: Optional[float] = None
     notes: Optional[str] = None
     status: Optional[str] = None
-    created_at: Optional[str] = None
-    createdAt: Optional[str] = None
-    updated_at: Optional[str] = None
-    updatedAt: Optional[str] = None
+    payment_status: Optional[str] = Field(None, alias="paymentStatus")
+    created_at: Optional[str] = Field(None, alias="createdAt")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
     
     class Config:
         extra = "allow"
+        populate_by_name = True
 
 
 def calculate_invoice_totals(items: List[InvoiceItemCreate]) -> dict:
@@ -89,7 +108,11 @@ def calculate_invoice_totals(items: List[InvoiceItemCreate]) -> dict:
     calculated_items = []
     for item in items:
         item_total = (item.quantity * item.unit_price) - item.discount
-        item_tax = item_total * (item.gst_rate / 100)
+        
+        # Calculate taxes
+        gst_amount = item_total * (item.gst_rate / 100)
+        cess_amount = item_total * (item.cess_rate / 100)
+        item_tax = gst_amount + cess_amount
         
         subtotal += item_total
         tax_total += item_tax
@@ -102,9 +125,17 @@ def calculate_invoice_totals(items: List[InvoiceItemCreate]) -> dict:
             "unit_price": item.unit_price,
             "discount": item.discount,
             "gst_rate": item.gst_rate,
+            "cess_rate": item.cess_rate,
+            "product_id": item.product_id,
+            "item_code": item.item_code,
+            "serial_numbers": item.serial_numbers,
             "item_total": item_total,
             "tax_amount": item_tax,
-            "total_with_tax": item_total + item_tax
+            "total_with_tax": item_total + item_tax,
+            "cgst": gst_amount / 2,
+            "sgst": gst_amount / 2,
+            "igst": 0,
+            "cess": cess_amount
         })
     
     return {
@@ -141,6 +172,12 @@ async def list_all_invoices(
         
         for doc in query_ref.stream():
             invoice_data = doc.to_dict()
+            # Backfill totalAmount for frontend compatibility
+            if "totalAmount" not in invoice_data and "grandTotal" in invoice_data:
+                invoice_data["totalAmount"] = invoice_data["grandTotal"]
+            elif "total_amount" not in invoice_data and "grand_total" in invoice_data:
+                invoice_data["total_amount"] = invoice_data["grand_total"]
+                
             invoices.append({"id": doc.id, **serialize_firestore_doc(invoice_data)})
         
         return invoices
@@ -155,9 +192,9 @@ async def create_invoice_toplevel(invoice: InvoiceCreate):
         db = get_firestore_db()
         
         # Extract company_id from request
-        company_id = getattr(invoice, 'company_id', None) or getattr(invoice, 'companyId', None)
+        company_id = invoice.company_id
         if not company_id:
-            raise HTTPException(status_code=400, detail="company_id or companyId is required")
+            raise HTTPException(status_code=400, detail="company_id is required")
         
         # Verify company exists
         company_doc = db.collection("companies").document(company_id).get()
@@ -167,25 +204,28 @@ async def create_invoice_toplevel(invoice: InvoiceCreate):
         # Calculate totals
         calculations = calculate_invoice_totals(invoice.items)
         
-        # Generate invoice number
-        # Get all invoices for company and find max number (avoid composite index)
-        all_invoices = db.collection("invoices")\
-            .where("companyId", "==", company_id)\
-            .stream()
+        # Generate invoice number if not provided
+        invoice_number = invoice.invoice_number
+        if not invoice_number:
+            # Get all invoices for company and find max number (avoid composite index)
+            all_invoices = db.collection("invoices")\
+                .where("companyId", "==", company_id)\
+                .stream()
+            
+            last_num = 0
+            for doc in all_invoices:
+                invoice_data = doc.to_dict()
+                if invoice_data.get("invoiceNumber"):
+                    try:
+                        num = int(invoice_data["invoiceNumber"].split("-")[-1])
+                        if num > last_num:
+                            last_num = num
+                    except:
+                        pass
+            
+            invoice_number = f"INV-{str(last_num + 1).zfill(3)}"
         
-        last_num = 0
-        for doc in all_invoices:
-            invoice_data = doc.to_dict()
-            if invoice_data.get("invoiceNumber"):
-                try:
-                    num = int(invoice_data["invoiceNumber"].split("-")[-1])
-                    if num > last_num:
-                        last_num = num
-                except:
-                    pass
-        
-        invoice_number = f"INV-{str(last_num + 1).zfill(3)}"
-        invoice_date = invoice.date or invoice.invoice_date or datetime.utcnow().strftime("%Y-%m-%d")
+        invoice_date = invoice.date or datetime.utcnow().strftime("%Y-%m-%d")
         
         invoice_data = {
             "companyId": company_id,
@@ -198,7 +238,8 @@ async def create_invoice_toplevel(invoice: InvoiceCreate):
             "taxTotal": calculations["tax_total"],
             "grandTotal": calculations["grand_total"],
             "notes": invoice.notes,
-            "status": invoice.status or "unpaid",
+            "status": invoice.status or "draft",
+            "paymentStatus": invoice.payment_status,
             "createdAt": datetime.utcnow().isoformat(),
             "updatedAt": datetime.utcnow().isoformat()
         }
@@ -252,7 +293,8 @@ async def update_invoice_toplevel(invoice_id: str, invoice: InvoiceCreate):
             "taxTotal": calculations["tax_total"],
             "grandTotal": calculations["grand_total"],
             "notes": invoice.notes,
-            "status": invoice.status or "unpaid",
+            "status": invoice.status or "draft",
+            "paymentStatus": invoice.payment_status,
             "updatedAt": datetime.utcnow().isoformat()
         }
         
@@ -320,7 +362,7 @@ async def create_invoice(company_id: str, invoice: InvoiceCreate):
             invoice_number = f"INV-{str(last_num + 1).zfill(3)}"
         
         # Use either date or invoice_date field
-        invoice_date = invoice.date or invoice.invoice_date or datetime.utcnow().strftime("%Y-%m-%d")
+        invoice_date = invoice.date or datetime.utcnow().strftime("%Y-%m-%d")
         
         invoice_data = {
             "company_id": company_id,

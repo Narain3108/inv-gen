@@ -13,8 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Plus } from 'lucide-react';
 import { ProductForm, ProductList, ProductFilters } from '@/components/products';
 import { Product } from '@/types';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
@@ -23,6 +21,7 @@ import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatProductsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import { productsApi } from '@/lib/api/products.api';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
 
@@ -71,35 +70,27 @@ function ProductsContent() {
     if (!selectedCompany) return;
 
     try {
-      // Filter out undefined values to avoid Firebase errors
-      const productData: any = {
-        ...data,
-        companyId: selectedCompany.id,
-      };
-
+      // Filter out undefined values
       // Remove itemCode if it's empty or undefined
-      if (!productData.itemCode || productData.itemCode.trim() === '') {
-        delete productData.itemCode;
+      const cleanData = { ...data };
+      if (!cleanData.itemCode || cleanData.itemCode.trim() === '') {
+        delete cleanData.itemCode;
       }
 
       if (editingProduct) {
-        // Update existing product
-        console.log('Updating product:', editingProduct.id, productData);
-        const productRef = doc(db, 'products', editingProduct.id);
-        await updateDoc(productRef, {
-          ...productData,
-          updatedAt: serverTimestamp(),
-        });
+        // Update existing product using API - don't send companyId
+        console.log('Updating product:', editingProduct.id, cleanData);
+        await productsApi.update(editingProduct.id, cleanData);
         toast.success('Product updated successfully');
       } else {
-        // Create new product
+        // Create new product using API - include companyId
+        const productData = {
+          ...cleanData,
+          companyId: selectedCompany.id,
+        };
         console.log('Creating new product:', productData);
-        const docRef = await addDoc(collection(db, 'products'), {
-          ...productData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        console.log('Created product with ID:', docRef.id);
+        const newProduct = await productsApi.create(productData);
+        console.log('Created product with ID:', newProduct.id);
         toast.success('Product created successfully');
       }
 
@@ -115,7 +106,7 @@ function ProductsContent() {
     if (!deletingProduct) return;
 
     try {
-      await deleteDoc(doc(db, 'products', deletingProduct.id));
+      await productsApi.delete(deletingProduct.id);
       toast.success('Product deleted successfully');
       setDeletingProduct(null);
       await refreshProducts();

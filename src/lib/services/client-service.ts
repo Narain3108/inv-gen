@@ -8,15 +8,16 @@
  */
 
 import { Client } from '@/types';
-import { BaseService } from './base-service';
+import { ApiBaseService } from './api-base-service';
 import { ValidationError } from '@/lib/errors/error-handler';
+import { clientsApi } from '@/lib/api/clients.api';
 
 /**
  * Service for managing clients
  */
-class ClientService extends BaseService<Client> {
+class ClientService extends ApiBaseService<Client> {
   constructor() {
-    super('clients');
+    super(clientsApi);
   }
 
   /**

@@ -3,83 +3,89 @@
  * All quotation-related API calls
  */
 
-import { apiClient, PaginatedResponse } from './client';
+import { apiClient } from './client';
 import type { Quotation, Invoice } from '@/types';
 
 export interface QuotationFilters {
   search?: string;
-  company?: string;
-  client?: string;
+  company_id?: string;
+  client_id?: string;
   status?: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   date_from?: string;
   date_to?: string;
   ordering?: string;
-  page?: number;
-  page_size?: number;
 }
 
 export const quotationsApi = {
   /**
    * Get all quotations with optional filters
    */
-  getAll: async (filters?: QuotationFilters): Promise<PaginatedResponse<Quotation>> => {
-    return apiClient.get<PaginatedResponse<Quotation>>('/quotations/', filters);
+  getAll: async (filters?: QuotationFilters): Promise<Quotation[]> => {
+    return apiClient.get<Quotation[]>('/quotations', filters);
+  },
+
+  /**
+   * Get quotations by company ID
+   * Used for dashboard and list views
+   */
+  getByCompanyId: async (companyId: string): Promise<Quotation[]> => {
+    return apiClient.get<Quotation[]>('/quotations', { company_id: companyId });
   },
 
   /**
    * Get a single quotation by ID
    */
   getById: async (id: string): Promise<Quotation> => {
-    return apiClient.get<Quotation>(`/quotations/${id}/`);
+    return apiClient.get<Quotation>(`/quotations/${id}`);
   },
 
   /**
    * Create a new quotation
    */
   create: async (data: Partial<Quotation>): Promise<Quotation> => {
-    return apiClient.post<Quotation>('/quotations/', data);
+    return apiClient.post<Quotation>('/quotations', data);
   },
 
   /**
    * Update an existing quotation
    */
   update: async (id: string, data: Partial<Quotation>): Promise<Quotation> => {
-    return apiClient.put<Quotation>(`/quotations/${id}/`, data);
+    return apiClient.put<Quotation>(`/quotations/${id}`, data);
   },
 
   /**
    * Partially update a quotation
    */
   partialUpdate: async (id: string, data: Partial<Quotation>): Promise<Quotation> => {
-    return apiClient.patch<Quotation>(`/quotations/${id}/`, data);
+    return apiClient.patch<Quotation>(`/quotations/${id}`, data);
   },
 
   /**
    * Delete a quotation
    */
   delete: async (id: string): Promise<void> => {
-    return apiClient.delete<void>(`/quotations/${id}/`);
+    return apiClient.delete<void>(`/quotations/${id}`);
   },
 
   /**
    * Convert quotation to invoice
    */
   convertToInvoice: async (id: string): Promise<Invoice> => {
-    return apiClient.post<Invoice>(`/quotations/${id}/convert_to_invoice/`);
+    return apiClient.post<Invoice>(`/quotations/${id}/convert_to_invoice`);
   },
 
   /**
    * Update quotation status
    */
   updateStatus: async (id: string, status: QuotationFilters['status']): Promise<Quotation> => {
-    return apiClient.patch<Quotation>(`/quotations/${id}/`, { status });
+    return apiClient.patch<Quotation>(`/quotations/${id}`, { status });
   },
 
   /**
    * Generate quotation number
    */
   generateNumber: async (companyId: string): Promise<{ quotation_number: string }> => {
-    return apiClient.get<{ quotation_number: string }>('/quotations/generate_number/', { 
+    return apiClient.get<{ quotation_number: string }>('/quotations/generate_number', { 
       company: companyId 
     });
   },

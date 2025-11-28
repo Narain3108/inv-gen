@@ -1,37 +1,17 @@
 /**
  * Product Category Service
- * Manages global product categories (accessible by all companies)
+ * Manages product categories (per company subcollection)
  */
 
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { categoriesApi } from '@/lib/api/categories.api';
 import { ProductCategory, ProductCategoryFormData, CategoryProduct } from '@/types';
 
-const COLLECTION_NAME = 'productCategories';
-
 /**
- * Fetch all product categories (global, accessible by all companies)
+ * Fetch all product categories for a company
  */
-export async function fetchProductCategories(): Promise<ProductCategory[]> {
+export async function fetchProductCategories(companyId: string): Promise<ProductCategory[]> {
   try {
-    const q = query(collection(db, COLLECTION_NAME), orderBy('categoryName', 'asc'));
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ProductCategory[];
+    return await categoriesApi.getByCompanyId(companyId);
   } catch (error) {
     console.error('Error fetching product categories:', error);
     throw error;
@@ -42,20 +22,19 @@ export async function fetchProductCategories(): Promise<ProductCategory[]> {
  * Create a new product category
  */
 export async function createProductCategory(
+  companyId: string,
   data: ProductCategoryFormData
 ): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+    const category = await categoriesApi.create(companyId, {
       categoryName: data.categoryName,
       description: data.description || '',
       products: data.products || [],
       defaultGstRate: data.defaultGstRate,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
     });
 
-    console.log('✅ Created product category:', docRef.id);
-    return docRef.id;
+    console.log('✅ Created product category:', category.id);
+    return category.id!;
   } catch (error) {
     console.error('Error creating product category:', error);
     throw error;
@@ -66,17 +45,16 @@ export async function createProductCategory(
  * Update an existing product category
  */
 export async function updateProductCategory(
+  companyId: string,
   id: string,
   data: ProductCategoryFormData
 ): Promise<void> {
   try {
-    const categoryRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(categoryRef, {
+    await categoriesApi.update(companyId, id, {
       categoryName: data.categoryName,
       description: data.description || '',
       products: data.products || [],
       defaultGstRate: data.defaultGstRate,
-      updatedAt: serverTimestamp(),
     });
 
     console.log('✅ Updated product category:', id);
@@ -89,9 +67,9 @@ export async function updateProductCategory(
 /**
  * Delete a product category
  */
-export async function deleteProductCategory(id: string): Promise<void> {
+export async function deleteProductCategory(companyId: string, id: string): Promise<void> {
   try {
-    await deleteDoc(doc(db, COLLECTION_NAME, id));
+    await categoriesApi.delete(companyId, id);
     console.log('✅ Deleted product category:', id);
   } catch (error) {
     console.error('Error deleting product category:', error);
@@ -103,15 +81,15 @@ export async function deleteProductCategory(id: string): Promise<void> {
  * Find category by HSN code
  * Returns the category and matched product if found
  */
-export async function findCategoryByHSN(hsn: string): Promise<{
+export async function findCategoryByHSN(companyId: string, hsn: string): Promise<{
   category: ProductCategory;
   product: CategoryProduct;
 } | null> {
   try {
-    const categories = await fetchProductCategories();
+    const categories = await fetchProductCategories(companyId);
 
     for (const category of categories) {
-      const matchedProduct = category.products.find(
+      const matchedProduct = category.products?.find(
         (p) => p.hsn.toLowerCase() === hsn.toLowerCase()
       );
 
@@ -131,16 +109,16 @@ export async function findCategoryByHSN(hsn: string): Promise<{
  * Find category by product name
  * Returns the category and matched product if found
  */
-export async function findCategoryByProductName(name: string): Promise<{
+export async function findCategoryByProductName(companyId: string, name: string): Promise<{
   category: ProductCategory;
   product: CategoryProduct;
 } | null> {
   try {
-    const categories = await fetchProductCategories();
+    const categories = await fetchProductCategories(companyId);
     const searchName = name.toLowerCase().trim();
 
     for (const category of categories) {
-      const matchedProduct = category.products.find(
+      const matchedProduct = category.products?.find(
         (p) => p.name.toLowerCase().trim() === searchName
       );
 
@@ -161,13 +139,14 @@ export async function findCategoryByProductName(name: string): Promise<{
  * Returns the GST rate if a matching category is found, otherwise null
  */
 export async function getSuggestedGSTRate(
+  companyId: string,
   hsn?: string,
   productName?: string
 ): Promise<number | null> {
   try {
     // Try to find by HSN first
     if (hsn) {
-      const hsnMatch = await findCategoryByHSN(hsn);
+      const hsnMatch = await findCategoryByHSN(companyId, hsn);
       if (hsnMatch) {
         console.log('✅ Found GST rate by HSN:', hsnMatch.category.defaultGstRate);
         return hsnMatch.category.defaultGstRate;
@@ -176,7 +155,7 @@ export async function getSuggestedGSTRate(
 
     // Try to find by product name
     if (productName) {
-      const nameMatch = await findCategoryByProductName(productName);
+      const nameMatch = await findCategoryByProductName(companyId, productName);
       if (nameMatch) {
         console.log('✅ Found GST rate by product name:', nameMatch.category.defaultGstRate);
         return nameMatch.category.defaultGstRate;

@@ -153,7 +153,18 @@ export function QuotationList({
             </thead>
             <tbody>
               {filteredQuotations.map((quotation) => {
-                const validUntilDate = quotation.validUntil?.toDate ? quotation.validUntil.toDate() : null;
+                // Handle validUntil which can be a string (API) or Date/Timestamp
+                let validUntilDate: Date | null = null;
+                if (quotation.validUntil) {
+                  if (typeof quotation.validUntil === 'string') {
+                    validUntilDate = new Date(quotation.validUntil);
+                  } else if (quotation.validUntil instanceof Date) {
+                    validUntilDate = quotation.validUntil;
+                  } else if ((quotation.validUntil as any).toDate) {
+                    validUntilDate = (quotation.validUntil as any).toDate();
+                  }
+                }
+
                 const isExpired = validUntilDate && validUntilDate < new Date() && quotation.status === 'pending';
                 const canConvert = quotation.status !== 'converted' && quotation.status !== 'rejected' && !isExpired;
 
@@ -171,7 +182,7 @@ export function QuotationList({
                     </td>
                     <td className="p-3">
                       <span className="text-sm">
-                        {quotation.date?.toDate ? formatDate(quotation.date.toDate()) : 'N/A'}
+                        {formatDate(quotation.date)}
                       </span>
                     </td>
                     <td className="p-3">
@@ -252,8 +263,8 @@ export function QuotationList({
       {/* Quotations Cards - Mobile */}
       <div className="space-y-3 md:hidden">
         {filteredQuotations.map((quotation) => {
-          const validUntilDate = quotation.validUntil?.toDate ? quotation.validUntil.toDate() : null;
-          const isExpired = validUntilDate && validUntilDate < new Date() && quotation.status === 'pending';
+          const validUntilDate = quotation.validUntil ? (typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil) : quotation.validUntil) : null;
+          const isExpired = validUntilDate && !isNaN(validUntilDate.getTime()) && validUntilDate < new Date() && quotation.status === 'pending';
           const canConvert = quotation.status !== 'converted' && quotation.status !== 'rejected' && !isExpired;
 
           return (
@@ -270,7 +281,7 @@ export function QuotationList({
                 <div>
                   <p className="text-muted-foreground">Date</p>
                   <p className="font-medium">
-                    {quotation.date?.toDate ? formatDate(quotation.date.toDate()) : 'N/A'}
+                    {formatDate(quotation.date)}
                   </p>
                 </div>
                 <div>

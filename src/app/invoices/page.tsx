@@ -7,19 +7,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  orderBy,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem } from '@/types';
 import { InvoiceForm, InvoiceList } from '@/components/invoices';
 import { Button } from '@/components/ui/button';
@@ -49,6 +36,9 @@ import { DashboardLayout } from '@/components/layout';
 import { z } from 'zod';
 import { invoiceFormSchema } from '@/lib/validations';
 import { toast } from 'sonner';
+import { invoicesApi } from '@/lib/api/invoices.api';
+import { productsApi } from '@/lib/api/products.api';
+import { clientsApi } from '@/lib/api/clients.api';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -93,49 +83,22 @@ function InvoicesContent() {
       // Set company
       setCompany(selectedCompany);
 
-      // Load invoices - Only filter by companyId (no orderBy to avoid index requirement)
-      const invoicesRef = collection(db, 'invoices');
-      const invoicesQuery = query(
-        invoicesRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const invoicesSnapshot = await getDocs(invoicesQuery);
-      const invoicesData = invoicesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Invoice[];
-      // Sort in memory instead of in query
+      // Load invoices
+      const invoicesData = await invoicesApi.getAll({ company_id: selectedCompany.id });
+      // Sort in memory (API might already sort, but just in case)
       invoicesData.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || 0;
-        const bTime = b.createdAt?.toMillis?.() || 0;
+        const aTime = new Date(a.createdAt as string).getTime();
+        const bTime = new Date(b.createdAt as string).getTime();
         return bTime - aTime;
       });
       setInvoices(invoicesData);
 
-      // Load products - Filter by companyId
-      const productsRef = collection(db, 'products');
-      const productsQuery = query(
-        productsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const productsSnapshot = await getDocs(productsQuery);
-      const productsData = productsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[];
+      // Load products
+      const productsData = await productsApi.getAll({ company_id: selectedCompany.id });
       setProducts(productsData);
 
-      // Load clients - Filter by companyId
-      const clientsRef = collection(db, 'clients');
-      const clientsQuery = query(
-        clientsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const clientsSnapshot = await getDocs(clientsQuery);
-      const clientsData = clientsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Client[];
+      // Load clients
+      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
       setClients(clientsData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -191,25 +154,17 @@ function InvoicesContent() {
       const invoiceData = {
         ...data,
         companyId: selectedCompany.id,
-        date: Timestamp.fromDate(new Date(data.date)),
+        date: new Date(data.date).toISOString(),
         totalAmountInWords: amountToWords(data.totalAmount),
       };
 
       if (editingInvoice?.id) {
         // Update existing invoice
-        const invoiceRef = doc(db, 'invoices', editingInvoice.id);
-        await updateDoc(invoiceRef, {
-          ...invoiceData,
-          updatedAt: Timestamp.now(),
-        });
+        await invoicesApi.update(editingInvoice.id, invoiceData);
         toast.success('Invoice updated successfully');
       } else {
         // Create new invoice
-        await addDoc(collection(db, 'invoices'), {
-          ...invoiceData,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
+        await invoicesApi.create(invoiceData);
         toast.success('Invoice created successfully');
       }
 
@@ -225,7 +180,7 @@ function InvoicesContent() {
     if (!deleteInvoice?.id) return;
 
     try {
-      await deleteDoc(doc(db, 'invoices', deleteInvoice.id));
+      await invoicesApi.delete(deleteInvoice.id);
       toast.success('Invoice deleted successfully');
       setDeleteInvoice(null);
       loadData();

@@ -13,8 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { UserPlus } from 'lucide-react';
 import { ClientForm, ClientList, ClientFilters } from '@/components/clients';
 import { Client } from '@/types';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { clientFormSchema } from '@/lib/validations';
@@ -23,6 +21,7 @@ import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatClientsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import { clientsApi } from '@/lib/api/clients.api';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
 
@@ -61,26 +60,18 @@ function ClientsContent() {
     if (!selectedCompany) return;
 
     try {
-      // Don't add companyId - clients are global
+      // Clients are global in backend
       const clientData = {
         ...data,
       };
 
       if (editingClient) {
-        // Update existing client
-        const clientRef = doc(db, 'clients', editingClient.id);
-        await updateDoc(clientRef, {
-          ...clientData,
-          updatedAt: serverTimestamp(),
-        });
+        // Update existing client using API
+        await clientsApi.update(editingClient.id, clientData);
         toast.success('Client updated successfully');
       } else {
-        // Create new client (global - no companyId)
-        await addDoc(collection(db, 'clients'), {
-          ...clientData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+        // Create new client using API
+        await clientsApi.create(clientData);
         toast.success('Client created successfully');
       }
 
@@ -96,7 +87,7 @@ function ClientsContent() {
     if (!deletingClient) return;
 
     try {
-      await deleteDoc(doc(db, 'clients', deletingClient.id));
+      await clientsApi.delete(deletingClient.id);
       toast.success('Client deleted successfully');
       setDeletingClient(null);
       await refreshClients();

@@ -30,7 +30,21 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
 
     invoices.forEach(invoice => {
       if (invoice.date) {
-        const date = invoice.date.toDate();
+        let date: Date;
+        if (invoice.date instanceof Date) {
+          date = invoice.date;
+        } else if (typeof invoice.date === 'string') {
+          date = new Date(invoice.date);
+        } else if (typeof invoice.date === 'object' && (invoice.date as any)._seconds) {
+          date = new Date((invoice.date as any)._seconds * 1000);
+        } else if (typeof invoice.date === 'object' && (invoice.date as any).toDate) {
+          date = (invoice.date as any).toDate();
+        } else {
+          return; // Skip invalid dates
+        }
+        
+        if (isNaN(date.getTime())) return; // Skip invalid dates
+        
         const year = date.getFullYear();
         const month = date.toLocaleString('default', { month: 'long', year: 'numeric' });
         

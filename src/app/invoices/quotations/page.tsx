@@ -7,18 +7,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { Quotation, Product, Client, Company, QuotationStatus } from '@/types';
 import { QuotationForm, QuotationList, QuotationFilters } from '@/components/quotations';
 import { CustomizationDialog } from '@/components/invoices';
@@ -54,6 +42,11 @@ import { amountToWords } from '@/lib/utils/number-to-words';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
+import { quotationsApi } from '@/lib/api/quotations.api';
+import { productsApi } from '@/lib/api/products.api';
+import { clientsApi } from '@/lib/api/clients.api';
+import { invoicesApi } from '@/lib/api/invoices.api';
+import { companiesApi } from '@/lib/api/companies.api';
 
 function QuotationsContent() {
   const router = useRouter();
@@ -83,7 +76,7 @@ function QuotationsContent() {
     },
     validity: (quotation, value) => {
       if (!quotation.validUntil) return false;
-      const validDate = quotation.validUntil.toDate();
+      const validDate = typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil) : quotation.validUntil;
       const now = new Date();
       const daysUntilExpiry = Math.ceil((validDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -127,24 +120,15 @@ function QuotationsContent() {
     return generateQuotationNumber(company);
   };
 
-  // Reload fresh company data from Firebase
+  // Reload fresh company data from API
   const reloadCompanyData = React.useCallback(async () => {
     if (!selectedCompany?.id) return;
     
     try {
-      const companyDoc = await getDocs(
-        query(collection(db, 'companies'), where('__name__', '==', selectedCompany.id))
-      );
-      
-      if (!companyDoc.empty) {
-        const freshCompanyData = {
-          id: companyDoc.docs[0].id,
-          ...companyDoc.docs[0].data(),
-        } as Company;
-        console.log('🔄 Reloaded company data:', freshCompanyData.quotationNumbering);
-        setCompany(freshCompanyData);
-        setSelectedCompany(freshCompanyData);
-      }
+      const freshCompanyData = await companiesApi.getById(selectedCompany.id);
+      console.log('🔄 Reloaded company data:', freshCompanyData.quotationNumbering);
+      setCompany(freshCompanyData);
+      setSelectedCompany(freshCompanyData);
     } catch (error) {
       console.error('Error reloading company data:', error);
     }
@@ -158,46 +142,23 @@ function QuotationsContent() {
     try {
       setCompany(selectedCompany);
 
-      // Load quotations
-      const quotationsRef = collection(db, 'quotations');
-      const quotationsQuery = query(
-        quotationsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const quotationsSnapshot = await getDocs(quotationsQuery);
-      const quotationsData = quotationsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Quotation[];
+      // Load quotations using API
+      const quotationsData = await quotationsApi.getAll({ company_id: selectedCompany.id });
       
-      // Sort by date
+      // Sort by createdAt date
       quotationsData.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || 0;
-        const bTime = b.createdAt?.toMillis?.() || 0;
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
       });
       setQuotations(quotationsData);
 
-      // Load products
-      const productsRef = collection(db, 'products');
-      const productsQuery = query(
-        productsRef,
-        where('companyId', '==', selectedCompany.id)
-      );
-      const productsSnapshot = await getDocs(productsQuery);
-      const productsData = productsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[];
+      // Load products using API
+      const productsData = await productsApi.getAll({ company_id: selectedCompany.id });
       setProducts(productsData);
 
-      // Load clients (global)
-      const clientsRef = collection(db, 'clients');
-      const clientsSnapshot = await getDocs(clientsRef);
-      const clientsData = clientsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Client[];
+      // Load clients using API
+      const clientsData = await clientsApi.getAll();
       setClients(clientsData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -279,33 +240,27 @@ function QuotationsContent() {
         items: cleanedItems,
         quotationNumber,
         companyId: selectedCompany.id,
+        company_id: selectedCompany.id,
         status: editingQuotation?.status || 'pending' as QuotationStatus,
-        date: Timestamp.fromDate(new Date(data.date)),
-        validUntil: Timestamp.fromDate(new Date(data.validUntil)),
+        date: new Date(data.date).toISOString(),
+        validUntil: new Date(data.validUntil).toISOString(),
         totalAmountInWords: amountToWords(data.totalAmount),
       };
 
       if (editingQuotation?.id) {
-        const quotationRef = doc(db, 'quotations', editingQuotation.id);
-        await updateDoc(quotationRef, {
-          ...quotationData,
-          updatedAt: Timestamp.now(),
-        });
+        await quotationsApi.update(editingQuotation.id, quotationData);
         toast.success('Quotation updated successfully');
       } else {
-        await addDoc(collection(db, 'quotations'), {
-          ...quotationData,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
+        await quotationsApi.create(quotationData);
         
         // Increment quotation counter in company if using auto-numbering
         if (!editingQuotation && !data.quotationNumber?.trim() && company.quotationNumbering) {
-          const companyRef = doc(db, 'companies', selectedCompany.id);
           const newNextNumber = quotations.length + 2; // +2 because we just added one
-          await updateDoc(companyRef, {
-            'quotationNumbering.nextNumber': newNextNumber,
-            updatedAt: Timestamp.now(),
+          await companiesApi.update(selectedCompany.id, {
+            quotationNumbering: {
+              ...company.quotationNumbering,
+              nextNumber: newNextNumber,
+            },
           });
           console.log(`📈 Updated company quotation counter to: ${newNextNumber}`);
         }
@@ -326,7 +281,7 @@ function QuotationsContent() {
     if (!deleteQuotation) return;
 
     try {
-      await deleteDoc(doc(db, 'quotations', deleteQuotation.id));
+      await quotationsApi.delete(deleteQuotation.id);
       toast.success('Quotation deleted successfully');
       setDeleteQuotation(null);
       await loadData();
@@ -384,11 +339,9 @@ function QuotationsContent() {
   };
 
   const handleConvertToInvoice = async (quotation: Quotation) => {
-    // Generate suggested invoice number
-    const invoicesRef = collection(db, 'invoices');
-    const q = query(invoicesRef, where('companyId', '==', selectedCompany?.id || ''));
-    const snapshot = await getDocs(q);
-    const number = snapshot.size + 1;
+    // Generate suggested invoice number using API
+    const invoices = await invoicesApi.getAll({ company_id: selectedCompany?.id || '' });
+    const number = invoices.length + 1;
     const year = new Date().getFullYear();
     const suggestedNumber = `INV-${year}-${String(number).padStart(4, '0')}`;
     
@@ -403,16 +356,12 @@ function QuotationsContent() {
     }
 
     try {
-      // Check if invoice number already exists
-      const invoicesRef = collection(db, 'invoices');
-      const q = query(
-        invoicesRef,
-        where('companyId', '==', selectedCompany.id),
-        where('invoiceNumber', '==', invoiceNumber.trim())
-      );
-      const existingInvoices = await getDocs(q);
+      // Check if invoice number already exists using API
+      const existingInvoices = await invoicesApi.getAll({ 
+        company_id: selectedCompany.id,
+      });
       
-      if (!existingInvoices.empty) {
+      if (existingInvoices.some(inv => inv.invoiceNumber === invoiceNumber.trim())) {
         toast.error('Invoice number already exists');
         return;
       }
@@ -421,8 +370,10 @@ function QuotationsContent() {
       const invoiceData = {
         invoiceNumber: invoiceNumber.trim(),
         companyId: convertingQuotation.companyId,
+        company_id: convertingQuotation.companyId,
         clientId: convertingQuotation.clientId,
-        date: Timestamp.now(), // Use current date for invoice
+        client_id: convertingQuotation.clientId,
+        date: new Date().toISOString(), // Use current date for invoice
         items: convertingQuotation.items,
         totalAmount: convertingQuotation.totalAmount,
         totalAmountInWords: convertingQuotation.totalAmountInWords,
@@ -430,18 +381,15 @@ function QuotationsContent() {
         cgst: convertingQuotation.cgst,
         sgst: convertingQuotation.sgst,
         igst: convertingQuotation.igst,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        paymentStatus: 'unpaid' as const,
       };
 
-      const invoiceRef = await addDoc(collection(db, 'invoices'), invoiceData);
+      const newInvoice = await invoicesApi.create(invoiceData);
 
       // Update quotation status to converted
-      const quotationRef = doc(db, 'quotations', convertingQuotation.id);
-      await updateDoc(quotationRef, {
+      await quotationsApi.partialUpdate(convertingQuotation.id, {
         status: 'converted' as QuotationStatus,
-        convertedToInvoiceId: invoiceRef.id,
-        updatedAt: Timestamp.now(),
+        convertedToInvoiceId: newInvoice.id,
       });
 
       toast.success('Quotation converted to invoice successfully');
@@ -459,11 +407,7 @@ function QuotationsContent() {
 
   const handleUpdateStatus = async (quotation: Quotation, status: QuotationStatus) => {
     try {
-      const quotationRef = doc(db, 'quotations', quotation.id);
-      await updateDoc(quotationRef, {
-        status,
-        updatedAt: Timestamp.now(),
-      });
+      await quotationsApi.updateStatus(quotation.id, status);
       toast.success(`Quotation marked as ${status}`);
       await loadData();
     } catch (error) {

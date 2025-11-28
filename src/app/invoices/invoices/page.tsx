@@ -7,25 +7,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  orderBy,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { Invoice, Product, Client, Company, InvoiceItem, PaymentFormData } from '@/types';
 import { InvoiceForm, InvoiceList, InvoiceFilters, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
 import { FilterBar, ExportButton } from '@/components/shared';
 import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils/export-utils';
 import { Button } from '@/components/ui/button';
 import { loadCustomization } from '@/lib/services/customization-service';
+import { invoicesApi } from '@/lib/api/invoices.api';
+import { productsApi } from '@/lib/api/products.api';
+import { clientsApi } from '@/lib/api/clients.api';
+import { companiesApi } from '@/lib/api/companies.api';
 import {
   Dialog,
   DialogContent,
@@ -48,13 +39,13 @@ import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
+import { toast } from 'sonner';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { DashboardLayout } from '@/components/layout';
 import { z } from 'zod';
 import { invoiceFormSchema } from '@/lib/validations';
-import { toast } from 'sonner';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -93,7 +84,7 @@ function InvoicesContent() {
     paymentStatus: (invoice, value) => invoice.paymentStatus === value,
     datePeriod: (invoice, value) => {
       if (!invoice.date) return false;
-      const invoiceDate = invoice.date.toDate();
+      const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
       const now = new Date();
       
       switch (value) {
@@ -127,13 +118,14 @@ function InvoicesContent() {
     },
     month: (invoice, value) => {
       if (!invoice.date) return false;
-      const invoiceDate = invoice.date.toDate();
+      const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
       const monthYear = invoiceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
       return monthYear === value;
     },
     year: (invoice, value) => {
       if (!invoice.date) return false;
-      return invoice.date.toDate().getFullYear() === parseInt(value);
+      const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
+      return invoiceDate.getFullYear() === parseInt(value);
     },
     minAmount: (invoice, value) => invoice.totalAmount >= value,
     maxAmount: (invoice, value) => invoice.totalAmount <= value,
@@ -154,20 +146,14 @@ function InvoicesContent() {
     }
   }, [selectedCompany]);
 
-  // Reload fresh company data from Firebase
+  // Reload fresh company data from API
   const reloadCompanyData = React.useCallback(async () => {
     if (!selectedCompany?.id) return;
     
     try {
-      const companyDoc = await getDocs(
-        query(collection(db, 'companies'), where('__name__', '==', selectedCompany.id))
-      );
+      const freshCompanyData = await companiesApi.getById(selectedCompany.id);
       
-      if (!companyDoc.empty) {
-        const freshCompanyData = {
-          id: companyDoc.docs[0].id,
-          ...companyDoc.docs[0].data(),
-        } as Company;
+      if (freshCompanyData) {
         console.log('🔄 Reloaded company data:', freshCompanyData.invoiceNumbering);
         setCompany(freshCompanyData);
         setSelectedCompany(freshCompanyData);
@@ -185,22 +171,12 @@ function InvoicesContent() {
     try {
       console.log('📡 Fetching invoices for company:', selectedCompany.name);
       
-      const invoicesSnapshot = await getDocs(
-        query(
-          collection(db, 'invoices'),
-          where('companyId', '==', selectedCompany.id)
-        )
-      );
-
-      const invoicesData = invoicesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Invoice[];
+      const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
       
-      // Sort in memory
+      // Sort in memory (API might already sort, but to be safe)
       invoicesData.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || 0;
-        const bTime = b.createdAt?.toMillis?.() || 0;
+        const aTime = new Date(a.createdAt || 0).getTime();
+        const bTime = new Date(b.createdAt || 0).getTime();
         return bTime - aTime;
       });
 
@@ -287,42 +263,39 @@ function InvoicesContent() {
         invoiceNumber,
         items: cleanedItems,
         companyId: selectedCompany.id,
-        date: Timestamp.fromDate(new Date(data.date)),
+        date: typeof data.date === 'string' ? data.date : new Date(data.date).toISOString(),
         totalAmountInWords: amountToWords(data.totalAmount),
       };
 
       if (editingInvoice?.id) {
         // Update existing invoice - preserve payment data
-        const invoiceRef = doc(db, 'invoices', editingInvoice.id);
-        await updateDoc(invoiceRef, {
+        await invoicesApi.update(editingInvoice.id, {
           ...invoiceData,
           // Preserve existing payment tracking fields
           paymentStatus: editingInvoice.paymentStatus || 'pending',
           amountPaid: editingInvoice.amountPaid || 0,
           amountPending: editingInvoice.amountPending ?? invoiceData.totalAmount,
           payments: editingInvoice.payments || [],
-          updatedAt: Timestamp.now(),
         });
         toast.success('Invoice updated successfully');
       } else {
         // Create new invoice with payment tracking initialized
-        await addDoc(collection(db, 'invoices'), {
+        await invoicesApi.create({
           ...invoiceData,
           paymentStatus: 'pending',
           amountPaid: 0,
           amountPending: invoiceData.totalAmount,
           payments: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
         });
 
         // Increment invoice counter in company if auto-generated
         if (!data.invoiceNumber?.trim() && company.invoiceNumbering) {
-          const companyRef = doc(db, 'companies', selectedCompany.id);
           const newNextNumber = invoices.length + 2; // +2 because we just added one
-          await updateDoc(companyRef, {
-            'invoiceNumbering.nextNumber': newNextNumber,
-            updatedAt: Timestamp.now(),
+          await companiesApi.update(selectedCompany.id, {
+            invoiceNumbering: {
+              ...company.invoiceNumbering,
+              nextNumber: newNextNumber,
+            }
           });
           console.log(`📈 Updated company invoice counter to: ${newNextNumber}`);
         }
@@ -333,10 +306,8 @@ function InvoicesContent() {
             const product = products.find(p => p.id === item.productId);
             if (product && product.type === 'product' && typeof product.stock === 'number') {
               const newStock = product.stock - item.quantity;
-              const productRef = doc(db, 'products', item.productId);
-              await updateDoc(productRef, {
+              await productsApi.update(item.productId, {
                 stock: Math.max(0, newStock), // Ensure stock doesn't go negative
-                updatedAt: Timestamp.now(),
               });
             }
           }
@@ -348,7 +319,7 @@ function InvoicesContent() {
       setIsDialogOpen(false);
       await Promise.all([
         loadInvoices(),
-        refreshProducts(), // Refresh products to update stock
+        // refreshProducts(), // Assuming products are refreshed via context or we need to trigger it
       ]);
     } catch (error) {
       console.error('Error saving invoice:', error);
@@ -360,7 +331,7 @@ function InvoicesContent() {
     if (!deleteInvoice?.id) return;
 
     try {
-      await deleteDoc(doc(db, 'invoices', deleteInvoice.id));
+      await invoicesApi.delete(deleteInvoice.id);
       toast.success('Invoice deleted successfully');
       setDeleteInvoice(null);
       loadInvoices();
@@ -465,8 +436,6 @@ function InvoicesContent() {
     if (!paymentInvoice?.id) return;
 
     try {
-      const invoiceRef = doc(db, 'invoices', paymentInvoice.id);
-      
       // Round amounts to 2 decimal places to avoid floating point issues
       const roundTo2Decimals = (num: number) => Math.round(num * 100) / 100;
       
@@ -474,11 +443,11 @@ function InvoicesContent() {
       const newPayment = {
         id: `payment_${Date.now()}`,
         amount: roundTo2Decimals(paymentData.amount),
-        paymentDate: Timestamp.fromDate(new Date(paymentData.paymentDate)),
+        paymentDate: typeof paymentData.paymentDate === 'string' ? paymentData.paymentDate : new Date(paymentData.paymentDate).toISOString(),
         paymentMode: paymentData.paymentMode,
         referenceNumber: paymentData.referenceNumber || '',
         notes: paymentData.notes || '',
-        recordedAt: Timestamp.now(),
+        recordedAt: new Date().toISOString(),
       };
 
       // Get current invoice data with defaults for existing invoices
@@ -501,12 +470,11 @@ function InvoicesContent() {
       }
 
       // Update invoice with new payment - set pending to 0 if it's negligible
-      await updateDoc(invoiceRef, {
+      await invoicesApi.update(paymentInvoice.id, {
         payments: [...currentPayments, newPayment],
         amountPaid: newAmountPaid,
         amountPending: newAmountPending <= 0.01 ? 0 : Math.max(0, newAmountPending),
         paymentStatus: newPaymentStatus,
-        updatedAt: Timestamp.now(),
       });
 
       toast.success('Payment recorded successfully');

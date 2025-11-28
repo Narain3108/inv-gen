@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,17 +38,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="overflow-x-hidden">
       <body className={`${inter.variable} font-sans antialiased overflow-x-hidden`}>
-        <ThemeProvider>
+        <Providers>
           {children}
-          <Toaster 
-            position="top-right" 
-            richColors 
-            closeButton 
-            toastOptions={{
-              className: 'dark:bg-gray-800 dark:text-white dark:border-gray-700',
-            }}
-          />
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

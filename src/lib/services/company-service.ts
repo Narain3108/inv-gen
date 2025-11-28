@@ -8,15 +8,16 @@
  */
 
 import { Company } from '@/types';
-import { BaseService } from './base-service';
+import { ApiBaseService } from './api-base-service';
 import { ValidationError } from '@/lib/errors/error-handler';
+import { companiesApi } from '@/lib/api/companies.api';
 
 /**
  * Service for managing companies
  */
-class CompanyService extends BaseService<Company> {
+class CompanyService extends ApiBaseService<Company> {
   constructor() {
-    super('companies');
+    super(companiesApi);
   }
 
   /**

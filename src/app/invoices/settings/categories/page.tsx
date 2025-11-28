@@ -27,8 +27,10 @@ import {
 } from '@/lib/services/product-category-service';
 import { toast } from 'sonner';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import { useCompany } from '@/hooks/useCompany';
 
 function CategoriesContent() {
+  const { selectedCompany } = useCompany();
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,9 +39,15 @@ function CategoriesContent() {
 
   // Load categories
   const loadCategories = async () => {
+    if (!selectedCompany) {
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
-      const data = await fetchProductCategories();
+      const data = await fetchProductCategories(selectedCompany.id);
       setCategories(data);
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -51,7 +59,7 @@ function CategoriesContent() {
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [selectedCompany]);
 
   const handleOpenForm = (category?: ProductCategory) => {
     setEditingCategory(category);
@@ -64,11 +72,13 @@ function CategoriesContent() {
   };
 
   const handleSubmit = async (data: ProductCategoryFormData) => {
+    if (!selectedCompany) return;
+    
     try {
       if (editingCategory) {
-        await updateProductCategory(editingCategory.id, data);
+        await updateProductCategory(selectedCompany.id, editingCategory.id, data);
       } else {
-        await createProductCategory(data);
+        await createProductCategory(selectedCompany.id, data);
       }
 
       handleCloseForm();
@@ -80,10 +90,10 @@ function CategoriesContent() {
   };
 
   const handleDelete = async () => {
-    if (!deletingCategory) return;
+    if (!deletingCategory || !selectedCompany) return;
 
     try {
-      await deleteProductCategory(deletingCategory.id);
+      await deleteProductCategory(selectedCompany.id, deletingCategory.id);
       toast.success('Category deleted successfully');
       setDeletingCategory(null);
       await loadCategories();

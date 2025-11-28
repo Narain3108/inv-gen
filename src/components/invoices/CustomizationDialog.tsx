@@ -18,8 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Settings, Eye, Save, RotateCcw, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { InvoiceCustomization, InvoiceColumn, DEFAULT_INVOICE_CUSTOMIZATION, DEFAULT_QUOTATION_CUSTOMIZATION } from '@/types/customization';
-import { collection, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { customizationsApi } from '@/lib/api/customizations.api';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 interface CustomizationDialogProps {
@@ -54,16 +53,16 @@ export function CustomizationDialog({
   const loadCustomization = async () => {
     setLoading(true);
     try {
-      const docRef = doc(db, 'customizations', `${companyId}_${type}`);
-      const docSnap = await getDoc(docRef);
+      const data = await customizationsApi.getByCompanyId(companyId, type);
       
-      if (docSnap.exists()) {
-        setCustomization(docSnap.data() as InvoiceCustomization);
+      if (data && data.id !== 'default') {
+        setCustomization(data);
       } else {
         // Use defaults
         setCustomization({
           ...(type === 'invoice' ? DEFAULT_INVOICE_CUSTOMIZATION : DEFAULT_QUOTATION_CUSTOMIZATION),
           companyId,
+          type, // Ensure type is set
         });
       }
     } catch (error) {
@@ -77,13 +76,10 @@ export function CustomizationDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const docRef = doc(db, 'customizations', `${companyId}_${type}`);
-      await setDoc(docRef, {
+      await customizationsApi.createOrUpdate(companyId, {
         ...customization,
         companyId,
         type,
-        updatedAt: serverTimestamp(),
-        createdAt: customization.createdAt || serverTimestamp(),
       });
       
       toast.success(`${type === 'invoice' ? 'Invoice' : 'Quotation'} customization saved successfully`);

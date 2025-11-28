@@ -8,15 +8,16 @@
  */
 
 import { Product } from '@/types';
-import { BaseService } from './base-service';
+import { ApiBaseService } from './api-base-service';
 import { ValidationError } from '@/lib/errors/error-handler';
+import { productsApi } from '@/lib/api/products.api';
 
 /**
  * Service for managing products and services
  */
-class ProductService extends BaseService<Product> {
+class ProductService extends ApiBaseService<Product> {
   constructor() {
-    super('products');
+    super(productsApi);
   }
 
   /**

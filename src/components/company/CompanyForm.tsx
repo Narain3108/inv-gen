@@ -18,7 +18,6 @@ import { Loader2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { INDIAN_STATES } from '@/lib/constants';
 import { fetchGSTINDetails } from '@/lib/api/gst-api';
-import Image from 'next/image';
 import { z } from 'zod';
 import { ImageUpload } from '@/components/shared/ImageUpload';
 import { NumberingConfig } from '@/components/shared/NumberingConfig';

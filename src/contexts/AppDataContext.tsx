@@ -7,10 +7,11 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { Company, Client, Product } from '@/types';
 import { useCompany } from '@/hooks/useCompany';
+import { companiesApi } from '@/lib/api/companies.api';
+import { clientsApi } from '@/lib/api/clients.api';
+import { productsApi } from '@/lib/api/products.api';
 
 interface AppDataContextType {
   // Companies
@@ -61,11 +62,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setCompaniesLoading(true);
     try {
       console.log('🏢 Loading companies...');
-      const snapshot = await getDocs(collection(db, 'companies'));
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Company[];
+      const data = await companiesApi.getAll();
       
       setCompanies(data);
       console.log('✅ Companies loaded:', data.length);
@@ -88,11 +85,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setClientsLoading(true);
     try {
       console.log('👥 Loading clients...');
-      const snapshot = await getDocs(collection(db, 'clients'));
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Client[];
+      const data = await clientsApi.getAll();
       
       setClients(data);
       console.log('✅ Clients loaded:', data.length);
@@ -115,15 +108,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setProductsLoading(true);
     try {
       console.log('📦 Loading products for company:', selectedCompany.name);
-      const q = query(
-        collection(db, 'products'),
-        where('companyId', '==', selectedCompany.id)
-      );
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Product[];
+      const data = await productsApi.getAll({ company_id: selectedCompany.id });
       
       setProducts(data);
       console.log('✅ Products loaded:', data.length);

@@ -27,7 +27,7 @@ export const uploadsApi = {
     folder?: string,
     resourceType?: 'image' | 'video' | 'raw' | 'auto'
   ): Promise<UploadResponse> => {
-    return apiClient.uploadFile<UploadResponse>('/uploads/upload/', file, {
+    return apiClient.uploadFile<UploadResponse>('/uploads/upload', file, {
       folder: folder || 'invoice-generator',
       resource_type: resourceType || 'auto',
     });

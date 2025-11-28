@@ -5,7 +5,7 @@ Companies is a GLOBAL collection
 
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from datetime import datetime
 
@@ -34,8 +34,36 @@ class CompanyCreate(BaseModel):
     pan: Optional[str] = None
     address: Optional[dict] = None
     contact: Optional[dict] = None
-    bank_details: Optional[dict] = None
-    logo_url: Optional[str] = None
+    bank_details: Optional[dict] = Field(None, alias="bankDetails")
+    logo_url: Optional[str] = Field(None, alias="logoUrl")
+    signature_url: Optional[str] = Field(None, alias="signatureUrl")
+    website: Optional[str] = None
+    additional_notes: Optional[str] = Field(None, alias="additionalNotes")
+    terms_and_conditions: Optional[str] = Field(None, alias="termsAndConditions")
+    invoice_numbering: Optional[dict] = Field(None, alias="invoiceNumbering")
+    quotation_numbering: Optional[dict] = Field(None, alias="quotationNumbering")
+
+    class Config:
+        populate_by_name = True
+
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
+    address: Optional[dict] = None
+    contact: Optional[dict] = None
+    bank_details: Optional[dict] = Field(None, alias="bankDetails")
+    logo_url: Optional[str] = Field(None, alias="logoUrl")
+    signature_url: Optional[str] = Field(None, alias="signatureUrl")
+    website: Optional[str] = None
+    additional_notes: Optional[str] = Field(None, alias="additionalNotes")
+    terms_and_conditions: Optional[str] = Field(None, alias="termsAndConditions")
+    invoice_numbering: Optional[dict] = Field(None, alias="invoiceNumbering")
+    quotation_numbering: Optional[dict] = Field(None, alias="quotationNumbering")
+
+    class Config:
+        populate_by_name = True
 
 
 class CompanyOut(BaseModel):
@@ -45,28 +73,24 @@ class CompanyOut(BaseModel):
     pan: Optional[str] = None
     address: Optional[dict] = None
     contact: Optional[dict] = None
-    bank_details: Optional[dict] = None
-    bankDetails: Optional[dict] = None
-    logo_url: Optional[str] = None
-    logoUrl: Optional[str] = None
-    signature_url: Optional[str] = None
-    signatureUrl: Optional[str] = None
-    created_at: Optional[str] = None
-    createdAt: Optional[str] = None
-    updated_at: Optional[str] = None
-    updatedAt: Optional[str] = None
+    bank_details: Optional[dict] = Field(None, alias="bankDetails")
+    logo_url: Optional[str] = Field(None, alias="logoUrl")
+    signature_url: Optional[str] = Field(None, alias="signatureUrl")
+    created_at: Optional[str] = Field(None, alias="createdAt")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
     state: Optional[str] = None
     website: Optional[str] = None
-    additionalNotes: Optional[str] = None
-    termsAndConditions: Optional[str] = None
-    invoiceNumbering: Optional[dict] = None
-    quotationNumbering: Optional[dict] = None
+    additional_notes: Optional[str] = Field(None, alias="additionalNotes")
+    terms_and_conditions: Optional[str] = Field(None, alias="termsAndConditions")
+    invoice_numbering: Optional[dict] = Field(None, alias="invoiceNumbering")
+    quotation_numbering: Optional[dict] = Field(None, alias="quotationNumbering")
     
     class Config:
         extra = "allow"
+        populate_by_name = True
 
 
-@router.post("/", response_model=CompanyOut)
+@router.post("", response_model=CompanyOut)
 async def create_company(company: CompanyCreate):
     """Create a new company in Firestore (Global Collection)"""
     try:
@@ -78,8 +102,14 @@ async def create_company(company: CompanyCreate):
             "pan": company.pan,
             "address": company.address or {},
             "contact": company.contact or {},
-            "bank_details": company.bank_details or {},
-            "logo_url": company.logo_url,
+            "bankDetails": company.bank_details or {},
+            "logoUrl": company.logo_url,
+            "signatureUrl": company.signature_url,
+            "website": company.website,
+            "additionalNotes": company.additional_notes,
+            "termsAndConditions": company.terms_and_conditions,
+            "invoiceNumbering": company.invoice_numbering,
+            "quotationNumbering": company.quotation_numbering,
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()
         }
@@ -92,7 +122,7 @@ async def create_company(company: CompanyCreate):
         raise HTTPException(status_code=500, detail=f"Error creating company: {str(e)}")
 
 
-@router.get("/", response_model=List[CompanyOut])
+@router.get("", response_model=List[CompanyOut])
 async def list_companies(skip: int = 0, limit: int = 50):
     """Get all companies from Firestore (Global Collection)"""
     try:
@@ -128,7 +158,7 @@ async def get_company(company_id: str):
 
 
 @router.put("/{company_id}", response_model=CompanyOut)
-async def update_company(company_id: str, company: CompanyCreate):
+async def update_company(company_id: str, company: CompanyUpdate):
     """Update a company in Firestore (Global Collection)"""
     try:
         db = get_firestore_db()
@@ -143,10 +173,44 @@ async def update_company(company_id: str, company: CompanyCreate):
             "pan": company.pan,
             "address": company.address or {},
             "contact": company.contact or {},
-            "bank_details": company.bank_details or {},
-            "logo_url": company.logo_url,
+            "bankDetails": company.bank_details or {},
+            "logoUrl": company.logo_url,
+            "signatureUrl": company.signature_url,
+            "website": company.website,
+            "additionalNotes": company.additional_notes,
+            "termsAndConditions": company.terms_and_conditions,
+            "invoiceNumbering": company.invoice_numbering,
+            "quotationNumbering": company.quotation_numbering,
             "updated_at": datetime.utcnow().isoformat()
         }
+        
+        doc_ref.update(update_data)
+        updated_doc = doc_ref.get()
+        
+        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating company: {str(e)}")
+
+
+@router.patch("/{company_id}", response_model=CompanyOut)
+async def patch_company(company_id: str, company: CompanyUpdate):
+    """Partially update a company in Firestore"""
+    try:
+        db = get_firestore_db()
+        doc_ref = db.collection("companies").document(company_id)
+        
+        if not doc_ref.get().exists:
+            raise HTTPException(status_code=404, detail="Company not found")
+            
+        # Filter out None values and use aliases (camelCase) for Firestore keys
+        update_data = company.model_dump(exclude_unset=True, by_alias=True)
+        
+        if not update_data:
+             return {"id": company_id, **serialize_firestore_doc(doc_ref.get().to_dict())}
+
+        update_data["updated_at"] = datetime.utcnow().isoformat()
         
         doc_ref.update(update_data)
         updated_doc = doc_ref.get()

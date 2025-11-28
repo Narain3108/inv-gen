@@ -141,7 +141,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Building2 className="h-4 w-4 text-primary" />
                 </div>
                 <span className="truncate font-medium text-sm">
-                  {companiesLoading ? 'Loading...' : selectedCompany ? selectedCompany.name : 'No Company'}
+                  {companiesLoading ? 'Loading...' : selectedCompany ? (selectedCompany.name || 'Unnamed Company') : 'No Company'}
                 </span>
               </div>
               <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
@@ -165,7 +165,7 @@ export function Sidebar({ className }: SidebarProps) {
                   )}
                 >
                   <Building2 className="mr-2 h-4 w-4" />
-                  {company.name}
+                  {company.name || 'Unnamed Company'}
                 </DropdownMenuItem>
               ))
             )}

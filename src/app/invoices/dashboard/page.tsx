@@ -35,8 +35,8 @@ import {
 } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { invoicesApi } from '@/lib/api/invoices.api';
+import { quotationsApi } from '@/lib/api/quotations.api';
 import { Invoice, Quotation, Product, Client } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { toast } from 'sonner';
@@ -83,29 +83,18 @@ function DashboardContent() {
 
   // Load invoices and quotations
   const loadData = async () => {
+    // Ensure company is selected
     if (!selectedCompany) return;
 
     try {
       setLoading(true);
 
       // Load invoices
-      const invoicesRef = collection(db, 'invoices');
-      const invoicesQuery = query(invoicesRef, where('companyId', '==', selectedCompany.id));
-      const invoicesSnapshot = await getDocs(invoicesQuery);
-      const invoicesData = invoicesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Invoice[];
+      const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
       setInvoices(invoicesData);
 
       // Load quotations
-      const quotationsRef = collection(db, 'quotations');
-      const quotationsQuery = query(quotationsRef, where('companyId', '==', selectedCompany.id));
-      const quotationsSnapshot = await getDocs(quotationsQuery);
-      const quotationsData = quotationsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Quotation[];
+      const quotationsData = await quotationsApi.getByCompanyId(selectedCompany.id);
       setQuotations(quotationsData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);

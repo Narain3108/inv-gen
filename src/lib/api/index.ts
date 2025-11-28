@@ -33,6 +33,8 @@ export type { QuotationFilters } from './quotations.api';
 export { uploadsApi } from './uploads.api';
 export type { UploadResponse, DeleteResponse } from './uploads.api';
 
+export { customizationsApi } from './customizations.api';
+
 // Import for centralized API object
 import { companiesApi } from './companies.api';
 import { clientsApi } from './clients.api';
@@ -41,6 +43,7 @@ import { categoriesApi } from './categories.api';
 import { invoicesApi } from './invoices.api';
 import { quotationsApi } from './quotations.api';
 import { uploadsApi } from './uploads.api';
+import { customizationsApi } from './customizations.api';
 
 /**
  * Centralized API object for convenience
@@ -53,4 +56,5 @@ export const api = {
   invoices: invoicesApi,
   quotations: quotationsApi,
   uploads: uploadsApi,
+  customizations: customizationsApi,
 };

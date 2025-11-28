@@ -5,7 +5,7 @@ Customizations is a SUBCOLLECTION under companies: companies/{companyId}/customi
 
 from fastapi import APIRouter, HTTPException
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from datetime import datetime
 
@@ -29,16 +29,19 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 # Schemas
 class CustomizationCreate(BaseModel):
-    invoice_prefix: Optional[str] = "INV"
-    quotation_prefix: Optional[str] = "QUO"
-    invoice_starting_number: Optional[int] = 1
-    quotation_starting_number: Optional[int] = 1
-    terms_and_conditions: Optional[str] = None
-    payment_terms: Optional[str] = None
-    signature_url: Optional[str] = None
-    theme_color: Optional[str] = "#000000"
-    font_family: Optional[str] = "Arial"
-    logo_position: Optional[str] = "left"
+    invoice_prefix: Optional[str] = Field("INV", alias="invoicePrefix")
+    quotation_prefix: Optional[str] = Field("QUO", alias="quotationPrefix")
+    invoice_starting_number: Optional[int] = Field(1, alias="invoiceStartingNumber")
+    quotation_starting_number: Optional[int] = Field(1, alias="quotationStartingNumber")
+    terms_and_conditions: Optional[str] = Field(None, alias="termsAndConditions")
+    payment_terms: Optional[str] = Field(None, alias="paymentTerms")
+    signature_url: Optional[str] = Field(None, alias="signatureUrl")
+    theme_color: Optional[str] = Field("#000000", alias="themeColor")
+    font_family: Optional[str] = Field("Arial", alias="fontFamily")
+    logo_position: Optional[str] = Field("left", alias="logoPosition")
+
+    class Config:
+        populate_by_name = True
 
 
 class CustomizationOut(BaseModel):
@@ -197,7 +200,7 @@ async def update_customization(company_id: str, customization_id: str, customiza
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        doc_ref.update(update_dict)
+        doc_ref.update(update_data)
         updated_doc = doc_ref.get()
         
         return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}

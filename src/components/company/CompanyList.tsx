@@ -60,6 +60,7 @@ export function CompanyList({
                       src={company.logoUrl}
                       alt={company.name}
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="rounded-lg object-contain p-1"
                     />
                   </div>
@@ -70,7 +71,7 @@ export function CompanyList({
                 )}
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{company.name}</h3>
+                    <h3 className="font-semibold">{company.name || 'Unnamed Company'}</h3>
                     {selectedCompanyId === company.id && (
                       <Badge variant="default" className="h-5">
                         <Check className="mr-1 h-3 w-3" />

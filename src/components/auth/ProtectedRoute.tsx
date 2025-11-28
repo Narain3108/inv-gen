@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/firebase/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface ProtectedRouteProps {

@@ -144,7 +144,7 @@ export function InvoiceList({
                     </td>
                     <td className="p-3">
                       <span className="text-sm">
-                        {invoice.date?.toDate ? formatDate(invoice.date.toDate()) : 'N/A'}
+                        {formatDate(invoice.date)}
                       </span>
                     </td>
                     <td className="p-3 text-right font-medium">

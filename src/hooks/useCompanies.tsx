@@ -1,13 +1,13 @@
 /**
  * useCompanies Hook
- * Manages global companies list - pure Firestore, no localStorage
+ * Manages global companies list - uses backend API
  */
 
 'use client';
 
 import { create } from 'zustand';
 import { Company } from '@/types';
-import { getAllDocuments } from '@/lib/firebase/firestore-helpers';
+import { companiesApi } from '@/lib/api/companies.api';
 
 interface CompaniesStore {
   companies: Company[];
@@ -28,8 +28,8 @@ export const useCompanies = create<CompaniesStore>((set, get) => ({
     
     set({ loading: true });
     try {
-      const data = await getAllDocuments<Company>('companies');
-      console.log('Loaded companies from Firestore:', data);
+      const data = await companiesApi.getAll();
+      console.log('Loaded companies from API:', data);
       set({ companies: data, loading: false });
     } catch (error) {
       console.error('Error loading companies:', error);

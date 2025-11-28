@@ -3,7 +3,47 @@
  * Base HTTP client for all API requests
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+/**
+ * Convert camelCase to snake_case
+ */
+function camelToSnake(obj: any): any {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(camelToSnake);
+  }
+
+  const snakeObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+    snakeObj[snakeKey] = typeof value === 'object' ? camelToSnake(value) : value;
+  }
+  return snakeObj;
+}
+
+/**
+ * Convert snake_case to camelCase
+ */
+function snakeToCamel(obj: any): any {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(snakeToCamel);
+  }
+
+  const camelObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    camelObj[camelKey] = typeof value === 'object' ? snakeToCamel(value) : value;
+  }
+  return camelObj;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
 export interface ApiResponse<T> {
   data: T;
@@ -64,7 +104,7 @@ class ApiClient {
     };
   }
 
-  async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+  async get<T>(endpoint: string, params?: Record<string, any>, transformCase = true): Promise<T> {
     const url = new URL(`${this.baseURL}${endpoint}`);
     
     if (params) {
@@ -80,37 +120,44 @@ class ApiClient {
       headers: this.getHeaders(),
     });
 
-    return this.handleResponse<T>(response);
+    const result = await this.handleResponse<T>(response);
+    return transformCase ? snakeToCamel(result) : result;
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+    const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(bodyData),
     });
 
-    return this.handleResponse<T>(response);
+    const result = await this.handleResponse<T>(response);
+    return transformCase ? snakeToCamel(result) : result;
   }
 
-  async put<T>(endpoint: string, data?: any): Promise<T> {
+  async put<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+    const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'PUT',
       headers: this.getHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(bodyData),
     });
 
-    return this.handleResponse<T>(response);
+    const result = await this.handleResponse<T>(response);
+    return transformCase ? snakeToCamel(result) : result;
   }
 
-  async patch<T>(endpoint: string, data?: any): Promise<T> {
+  async patch<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+    const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'PATCH',
       headers: this.getHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(bodyData),
     });
 
-    return this.handleResponse<T>(response);
+    const result = await this.handleResponse<T>(response);
+    return transformCase ? snakeToCamel(result) : result;
   }
 
   async delete<T>(endpoint: string): Promise<T> {

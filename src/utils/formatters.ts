@@ -9,7 +9,6 @@
 
 import { format } from 'date-fns';
 import { CURRENCY, DATE_FORMAT, DATE_TIME_FORMAT, INVOICE_DATE_FORMAT } from '@/lib/constants';
-import { Timestamp } from 'firebase/firestore';
 import { Address, Client } from '@/types';
 
 // ==================== Currency Formatting ====================
@@ -103,70 +102,147 @@ export const formatPercentage = (value: number): string => {
 /**
  * Format date in standard format (DD/MM/YYYY)
  * 
- * @param date - Date object or Firestore Timestamp
+ * @param date - Date object or ISO string
  * @returns Formatted date string
  * 
  * @example
  * formatDate(new Date()) // "15/11/2025"
  */
-export const formatDate = (date: Date | Timestamp): string => {
-  const dateObj = date instanceof Timestamp ? date.toDate() : date;
+export const formatDate = (date: Date | string | null | undefined | any): string => {
+  if (!date) return '-';
+  
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else if (typeof date === 'object' && date._seconds) {
+    // Handle Firestore Timestamp-like objects
+    dateObj = new Date(date._seconds * 1000);
+  } else if (typeof date === 'object' && date.toDate) {
+    // Handle Firestore Timestamp with toDate method
+    dateObj = date.toDate();
+  } else {
+    return '-';
+  }
+  
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, DATE_FORMAT);
 };
 
 /**
  * Format date and time
  * 
- * @param date - Date object or Firestore Timestamp
+ * @param date - Date object or ISO string
  * @returns Formatted date-time string
  * 
  * @example
  * formatDateTime(new Date()) // "15/11/2025 14:30"
  */
-export const formatDateTime = (date: Date | Timestamp): string => {
-  const dateObj = date instanceof Timestamp ? date.toDate() : date;
+export const formatDateTime = (date: Date | string | null | undefined | any): string => {
+  if (!date) return '-';
+  
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else if (typeof date === 'object' && date._seconds) {
+    dateObj = new Date(date._seconds * 1000);
+  } else if (typeof date === 'object' && date.toDate) {
+    dateObj = date.toDate();
+  } else {
+    return '-';
+  }
+  
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, DATE_TIME_FORMAT);
 };
 
 /**
  * Format date for invoices (DD-MM-YYYY)
  * 
- * @param date - Date object or Firestore Timestamp
+ * @param date - Date object or ISO string
  * @returns Formatted invoice date string
  * 
  * @example
  * formatInvoiceDate(new Date()) // "15-11-2025"
  */
-export const formatInvoiceDate = (date: Date | Timestamp): string => {
-  const dateObj = date instanceof Timestamp ? date.toDate() : date;
+export const formatInvoiceDate = (date: Date | string | null | undefined | any): string => {
+  if (!date) return '-';
+  
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else if (typeof date === 'object' && date._seconds) {
+    dateObj = new Date(date._seconds * 1000);
+  } else if (typeof date === 'object' && date.toDate) {
+    dateObj = date.toDate();
+  } else {
+    return '-';
+  }
+  
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, INVOICE_DATE_FORMAT);
 };
 
 /**
  * Format date for HTML input fields (YYYY-MM-DD)
  * 
- * @param date - Date object or Firestore Timestamp
+ * @param date - Date object or ISO string
  * @returns ISO date string
  * 
  * @example
  * formatDateForInput(new Date()) // "2025-11-15"
  */
-export const formatDateForInput = (date: Date | Timestamp): string => {
-  const dateObj = date instanceof Timestamp ? date.toDate() : date;
+export const formatDateForInput = (date: Date | string | null | undefined | any): string => {
+  if (!date) return '';
+  
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else if (typeof date === 'object' && date._seconds) {
+    dateObj = new Date(date._seconds * 1000);
+  } else if (typeof date === 'object' && date.toDate) {
+    dateObj = date.toDate();
+  } else {
+    return '';
+  }
+  
+  if (isNaN(dateObj.getTime())) return '';
   return format(dateObj, 'yyyy-MM-dd');
 };
 
 /**
  * Format date to Indian format (DD/MM/YYYY)
  * 
- * @param date - Date object or Firestore Timestamp
+ * @param date - Date object or ISO string
  * @returns Indian formatted date string
  * 
  * @example
  * formatDateIndian(new Date()) // "15/11/2025"
  */
-export function formatDateIndian(date: Date | Timestamp): string {
-  const dateObj = date instanceof Timestamp ? date.toDate() : date;
+export function formatDateIndian(date: Date | string | null | undefined | any): string {
+  if (!date) return '-';
+  
+  let dateObj: Date;
+  if (date instanceof Date) {
+    dateObj = date;
+  } else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else if (typeof date === 'object' && date._seconds) {
+    dateObj = new Date(date._seconds * 1000);
+  } else if (typeof date === 'object' && date.toDate) {
+    dateObj = date.toDate();
+  } else {
+    return '-';
+  }
+  
+  if (isNaN(dateObj.getTime())) return '-';
   const day = String(dateObj.getDate()).padStart(2, '0');
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
   const year = dateObj.getFullYear();

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { Plus, Building2 } from 'lucide-react';
 import { Company } from '@/types';
-import { createDocument, getUserDocuments, updateDocument, deleteDocument } from '@/lib/firebase/firestore-helpers';
+import { companiesApi } from '@/lib/api/companies.api';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { companyFormSchema } from '@/lib/validations';
@@ -55,7 +55,7 @@ export default function CompanySettingsPage() {
     if (!companyToDelete) return;
 
     try {
-      await deleteDocument('companies', companyToDelete);
+      await companiesApi.delete(companyToDelete);
       removeCompany(companyToDelete); // Update global store
       toast.success('Company deleted successfully');
       
@@ -124,10 +124,9 @@ export default function CompanySettingsPage() {
       if (editingCompany) {
         // Update existing company
         console.log('Updating company:', editingCompany.id, cleanedData);
-        await updateDocument('companies', editingCompany.id, cleanedData);
+        const updatedCompany = await companiesApi.update(editingCompany.id, cleanedData);
         
-        const updatedCompany = { ...editingCompany, ...cleanedData } as Company;
-        updateCompanyInStore(editingCompany.id, cleanedData as Partial<Company>); // Update global store
+        updateCompanyInStore(editingCompany.id, updatedCompany); // Update global store
         
         // CRITICAL FIX: Update selectedCompany if it's the one being edited
         if (selectedCompany?.id === editingCompany.id) {
@@ -139,9 +138,8 @@ export default function CompanySettingsPage() {
       } else {
         // Create new company
         console.log('Creating new company:', cleanedData);
-        const id = await createDocument('companies', cleanedData);
-        console.log('Created company with ID:', id);
-        const newCompany = { id, ...cleanedData } as Company;
+        const newCompany = await companiesApi.create(cleanedData);
+        console.log('Created company with ID:', newCompany.id);
         addCompany(newCompany); // Add to global store
         
         // Set as selected if it's the first company

@@ -5,7 +5,7 @@ Product Categories is a SUBCOLLECTION under companies: companies/{companyId}/pro
 
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from datetime import datetime
 
@@ -29,26 +29,30 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 # Schemas
 class ProductCategoryCreate(BaseModel):
-    name: str
+    name: str = Field(..., alias="categoryName")
     description: Optional[str] = None
+    products: Optional[List[Dict[str, Any]]] = None
+    default_gst_rate: Optional[float] = Field(None, alias="defaultGstRate")
     color: Optional[str] = "#6366f1"
+
+    class Config:
+        populate_by_name = True
 
 
 class ProductCategoryOut(BaseModel):
     id: str
     company_id: Optional[str] = None
-    companyId: Optional[str] = None
-    name: Optional[str] = None
-    categoryName: Optional[str] = None
+    name: Optional[str] = Field(None, alias="categoryName")
     description: Optional[str] = None
+    products: Optional[List[Dict[str, Any]]] = None
+    default_gst_rate: Optional[float] = Field(None, alias="defaultGstRate")
     color: Optional[str] = None
     created_at: Optional[str] = None
-    createdAt: Optional[str] = None
     updated_at: Optional[str] = None
-    updatedAt: Optional[str] = None
     
     class Config:
         extra = "allow"
+        populate_by_name = True
 
 
 @router.post("/companies/{company_id}/product-categories", response_model=ProductCategoryOut)
@@ -66,6 +70,8 @@ async def create_product_category(company_id: str, category: ProductCategoryCrea
             "company_id": company_id,
             "name": category.name,
             "description": category.description,
+            "products": category.products or [],
+            "default_gst_rate": category.default_gst_rate,
             "color": category.color or "#6366f1",
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()

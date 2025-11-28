@@ -5,7 +5,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/firebase/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';

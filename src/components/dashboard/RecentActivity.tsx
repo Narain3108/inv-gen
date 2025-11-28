@@ -18,14 +18,32 @@ interface RecentActivityProps {
 
 export function RecentActivity({ invoices, quotations, clients }: RecentActivityProps) {
   const activities = useMemo(() => {
-    // Helper function to safely convert Firestore Timestamp to Date
+    // Helper function to safely convert any date format to Date
     const toDate = (timestamp: any): Date => {
       if (!timestamp) return new Date();
+      
+      // Handle Date instance
+      if (timestamp instanceof Date) return timestamp;
+      
+      // Handle ISO string
+      if (typeof timestamp === 'string') {
+        const date = new Date(timestamp);
+        return isNaN(date.getTime()) ? new Date() : date;
+      }
+      
+      // Handle Firestore Timestamp object with _seconds
+      if (typeof timestamp === 'object' && timestamp._seconds) {
+        return new Date(timestamp._seconds * 1000);
+      }
+      
+      // Handle Firestore Timestamp with toDate method
       if (timestamp.toDate && typeof timestamp.toDate === 'function') {
         return timestamp.toDate();
       }
-      if (timestamp instanceof Date) return timestamp;
-      return new Date(timestamp);
+      
+      // Fallback: try to parse as date
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? new Date() : date;
     };
 
     // Get last 5 invoices

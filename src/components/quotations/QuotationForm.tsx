@@ -69,8 +69,8 @@ export function QuotationForm({
     defaultValues: quotation ? {
       quotationNumber: quotation.quotationNumber,
       clientId: quotation.clientId,
-      date: quotation.date?.toDate ? new Date(quotation.date.toDate()).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      validUntil: quotation.validUntil?.toDate ? new Date(quotation.validUntil.toDate()).toISOString().split('T')[0] : getDefaultValidUntil(),
+      date: quotation.date ? (typeof quotation.date === 'string' ? new Date(quotation.date).toISOString().split('T')[0] : quotation.date.toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
+      validUntil: quotation.validUntil ? (typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil).toISOString().split('T')[0] : quotation.validUntil.toISOString().split('T')[0]) : getDefaultValidUntil(),
       items: quotation.items.map((item) => ({
         productId: item.productId || '',
         quantity: item.quantity,

@@ -1,59 +1,49 @@
 /**
- * Categories API
- * All product category-related API calls
+ * Product Categories API
+ * All product category-related API calls (subcollection under companies)
  */
 
-import { apiClient, PaginatedResponse } from './client';
+import { apiClient } from './client';
 import type { ProductCategory } from '@/types';
 
 export interface CategoryFilters {
   search?: string;
-  company?: string;
   ordering?: string;
-  page?: number;
-  page_size?: number;
 }
 
 export const categoriesApi = {
   /**
-   * Get all categories with optional filters
+   * Get all categories for a company
    */
-  getAll: async (filters?: CategoryFilters): Promise<PaginatedResponse<ProductCategory>> => {
-    return apiClient.get<PaginatedResponse<ProductCategory>>('/categories/', filters);
+  getByCompanyId: async (companyId: string, filters?: CategoryFilters): Promise<ProductCategory[]> => {
+    return apiClient.get<ProductCategory[]>(`/companies/${companyId}/product-categories`, filters);
   },
 
   /**
    * Get a single category by ID
    */
-  getById: async (id: string): Promise<ProductCategory> => {
-    return apiClient.get<ProductCategory>(`/categories/${id}/`);
+  getById: async (companyId: string, categoryId: string): Promise<ProductCategory> => {
+    return apiClient.get<ProductCategory>(`/companies/${companyId}/product-categories/${categoryId}`);
   },
 
   /**
    * Create a new category
    */
-  create: async (data: Partial<ProductCategory>): Promise<ProductCategory> => {
-    return apiClient.post<ProductCategory>('/categories/', data);
+  create: async (companyId: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
+    return apiClient.post<ProductCategory>(`/companies/${companyId}/product-categories`, data);
   },
 
   /**
    * Update an existing category
    */
-  update: async (id: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
-    return apiClient.put<ProductCategory>(`/categories/${id}/`, data);
-  },
-
-  /**
-   * Partially update a category
-   */
-  partialUpdate: async (id: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
-    return apiClient.patch<ProductCategory>(`/categories/${id}/`, data);
+  update: async (companyId: string, categoryId: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
+    return apiClient.put<ProductCategory>(`/companies/${companyId}/product-categories/${categoryId}`, data);
   },
 
   /**
    * Delete a category
    */
-  delete: async (id: string): Promise<void> => {
-    return apiClient.delete<void>(`/categories/${id}/`);
+  delete: async (companyId: string, categoryId: string): Promise<void> => {
+    return apiClient.delete<void>(`/companies/${companyId}/product-categories/${categoryId}`);
   },
 };

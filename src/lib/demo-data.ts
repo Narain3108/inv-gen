@@ -3,7 +3,6 @@
  * Create sample data for testing
  */
 
-import { Timestamp } from 'firebase/firestore';
 import { Company, Product, Client, Invoice } from '@/types';
 
 /**
@@ -327,7 +326,7 @@ export const generateDemoInvoices = (
         companyId,
         clientId: client.id!,
         invoiceNumber: generateInvoiceNumber(invoices.length),
-        date: Timestamp.fromDate(invoiceDate),
+        date: invoiceDate.toISOString(),
         items,
         taxableAmount,
         cgst,
@@ -336,8 +335,8 @@ export const generateDemoInvoices = (
         totalAmount: Math.round(totalAmount),
         totalAmountInWords: '',
         notes: 'Thank you for your business!',
-        createdAt: Timestamp.fromDate(invoiceDate),
-        updatedAt: Timestamp.fromDate(invoiceDate),
+        createdAt: invoiceDate.toISOString(),
+        updatedAt: invoiceDate.toISOString(),
       });
     }
   });

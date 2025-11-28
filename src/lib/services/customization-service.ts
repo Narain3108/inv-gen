@@ -3,14 +3,13 @@
  * Handles CRUD operations for invoice/quotation customizations
  */
 
-import { collection, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import {
   InvoiceCustomization,
   DEFAULT_INVOICE_CUSTOMIZATION,
   DEFAULT_QUOTATION_CUSTOMIZATION,
 } from '@/types/customization';
-import { Company } from '@/types';
+import { customizationsApi } from '@/lib/api/customizations.api';
+import { companiesApi } from '@/lib/api/companies.api';
 
 /**
  * Load customization for a specific company and type
@@ -21,24 +20,21 @@ export async function loadCustomization(
 ): Promise<InvoiceCustomization> {
   try {
     // First, fetch company data to get terms and notes
-    const companyRef = doc(db, 'companies', companyId);
-    const companySnap = await getDoc(companyRef);
+    const company = await companiesApi.getById(companyId);
     
     let companyTerms = '';
     let companyNotes = '';
     
-    if (companySnap.exists()) {
-      const companyData = companySnap.data() as Company;
-      companyTerms = companyData.termsAndConditions || '';
-      companyNotes = companyData.additionalNotes || '';
+    if (company) {
+      companyTerms = company.termsAndConditions || '';
+      companyNotes = company.additionalNotes || '';
     }
 
-    // Then fetch customization
-    const docRef = doc(db, 'customizations', `${companyId}_${type}`);
-    const docSnap = await getDoc(docRef);
+    // Then fetch customization from API (returns single object)
+    const customization = await customizationsApi.getByCompanyId(companyId);
 
-    if (docSnap.exists()) {
-      const data = docSnap.data() as InvoiceCustomization;
+    if (customization && customization.id !== 'default') {
+      const data = customization as InvoiceCustomization;
       
       // Ensure all columns have valid width values
       if (data.table && data.table.columns) {
@@ -102,8 +98,6 @@ export async function saveCustomization(
   customization: InvoiceCustomization
 ): Promise<void> {
   try {
-    const docRef = doc(db, 'customizations', `${companyId}_${type}`);
-    
     // Ensure all columns have width property before saving
     if (customization.table && customization.table.columns) {
       console.log('📋 Validating columns before saving...');
@@ -126,12 +120,11 @@ export async function saveCustomization(
       console.log('✅ All columns validated for saving');
     }
     
-    await setDoc(docRef, {
+    // Use API to create or update customization
+    await customizationsApi.createOrUpdate(companyId, {
       ...customization,
       companyId,
       type,
-      updatedAt: serverTimestamp(),
-      createdAt: customization.createdAt || serverTimestamp(),
     });
     
     console.log('✅ Customization saved successfully');

@@ -8,18 +8,18 @@
  */
 
 import { Invoice, InvoiceItem, Client, Product, Company } from '@/types';
-import { BaseService } from './base-service';
+import { ApiBaseService } from './api-base-service';
 import { ValidationError, NotFoundError } from '@/lib/errors/error-handler';
 import { calculateInvoiceTotals } from '@/lib/utils/tax-calculator';
 import { amountToWords } from '@/lib/utils/number-to-words';
-import { Timestamp } from 'firebase/firestore';
+import { invoicesApi } from '@/lib/api/invoices.api';
 
 /**
  * Service for managing invoices
  */
-class InvoiceService extends BaseService<Invoice> {
+class InvoiceService extends ApiBaseService<Invoice> {
   constructor() {
-    super('invoices');
+    super(invoicesApi);
   }
 
   /**
@@ -136,8 +136,8 @@ class InvoiceService extends BaseService<Invoice> {
     const allInvoices = await this.getByCompanyId(companyId, 'date', 'desc');
     
     return allInvoices.filter(invoice => {
-      const invoiceDate = invoice.date instanceof Timestamp 
-        ? invoice.date.toDate() 
+      const invoiceDate = typeof invoice.date === 'string' 
+        ? new Date(invoice.date) 
         : new Date(invoice.date);
       
       return invoiceDate >= startDate && invoiceDate <= endDate;
@@ -148,7 +148,7 @@ class InvoiceService extends BaseService<Invoice> {
    * Get invoices by client
    */
   async getByClient(clientId: string): Promise<Invoice[]> {
-    return this.query('clientId', '==', clientId, 'date', 'desc');
+    return this.query({ client_id: clientId });
   }
 
   /**

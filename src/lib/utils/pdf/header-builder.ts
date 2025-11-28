@@ -123,7 +123,7 @@ export const buildInvoiceInfo = (
           ...(showDate ? [{
             text: [
               { text: `${dateLabel}: `, fontSize: 10, color: '#4b5563' },
-              { text: data.date?.toDate ? formatDate(data.date.toDate()) : 'N/A', fontSize: 10, bold: true },
+              { text: formatDate(data.date), fontSize: 10, bold: true },
             ],
             alignment: 'right',
             margin: [0, 3, 0, 0],
@@ -131,7 +131,7 @@ export const buildInvoiceInfo = (
           ...(showDueDate && data.validUntil ? [{
             text: [
               { text: `${dueDateLabel}: `, fontSize: 10, color: '#4b5563' },
-              { text: data.validUntil?.toDate ? formatDate(data.validUntil.toDate()) : 'N/A', fontSize: 10, bold: true },
+              { text: formatDate(data.validUntil), fontSize: 10, bold: true },
             ],
             alignment: 'right',
             margin: [0, 3, 0, 0],

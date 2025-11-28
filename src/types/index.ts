@@ -3,8 +3,6 @@
  * All types used across the Invoice Billing System
  */
 
-import { Timestamp } from 'firebase/firestore';
-
 // ==================== User Types ====================
 
 export interface User {
@@ -12,8 +10,8 @@ export interface User {
   email: string;
   name: string;
   photoURL?: string;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 // ==================== Address Types ====================
@@ -70,8 +68,8 @@ export interface Company {
   additionalNotes?: string; // Default notes for all invoices
   invoiceNumbering?: NumberingConfig;
   quotationNumbering?: NumberingConfig;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface CompanyFormData {
@@ -104,8 +102,8 @@ export interface ProductCategory {
   description?: string;
   products: CategoryProduct[];
   defaultGstRate: number; // Default GST rate for this category
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface CategoryProduct {
@@ -136,8 +134,8 @@ export interface Product {
   type: 'product' | 'service';
   hasSerialNumber?: boolean; // Whether this product requires serial numbers
   categoryId?: string; // Reference to global product category
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface ProductFormData {
@@ -168,8 +166,8 @@ export interface Client {
   billingAddress?: Address;
   shippingAddress?: Address;
   autoFetched?: boolean;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface ClientFormData {
@@ -217,11 +215,11 @@ export interface TaxBreakdown {
 export interface PaymentRecord {
   id: string;
   amount: number;
-  paymentDate: Timestamp;
+  paymentDate: string | Date;
   paymentMode?: PaymentMode;
   referenceNumber?: string;
   notes?: string;
-  recordedAt: Timestamp;
+  recordedAt: string | Date;
 }
 
 export type InvoicePaymentStatus = 'pending' | 'partially_paid' | 'paid';
@@ -231,7 +229,7 @@ export interface Invoice {
   invoiceNumber: string;
   companyId: string;
   clientId: string;
-  date: Timestamp;
+  date: string | Date;
   items: InvoiceItem[];
   totalAmount: number;
   totalAmountInWords: string;
@@ -245,8 +243,8 @@ export interface Invoice {
   amountPaid: number;
   amountPending: number;
   payments: PaymentRecord[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface InvoiceFormData {
@@ -270,8 +268,8 @@ export interface Quotation {
   quotationNumber: string;
   companyId: string;
   clientId: string;
-  date: Timestamp;
-  validUntil: Timestamp; // Validity period for quotation
+  date: string | Date;
+  validUntil: string | Date; // Validity period for quotation
   status: QuotationStatus;
   items: InvoiceItem[]; // Same structure as invoice items
   totalAmount: number;
@@ -282,8 +280,8 @@ export interface Quotation {
   igst: number;
   taxBreakdown?: TaxBreakdown[]; // GST breakdown by rate (5%, 12%, 18%, 28%, etc.)
   convertedToInvoiceId?: string; // Reference to invoice if converted
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface QuotationFormData {
@@ -379,7 +377,7 @@ export interface ClientStatistics {
   clientName: string;
   totalInvoices: number;
   totalAmount: number;
-  lastInvoiceDate: Timestamp;
+  lastInvoiceDate: string | Date;
 }
 
 export interface ProductStatistics {
