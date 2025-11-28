@@ -31,7 +31,7 @@ export function ProductFilters({ products, onFilterChange, filters }: ProductFil
 
     products.forEach(product => {
       if (product.unit) unitsSet.add(product.unit);
-      if (product.gstRate !== undefined) gstRatesSet.add(product.gstRate);
+      if (product.gstRate !== undefined && product.gstRate !== null) gstRatesSet.add(product.gstRate);
       if (product.categoryId) categoriesSet.add(product.categoryId);
     });
 

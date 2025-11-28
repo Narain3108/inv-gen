@@ -55,6 +55,9 @@ async def lifespan(app: FastAPI):
     print("👋 Shutting down Invoice Management API...")
 
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.requests import Request
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
@@ -65,6 +68,19 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     lifespan=lifespan
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print(f"❌ Validation Error: {exc.errors()}")
+    try:
+        body = await request.json()
+        print(f"❌ Payload: {body}")
+    except:
+        print("❌ Could not parse body")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 # Configure CORS

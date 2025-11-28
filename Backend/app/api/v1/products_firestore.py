@@ -4,12 +4,22 @@ Products is a GLOBAL collection
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Annotated
+from pydantic import BaseModel, Field, BeforeValidator
 from app.core.firebase import get_firestore_db
 from datetime import datetime
 
 router = APIRouter()
+
+def parse_float_or_zero(v: Any) -> float:
+    if v == "" or v is None:
+        return 0.0
+    return v
+
+def parse_float_or_none(v: Any) -> Optional[float]:
+    if v == "" or v is None:
+        return None
+    return v
 
 
 def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -29,14 +39,14 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 # Schemas
 class ProductCreate(BaseModel):
-    name: str = Field(..., alias="productName")
+    name: str = Field(..., alias="product_name")
     description: Optional[str] = None
     hsn: Optional[str] = None
     unit: str = "Nos"
     unit_price: float = Field(..., alias="price")
     gst_rate: float = Field(18.0, alias="gstRate")
-    cess_rate: Optional[float] = Field(0.0, alias="cessRate")
-    stock_quantity: Optional[int] = Field(0, alias="stock")
+    cess_rate: Annotated[Optional[float], BeforeValidator(parse_float_or_zero)] = Field(0.0, alias="cessRate")
+    stock_quantity: Annotated[Optional[float], BeforeValidator(parse_float_or_zero)] = Field(0.0, alias="stock")
     company_id: Optional[str] = Field(None, alias="companyId")
     item_code: Optional[str] = Field(None, alias="itemCode")
     type: Optional[str] = "product"
@@ -48,14 +58,14 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
-    name: Optional[str] = Field(None, alias="productName")
+    name: Optional[str] = Field(None, alias="product_name")
     description: Optional[str] = None
     hsn: Optional[str] = None
     unit: Optional[str] = None
     unit_price: Optional[float] = Field(None, alias="price")
     gst_rate: Optional[float] = Field(None, alias="gstRate")
-    cess_rate: Optional[float] = Field(None, alias="cessRate")
-    stock_quantity: Optional[int] = Field(None, alias="stock")
+    cess_rate: Annotated[Optional[float], BeforeValidator(parse_float_or_none)] = Field(None, alias="cessRate")
+    stock_quantity: Annotated[Optional[float], BeforeValidator(parse_float_or_none)] = Field(None, alias="stock")
     company_id: Optional[str] = Field(None, alias="companyId")
     item_code: Optional[str] = Field(None, alias="itemCode")
     type: Optional[str] = None
@@ -75,7 +85,7 @@ class ProductOut(BaseModel):
     unit_price: Optional[float] = Field(None, alias="price")
     gst_rate: Optional[float] = Field(None, alias="gstRate")
     cess_rate: Optional[float] = Field(None, alias="cessRate")
-    stock_quantity: Optional[int] = Field(None, alias="stock")
+    stock_quantity: Optional[float] = Field(None, alias="stock")
     category: Optional[str] = None
     company_id: Optional[str] = Field(None, alias="companyId")
     item_code: Optional[str] = Field(None, alias="itemCode")
