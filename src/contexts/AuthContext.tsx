@@ -35,11 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const userData = await usersApi.getById(userId);
           setUser(userData);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to fetch user profile', error);
-          // Don't clear immediately in case of network error, but for now...
-          // localStorage.removeItem('authToken');
-          // localStorage.removeItem('userId');
+          // Clear credentials if unauthorized or forbidden
+          if (error.status === 401 || error.status === 403) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('selected-company-storage');
+          }
         }
       }
       setLoading(false);
@@ -100,6 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error('Logout API error:', error);
+    }
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');
     localStorage.removeItem('selected-company-storage'); // Clear persisted company

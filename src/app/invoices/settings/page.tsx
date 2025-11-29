@@ -7,8 +7,10 @@
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Building2, Tag, Palette, FileText } from 'lucide-react';
+import { Settings, Building2, Tag, Palette, FileText, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 const settingsLinks = [
   {
@@ -30,13 +32,21 @@ const settingsLinks = [
 ];
 
 function SettingsContent() {
+  const { logout } = useAuth();
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Settings"
-        description="Manage your application settings and preferences"
-        icon={Settings}
-      />
+      <div className="flex justify-between items-center">
+        <PageHeader
+          title="Settings"
+          description="Manage your application settings and preferences"
+          icon={Settings}
+        />
+        <Button variant="destructive" onClick={logout} className="gap-2">
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {settingsLinks.map((link) => (

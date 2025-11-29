@@ -4,7 +4,7 @@ Centralized settings management using Pydantic Settings
 """
 
 from typing import List, Optional
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: str = "*"
     CORS_ALLOW_HEADERS: str = "*"
     
+    # Security
+    SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
     # Firebase Admin SDK Configuration
     FIREBASE_CREDENTIALS_PATH: str = "./firebase-credentials.json"
     FIREBASE_PROJECT_ID: str = "bill-6a1a2"

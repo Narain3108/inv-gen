@@ -7,6 +7,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { Company, Client, Product } from '@/types';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,6 +42,10 @@ const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
+  const pathname = usePathname();
+  
+  // Define public pages where we shouldn't fetch app data
+  const isPublicPage = ['/', '/login', '/signup', '/register', '/forgot-password', '/onboarding'].includes(pathname || '');
   
   // Companies state
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -125,6 +130,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Initial load on mount
   useEffect(() => {
     if (authLoading) return;
+    
+    // Skip data fetching on public pages to prevent unnecessary API calls
+    if (isPublicPage) return;
 
     if (user) {
       const initializeData = async () => {
@@ -145,7 +153,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setClientsInitialized(false);
       setProductsInitialized(false);
     }
-  }, [user, authLoading, loadCompanies, loadClients]);
+  }, [user, authLoading, loadCompanies, loadClients, isPublicPage]);
 
   // Reload products when company changes
   useEffect(() => {

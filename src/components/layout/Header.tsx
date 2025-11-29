@@ -60,16 +60,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
           <Search className="h-5 w-5" />
         </Button>
 
-        {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative shrink-0 hover:bg-primary/10 transition-colors hidden sm:inline-flex"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
-        </Button>
+
 
         {/* Theme Toggle */}
         <ThemeToggle className="shrink-0" />

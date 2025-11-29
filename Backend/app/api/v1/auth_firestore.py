@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from app.core.firebase import get_firestore_db
 from app.schemas.auth import LoginRequest, SignupRequest, LoginResponse, SignupResponse
+from app.core.security import create_access_token, get_password_hash, verify_password
 from datetime import datetime
 import uuid
 
 router = APIRouter()
 
 @router.post("/signup", response_model=SignupResponse)
-async def signup(request: SignupRequest):
+async def signup(request: SignupRequest, response: Response):
     db = get_firestore_db()
     users_ref = db.collection("users")
     
@@ -21,7 +22,7 @@ async def signup(request: SignupRequest):
     user_data = {
         "id": user_id,
         "email": request.email,
-        "password": request.password, # In a real app, hash this!
+        "password": get_password_hash(request.password), # Securely hashed
         "name": request.name,
         "createdAt": datetime.utcnow().isoformat(),
         "updatedAt": datetime.utcnow().isoformat()
@@ -29,10 +30,23 @@ async def signup(request: SignupRequest):
     
     users_ref.document(user_id).set(user_data)
     
+    # Create Session Token
+    access_token = create_access_token(subject=user_id)
+    
+    # Set HTTP-only Cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False, # Set to True in production (HTTPS)
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7 # 7 days
+    )
+    
     return {"message": "User created successfully", "uid": user_id}
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, response: Response):
     db = get_firestore_db()
     users_ref = db.collection("users")
     
@@ -48,15 +62,33 @@ async def login(request: LoginRequest):
     
     user_data = user_doc.to_dict()
     
-    # Verify password (simple check for this architecture)
-    if user_data.get("password") != request.password:
+    # Verify password
+    if not verify_password(request.password, user_data.get("password")):
         raise HTTPException(status_code=400, detail="Invalid email or password")
     
+    # Create Session Token
+    access_token = create_access_token(subject=user_doc.id)
+    
+    # Set HTTP-only Cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False, # Set to True in production (HTTPS)
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7 # 7 days
+    )
+    
     return {
-        "token": "dummy-jwt-token", # We use x-user-id for auth
+        "token": access_token,
         "refreshToken": "dummy-refresh-token",
         "expiresIn": "3600",
         "localId": user_doc.id,
         "email": user_data.get("email"),
         "displayName": user_data.get("name")
     }
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="access_token")
+    return {"message": "Logged out successfully"}

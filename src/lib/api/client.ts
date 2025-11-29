@@ -105,7 +105,7 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    // Add User ID if available (for new hierarchical DB structure)
+    // Add User ID if available (Fallback for non-cookie environments)
     if (typeof window !== 'undefined') {
       const userId = localStorage.getItem('userId');
       if (userId) {
@@ -133,6 +133,7 @@ class ApiClient {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: this.getHeaders(),
+      credentials: 'include', // Send cookies
     });
 
     const result = await this.handleResponse<T>(response);
@@ -145,6 +146,7 @@ class ApiClient {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
+      credentials: 'include', // Send cookies
     });
 
     const result = await this.handleResponse<T>(response);
@@ -157,6 +159,7 @@ class ApiClient {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
+      credentials: 'include', // Send cookies
     });
 
     const result = await this.handleResponse<T>(response);
@@ -169,6 +172,7 @@ class ApiClient {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
+      credentials: 'include', // Send cookies
     });
 
     const result = await this.handleResponse<T>(response);
@@ -179,6 +183,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
+      credentials: 'include', // Send cookies
     });
 
     return this.handleResponse<T>(response);
@@ -197,6 +202,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',
       body: formData,
+      credentials: 'include', // Send cookies
       // Don't set Content-Type header - browser will set it with boundary
     });
 

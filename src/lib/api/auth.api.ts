@@ -23,4 +23,8 @@ export const authApi = {
   signup: async (email: string, password: string, name: string): Promise<SignupResponse> => {
     return apiClient.post<SignupResponse>('/auth/signup', { email, password, name });
   },
+
+  logout: async (): Promise<void> => {
+    return apiClient.post<void>('/auth/logout');
+  },
 };
