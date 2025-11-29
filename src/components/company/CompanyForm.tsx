@@ -102,11 +102,19 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
   const handleFormSubmit = async (data: CompanyFormData) => {
     setIsLoading(true);
     try {
-      // Include logo and signature URLs in the data
-      const submitData = {
-        ...data,
-        logoUrl: logoUrl || '',
-        signatureUrl: signatureUrl || '',
+      // Explicitly construct payload to match backend schema
+      const companyData = {
+        name: data.name,
+        gstin: data.gstin || null,
+        pan: data.pan || null,
+        address: data.address,
+        contact: data.contact,
+        bankDetails: data.bankDetails || null,
+        logoUrl: logoUrl || null,
+        signatureUrl: signatureUrl || null,
+        website: data.website || null,
+        termsAndConditions: data.termsAndConditions || null,
+        additionalNotes: data.additionalNotes || null,
         invoiceNumbering: {
           prefix: invoicePrefix,
           suffix: invoiceSuffix,
@@ -118,11 +126,17 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           order: quotationOrder,
         },
       };
-      await onSubmit(submitData as CompanyFormData);
+
+      await onSubmit(companyData as any);
       toast.success(company ? 'Company updated successfully' : 'Company created successfully');
-    } catch (error) {
-      toast.error('Failed to save company');
-      console.error(error);
+    } catch (error: any) {
+      console.error('Error saving company:', error);
+      const errorMessage = error.response?.data?.detail 
+        ? (Array.isArray(error.response.data.detail) 
+            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
+            : error.response.data.detail)
+        : 'Failed to save company';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -269,14 +269,14 @@ function InvoicesContent() {
 
       if (editingInvoice?.id) {
         // Update existing invoice - preserve payment data
-        await invoicesApi.update(editingInvoice.id, {
+        await invoicesApi.partialUpdate(editingInvoice.id, {
           ...invoiceData,
           // Preserve existing payment tracking fields
           paymentStatus: editingInvoice.paymentStatus || 'pending',
           amountPaid: editingInvoice.amountPaid || 0,
           amountPending: editingInvoice.amountPending ?? invoiceData.totalAmount,
           payments: editingInvoice.payments || [],
-        });
+        }, editingInvoice.companyId);
         toast.success('Invoice updated successfully');
       } else {
         // Create new invoice with payment tracking initialized
@@ -331,7 +331,7 @@ function InvoicesContent() {
     if (!deleteInvoice?.id) return;
 
     try {
-      await invoicesApi.delete(deleteInvoice.id);
+      await invoicesApi.delete(deleteInvoice.id, deleteInvoice.companyId);
       toast.success('Invoice deleted successfully');
       setDeleteInvoice(null);
       loadInvoices();
@@ -470,12 +470,12 @@ function InvoicesContent() {
       }
 
       // Update invoice with new payment - set pending to 0 if it's negligible
-      await invoicesApi.update(paymentInvoice.id, {
+      await invoicesApi.partialUpdate(paymentInvoice.id, {
         payments: [...currentPayments, newPayment],
         amountPaid: newAmountPaid,
         amountPending: newAmountPending <= 0.01 ? 0 : Math.max(0, newAmountPending),
         paymentStatus: newPaymentStatus,
-      });
+      }, paymentInvoice.companyId);
 
       toast.success('Payment recorded successfully');
       setIsPaymentDialogOpen(false);

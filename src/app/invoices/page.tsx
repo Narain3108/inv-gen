@@ -180,7 +180,7 @@ function InvoicesContent() {
     if (!deleteInvoice?.id) return;
 
     try {
-      await invoicesApi.delete(deleteInvoice.id);
+      await invoicesApi.delete(deleteInvoice.id, deleteInvoice.companyId);
       toast.success('Invoice deleted successfully');
       setDeleteInvoice(null);
       loadData();

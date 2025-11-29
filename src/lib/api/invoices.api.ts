@@ -63,15 +63,17 @@ export const invoicesApi = {
   /**
    * Partially update an invoice
    */
-  partialUpdate: async (id: string, data: Partial<Invoice>): Promise<Invoice> => {
-    return apiClient.patch<Invoice>(`/invoices/${id}`, data);
+  partialUpdate: async (id: string, data: Partial<Invoice>, companyId?: string): Promise<Invoice> => {
+    const url = companyId ? `/invoices/${id}?companyId=${companyId}` : `/invoices/${id}`;
+    return apiClient.patch<Invoice>(url, data);
   },
 
   /**
    * Delete an invoice
    */
-  delete: async (id: string): Promise<void> => {
-    return apiClient.delete<void>(`/invoices/${id}`);
+  delete: async (id: string, companyId?: string): Promise<void> => {
+    const url = companyId ? `/invoices/${id}?companyId=${companyId}` : `/invoices/${id}`;
+    return apiClient.delete<void>(url);
   },
 
   /**
@@ -84,8 +86,9 @@ export const invoicesApi = {
   /**
    * Update invoice status
    */
-  updateStatus: async (id: string, status: InvoiceFilters['status']): Promise<Invoice> => {
-    return apiClient.patch<Invoice>(`/invoices/${id}`, { status });
+  updateStatus: async (id: string, status: InvoiceFilters['status'], companyId?: string): Promise<Invoice> => {
+    const url = companyId ? `/invoices/${id}?companyId=${companyId}` : `/invoices/${id}`;
+    return apiClient.patch<Invoice>(url, { status });
   },
 
   /**

@@ -93,7 +93,7 @@ export const buildInvoiceTitle = (customization?: InvoiceCustomization, type: 'i
  * Build invoice number and date section
  */
 export const buildInvoiceInfo = (
-  data: { invoiceNumber?: string; quotationNumber?: string; date: any; validUntil?: any },
+  data: { invoiceNumber?: string; quotationNumber?: string; referenceNumber?: string; date: any; validUntil?: any },
   customization?: InvoiceCustomization,
   type: 'invoice' | 'quotation' = 'invoice'
 ): any => {
@@ -119,6 +119,14 @@ export const buildInvoiceInfo = (
               { text: number, fontSize: 10, bold: true },
             ],
             alignment: 'right',
+          }] : []),
+          ...(type === 'invoice' && data.referenceNumber ? [{
+            text: [
+              { text: 'Ref No: ', fontSize: 10, color: '#4b5563' },
+              { text: data.referenceNumber, fontSize: 10, bold: true },
+            ],
+            alignment: 'right',
+            margin: [0, 3, 0, 0],
           }] : []),
           ...(showDate ? [{
             text: [

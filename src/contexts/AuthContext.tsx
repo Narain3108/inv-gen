@@ -48,8 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      await authApi.signup(email, password, name);
-      await signIn(email, password);
+      const response = await authApi.signup(email, password, name);
+      // Store user ID for API requests
+      localStorage.setItem('userId', response.uid);
+      localStorage.setItem('authToken', 'dummy-token'); // We use userId for auth now
+      
+      // Fetch full user profile
+      const userData = await usersApi.getById(response.uid);
+      setUser(userData);
+      
+      toast.success('Account created successfully');
+      // Redirect to settings to create a company
+      router.push('/invoices/settings');
     } catch (error: any) {
       console.error('Signup error:', error);
       throw error;
@@ -59,10 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       const response = await authApi.login(email, password);
-      localStorage.setItem('authToken', response.token);
+      // Store user ID for API requests
       localStorage.setItem('userId', response.localId);
+      localStorage.setItem('authToken', response.token);
       
-      // Fetch user profile
+      // Fetch full user profile
       const userData = await usersApi.getById(response.localId);
       setUser(userData);
       
@@ -81,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');
+    localStorage.removeItem('selected-company-storage'); // Clear persisted company
     setUser(null);
     router.push('/auth/login');
     toast.success('Logged out');

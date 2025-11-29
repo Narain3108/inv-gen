@@ -1,6 +1,6 @@
 /**
  * Product Categories API
- * All product category-related API calls (subcollection under companies)
+ * All product category-related API calls (Global for User)
  */
 
 import { apiClient } from './client';
@@ -13,37 +13,37 @@ export interface CategoryFilters {
 
 export const categoriesApi = {
   /**
-   * Get all categories for a company
+   * Get all categories (Global for User)
    */
-  getByCompanyId: async (companyId: string, filters?: CategoryFilters): Promise<ProductCategory[]> => {
-    return apiClient.get<ProductCategory[]>(`/companies/${companyId}/product-categories`, filters);
+  getAll: async (filters?: CategoryFilters): Promise<ProductCategory[]> => {
+    return apiClient.get<ProductCategory[]>('/categories', filters);
   },
 
   /**
    * Get a single category by ID
    */
-  getById: async (companyId: string, categoryId: string): Promise<ProductCategory> => {
-    return apiClient.get<ProductCategory>(`/companies/${companyId}/product-categories/${categoryId}`);
+  getById: async (categoryId: string): Promise<ProductCategory> => {
+    return apiClient.get<ProductCategory>(`/categories/${categoryId}`);
   },
 
   /**
    * Create a new category
    */
-  create: async (companyId: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
-    return apiClient.post<ProductCategory>(`/companies/${companyId}/product-categories`, data);
+  create: async (data: Partial<ProductCategory>): Promise<ProductCategory> => {
+    return apiClient.post<ProductCategory>('/categories', data);
   },
 
   /**
    * Update an existing category
    */
-  update: async (companyId: string, categoryId: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
-    return apiClient.put<ProductCategory>(`/companies/${companyId}/product-categories/${categoryId}`, data);
+  update: async (categoryId: string, data: Partial<ProductCategory>): Promise<ProductCategory> => {
+    return apiClient.put<ProductCategory>(`/categories/${categoryId}`, data);
   },
 
   /**
    * Delete a category
    */
-  delete: async (companyId: string, categoryId: string): Promise<void> => {
-    return apiClient.delete<void>(`/companies/${companyId}/product-categories/${categoryId}`);
+  delete: async (categoryId: string): Promise<void> => {
+    return apiClient.delete<void>(`/categories/${categoryId}`);
   },
 };

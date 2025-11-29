@@ -105,8 +105,10 @@ export const invoiceItemSchema = z.object({
 
 export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().optional(),
+  referenceNumber: z.string().optional(),
   clientId: z.string().min(1, 'Client is required'),
   date: z.string().min(1, 'Invoice date is required'), // Store as string, convert to Date in handler
+  shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
     quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
@@ -122,6 +124,7 @@ export const quotationFormSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
   date: z.string().min(1, 'Quotation date is required'),
   validUntil: z.string().min(1, 'Valid until date is required'),
+  shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
     quantity: z.number().min(0.01, 'Quantity must be greater than 0'),

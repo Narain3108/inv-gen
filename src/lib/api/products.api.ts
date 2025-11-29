@@ -53,8 +53,9 @@ export const productsApi = {
   /**
    * Delete a product
    */
-  delete: async (id: string): Promise<void> => {
-    return apiClient.delete<void>(`/products/${id}/`);
+  delete: async (id: string, companyId?: string): Promise<void> => {
+    const url = companyId ? `/products/${id}?companyId=${companyId}` : `/products/${id}`;
+    return apiClient.delete<void>(url);
   },
 
   /**

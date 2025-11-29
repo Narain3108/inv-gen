@@ -91,13 +91,16 @@ function DashboardContent() {
 
       // Load invoices
       const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
-      setInvoices(invoicesData);
+      setInvoices(invoicesData || []);
 
       // Load quotations
       const quotationsData = await quotationsApi.getByCompanyId(selectedCompany.id);
-      setQuotations(quotationsData);
+      setQuotations(quotationsData || []);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      setInvoices([]);
+      setQuotations([]);
+
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);

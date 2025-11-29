@@ -56,15 +56,17 @@ export const quotationsApi = {
   /**
    * Partially update a quotation
    */
-  partialUpdate: async (id: string, data: Partial<Quotation>): Promise<Quotation> => {
-    return apiClient.patch<Quotation>(`/quotations/${id}`, data);
+  partialUpdate: async (id: string, data: Partial<Quotation>, companyId?: string): Promise<Quotation> => {
+    const url = companyId ? `/quotations/${id}?companyId=${companyId}` : `/quotations/${id}`;
+    return apiClient.patch<Quotation>(url, data);
   },
 
   /**
    * Delete a quotation
    */
-  delete: async (id: string): Promise<void> => {
-    return apiClient.delete<void>(`/quotations/${id}`);
+  delete: async (id: string, companyId?: string): Promise<void> => {
+    const url = companyId ? `/quotations/${id}?companyId=${companyId}` : `/quotations/${id}`;
+    return apiClient.delete<void>(url);
   },
 
   /**
@@ -77,8 +79,9 @@ export const quotationsApi = {
   /**
    * Update quotation status
    */
-  updateStatus: async (id: string, status: QuotationFilters['status']): Promise<Quotation> => {
-    return apiClient.patch<Quotation>(`/quotations/${id}`, { status });
+  updateStatus: async (id: string, status: QuotationFilters['status'], companyId?: string): Promise<Quotation> => {
+    const url = companyId ? `/quotations/${id}?companyId=${companyId}` : `/quotations/${id}`;
+    return apiClient.patch<Quotation>(url, { status });
   },
 
   /**

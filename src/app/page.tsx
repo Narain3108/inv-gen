@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -33,6 +34,7 @@ import { Splash } from '@/components/shared';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -106,7 +108,14 @@ export default function LandingPage() {
               </Link>
               <ThemeToggle />
               <Button 
-                onClick={() => router.push('/invoices/dashboard')}
+                variant="ghost"
+                onClick={() => router.push('/auth/login')}
+                className="font-medium hover:text-primary"
+              >
+                Log in
+              </Button>
+              <Button 
+                onClick={() => router.push('/auth/register')}
                 className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold"
               >
                 Get Started Free
@@ -153,7 +162,7 @@ export default function LandingPage() {
                   Testimonials
                 </Link>
                 <Button 
-                  onClick={() => router.push('/invoices/dashboard')}
+                  onClick={() => router.push(user ? '/invoices/dashboard' : '/auth/register')}
                   className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 font-semibold"
                 >
                   Get Started Free
@@ -201,7 +210,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4 px-4">
               <Button
                 size="lg"
-                onClick={() => router.push('/invoices/dashboard')}
+                onClick={() => router.push(user ? '/invoices/dashboard' : '/auth/register')}
                 className="w-full sm:w-auto bg-gradient-to-r from-primary to-accent text-white shadow-xl shadow-primary/30 dark:shadow-primary/20 hover:shadow-2xl hover:scale-105 transition-all duration-200 font-semibold text-base px-6 sm:px-8 py-5 sm:py-6 group"
               >
                 Start Creating Now
@@ -515,7 +524,7 @@ export default function LandingPage() {
                   size="lg" 
                   variant="secondary" 
                   className="w-full sm:w-auto bg-white text-primary hover:bg-white/90 shadow-xl font-semibold text-sm sm:text-base px-6 sm:px-8 py-5 sm:py-6 group"
-                  onClick={() => router.push('/invoices/dashboard')}
+                  onClick={() => router.push(user ? '/invoices/dashboard' : '/auth/register')}
                 >
                   Get Started Now - It's Free
                   <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />

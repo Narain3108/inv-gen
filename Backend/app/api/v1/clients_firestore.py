@@ -1,12 +1,13 @@
 """
 Firestore-based Clients API
-Clients is a GLOBAL collection
+Clients are nested under Users: users/{uid}/clients
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.deps import get_current_user_id
 from datetime import datetime
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Convert Firestore datetime objects to ISO format strings"""
     result = {}
     for key, value in doc_dict.items():
-        if hasattr(value, 'isoformat'):  # datetime object
+        if hasattr(value, "isoformat"):  # datetime object
             result[key] = value.isoformat()
         elif isinstance(value, dict):
             result[key] = serialize_firestore_doc(value)
@@ -41,6 +42,7 @@ class ClientCreate(BaseModel):
     address: Optional[Dict[str, Any]] = None
     billing_address: Optional[Dict[str, Any]] = Field(None, alias="billingAddress")
     shipping_address: Optional[Dict[str, Any]] = Field(None, alias="shippingAddress")
+    shipping_addresses: Optional[List[Dict[str, Any]]] = Field(None, alias="shippingAddresses")
     bank_details: Optional[Dict[str, Any]] = Field(None, alias="bankDetails")
     pan: Optional[str] = None
     company_id: Optional[str] = Field(None, alias="companyId")
@@ -61,6 +63,7 @@ class ClientUpdate(BaseModel):
     address: Optional[Dict[str, Any]] = None
     billing_address: Optional[Dict[str, Any]] = Field(None, alias="billingAddress")
     shipping_address: Optional[Dict[str, Any]] = Field(None, alias="shippingAddress")
+    shipping_addresses: Optional[List[Dict[str, Any]]] = Field(None, alias="shippingAddresses")
     bank_details: Optional[Dict[str, Any]] = Field(None, alias="bankDetails")
     pan: Optional[str] = None
     company_id: Optional[str] = Field(None, alias="companyId")
@@ -82,6 +85,7 @@ class ClientOut(BaseModel):
     address: Optional[dict] = None
     billing_address: Optional[dict] = Field(None, alias="billingAddress")
     shipping_address: Optional[dict] = Field(None, alias="shippingAddress")
+    shipping_addresses: Optional[List[dict]] = Field(None, alias="shippingAddresses")
     bank_details: Optional[dict] = Field(None, alias="bankDetails")
     company_id: Optional[str] = Field(None, alias="companyId")
     created_at: Optional[str] = Field(None, alias="createdAt")
@@ -93,159 +97,102 @@ class ClientOut(BaseModel):
 
 
 @router.post("", response_model=ClientOut)
-async def create_client(client: ClientCreate):
-    """Create a new client in Firestore (Global Collection)"""
+async def create_client(
+    client: ClientCreate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Create a new client for the current user"""
     try:
         db = get_firestore_db()
         
-        # Handle nested objects from frontend
-        contact_data = client.contact or {}
-        email = client.email or contact_data.get("email")
-        phone = client.phone or contact_data.get("phone")
+        client_data = client.dict(by_alias=True, exclude_unset=True)
+        client_data["createdAt"] = datetime.utcnow()
+        client_data["updatedAt"] = datetime.utcnow()
         
-        client_data = {
-            "name": client.name,
-            "gstin": client.gstin,
-            "pan": client.pan,
-            "contact_person": client.contact_person,
-            "email": email,
-            "phone": phone,
-            "contact": contact_data,
-            "addresses": client.addresses or [],
-            "address": client.address,
-            "billingAddress": client.billing_address,
-            "shippingAddress": client.shipping_address,
-            "bankDetails": client.bank_details,
-            "companyId": client.company_id,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        # Add to user"s clients collection
+        doc_ref = db.collection("users").document(user_id).collection("clients").document()
+        doc_ref.set(client_data)
         
-        timestamp, doc_ref = db.collection("clients").add(client_data)
-        client_id = doc_ref.id
+        # Return the created client
+        client_data["id"] = doc_ref.id
+        return serialize_firestore_doc(client_data)
         
-        return {"id": client_id, **client_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating client: {str(e)}")
 
 
 @router.get("", response_model=List[ClientOut])
-async def list_clients(skip: int = 0, limit: int = 50):
-    """Get all clients from Firestore (Global Collection)"""
+async def get_clients(
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get all clients for the current user"""
     try:
         db = get_firestore_db()
+        clients_ref = db.collection("users").document(user_id).collection("clients")
+        docs = clients_ref.stream()
         
-        query = db.collection("clients").limit(limit).offset(skip)
         clients = []
-        
-        for doc in query.stream():
+        for doc in docs:
             client_data = doc.to_dict()
-            clients.append({"id": doc.id, **serialize_firestore_doc(client_data)})
-        
+            client_data["id"] = doc.id
+            clients.append(serialize_firestore_doc(client_data))
+            
         return clients
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing clients: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching clients: {str(e)}")
 
 
 @router.get("/{client_id}", response_model=ClientOut)
-async def get_client(client_id: str):
-    """Get a specific client from Firestore (Global Collection)"""
+async def get_client(
+    client_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get a specific client for the current user"""
     try:
         db = get_firestore_db()
-        doc = db.collection("clients").document(client_id).get()
+        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
+        doc = doc_ref.get()
         
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Client not found")
+            
+        client_data = doc.to_dict()
+        client_data["id"] = doc.id
+        return serialize_firestore_doc(client_data)
         
-        return {"id": doc.id, **serialize_firestore_doc(doc.to_dict())}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting client: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching client: {str(e)}")
 
 
 @router.put("/{client_id}", response_model=ClientOut)
-async def update_client(client_id: str, client: ClientUpdate):
-    """Update a client in Firestore (Global Collection)"""
+async def update_client(
+    client_id: str, 
+    client_update: ClientUpdate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Update a client for the current user"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("clients").document(client_id)
+        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
         
+        # Check if exists
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Client not found")
         
-        # Handle nested objects from frontend
-        contact_data = client.contact or {}
-        email = client.email or contact_data.get("email")
-        phone = client.phone or contact_data.get("phone")
-        
-        update_data = {
-            "name": client.name,
-            "gstin": client.gstin,
-            "pan": client.pan,
-            "contact_person": client.contact_person,
-            "email": email,
-            "phone": phone,
-            "contact": contact_data,
-            "addresses": client.addresses or [],
-            "address": client.address,
-            "billingAddress": client.billing_address,
-            "shippingAddress": client.shipping_address,
-            "bankDetails": client.bank_details,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        if client.company_id:
-            update_data["companyId"] = client.company_id
-            
-        doc_ref.update(update_data)
-        updated_doc = doc_ref.get()
-        
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating client: {str(e)}")
-
-
-@router.patch("/{client_id}", response_model=ClientOut)
-async def patch_client(client_id: str, client: ClientUpdate):
-    """Partially update a client in Firestore"""
-    try:
-        db = get_firestore_db()
-        doc_ref = db.collection("clients").document(client_id)
-        
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Client not found")
-            
-        # Get set fields without aliases (so name stays name)
-        data = client.model_dump(exclude_unset=True)
-        
-        # Map snake_case to Firestore keys (camelCase)
-        key_map = {
-            "billing_address": "billingAddress",
-            "shipping_address": "shippingAddress",
-            "bank_details": "bankDetails",
-            "company_id": "companyId"
-            # name is "name", so no change needed
-        }
-        
-        update_data = {}
-        for k, v in data.items():
-            if k in key_map:
-                update_data[key_map[k]] = v
-            else:
-                update_data[k] = v
-
-        if not update_data:
-             return {"id": client_id, **serialize_firestore_doc(doc_ref.get().to_dict())}
-
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data = client_update.dict(by_alias=True, exclude_unset=True)
+        update_data["updatedAt"] = datetime.utcnow()
         
         doc_ref.update(update_data)
-        updated_doc = doc_ref.get()
         
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
+        # Return updated document
+        updated_doc = doc_ref.get()
+        client_data = updated_doc.to_dict()
+        client_data["id"] = updated_doc.id
+        return serialize_firestore_doc(client_data)
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -253,18 +200,23 @@ async def patch_client(client_id: str, client: ClientUpdate):
 
 
 @router.delete("/{client_id}")
-async def delete_client(client_id: str):
-    """Delete a client from Firestore (Global Collection)"""
+async def delete_client(
+    client_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a client for the current user"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("clients").document(client_id)
+        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
         
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Client not found")
-        
+            
         doc_ref.delete()
-        return {"message": "Client deleted successfully", "id": client_id}
+        return {"message": "Client deleted successfully"}
+        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting client: {str(e)}")
+

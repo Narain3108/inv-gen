@@ -56,7 +56,22 @@ export function CustomizationDialog({
       const data = await customizationsApi.getByCompanyId(companyId, type);
       
       if (data && data.id !== 'default') {
-        setCustomization(data);
+        // Merge with defaults to ensure all fields exist
+        const defaults = type === 'invoice' ? DEFAULT_INVOICE_CUSTOMIZATION : DEFAULT_QUOTATION_CUSTOMIZATION;
+        setCustomization({
+          ...defaults,
+          ...data,
+          header: { ...defaults.header, ...(data.header || {}) },
+          companyDetails: { ...defaults.companyDetails, ...(data.companyDetails || {}) },
+          addresses: { ...defaults.addresses, ...(data.addresses || {}) },
+          table: { ...defaults.table, ...(data.table || {}) },
+          totals: { ...defaults.totals, ...(data.totals || {}) },
+          footer: { ...defaults.footer, ...(data.footer || {}) },
+          colorScheme: { ...defaults.colorScheme, ...(data.colorScheme || {}) },
+          margins: { ...defaults.margins, ...(data.margins || {}) },
+          companyId,
+          type,
+        } as InvoiceCustomization);
       } else {
         // Use defaults
         setCustomization({

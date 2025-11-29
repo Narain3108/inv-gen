@@ -281,7 +281,7 @@ function QuotationsContent() {
     if (!deleteQuotation) return;
 
     try {
-      await quotationsApi.delete(deleteQuotation.id);
+      await quotationsApi.delete(deleteQuotation.id, deleteQuotation.companyId);
       toast.success('Quotation deleted successfully');
       setDeleteQuotation(null);
       await loadData();
@@ -369,6 +369,7 @@ function QuotationsContent() {
       // Create invoice from quotation
       const invoiceData = {
         invoiceNumber: invoiceNumber.trim(),
+        referenceNumber: convertingQuotation.quotationNumber,
         companyId: convertingQuotation.companyId,
         company_id: convertingQuotation.companyId,
         clientId: convertingQuotation.clientId,
@@ -390,7 +391,7 @@ function QuotationsContent() {
       await quotationsApi.partialUpdate(convertingQuotation.id, {
         status: 'converted' as QuotationStatus,
         convertedToInvoiceId: newInvoice.id,
-      });
+      }, convertingQuotation.companyId);
 
       toast.success('Quotation converted to invoice successfully');
       setConvertingQuotation(null);
@@ -407,7 +408,7 @@ function QuotationsContent() {
 
   const handleUpdateStatus = async (quotation: Quotation, status: QuotationStatus) => {
     try {
-      await quotationsApi.updateStatus(quotation.id, status);
+      await quotationsApi.updateStatus(quotation.id, status, quotation.companyId);
       toast.success(`Quotation marked as ${status}`);
       await loadData();
     } catch (error) {

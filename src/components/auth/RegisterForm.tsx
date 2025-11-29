@@ -36,7 +36,7 @@ export default function RegisterForm({ onSuccess, onToggleForm }: RegisterFormPr
     try {
       setIsLoading(true);
       await signUp(data.email, data.password, data.name);
-      toast.success('Account created successfully!');
+      // Success toast is handled in AuthContext
       onSuccess?.();
     } catch (error: any) {
       console.error('Registration error:', error);

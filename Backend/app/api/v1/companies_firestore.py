@@ -1,12 +1,13 @@
 """
 Firestore-based Companies API
-Companies is a GLOBAL collection
+Companies are nested under Users: users/{uid}/companies
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.deps import get_current_user_id
 from datetime import datetime
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Convert Firestore datetime objects to ISO format strings"""
     result = {}
     for key, value in doc_dict.items():
-        if hasattr(value, 'isoformat'):  # datetime object
+        if hasattr(value, "isoformat"):  # datetime object
             result[key] = value.isoformat()
         elif isinstance(value, dict):
             result[key] = serialize_firestore_doc(value)
@@ -91,131 +92,102 @@ class CompanyOut(BaseModel):
 
 
 @router.post("", response_model=CompanyOut)
-async def create_company(company: CompanyCreate):
-    """Create a new company in Firestore (Global Collection)"""
+async def create_company(
+    company: CompanyCreate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Create a new company for the current user"""
     try:
         db = get_firestore_db()
         
-        company_data = {
-            "name": company.name,
-            "gstin": company.gstin,
-            "pan": company.pan,
-            "address": company.address or {},
-            "contact": company.contact or {},
-            "bankDetails": company.bank_details or {},
-            "logoUrl": company.logo_url,
-            "signatureUrl": company.signature_url,
-            "website": company.website,
-            "additionalNotes": company.additional_notes,
-            "termsAndConditions": company.terms_and_conditions,
-            "invoiceNumbering": company.invoice_numbering,
-            "quotationNumbering": company.quotation_numbering,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        company_data = company.dict(by_alias=True, exclude_unset=True)
+        company_data["createdAt"] = datetime.utcnow()
+        company_data["updatedAt"] = datetime.utcnow()
         
-        timestamp, doc_ref = db.collection("companies").add(company_data)
-        company_id = doc_ref.id
+        # Add to user"s companies collection
+        doc_ref = db.collection("users").document(user_id).collection("companies").document()
+        doc_ref.set(company_data)
         
-        return {"id": company_id, **company_data}
+        # Return the created company
+        company_data["id"] = doc_ref.id
+        return serialize_firestore_doc(company_data)
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating company: {str(e)}")
 
 
 @router.get("", response_model=List[CompanyOut])
-async def list_companies(skip: int = 0, limit: int = 50):
-    """Get all companies from Firestore (Global Collection)"""
+async def get_companies(
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get all companies for the current user"""
     try:
         db = get_firestore_db()
+        companies_ref = db.collection("users").document(user_id).collection("companies")
+        docs = companies_ref.stream()
         
-        query = db.collection("companies").limit(limit).offset(skip)
         companies = []
-        
-        for doc in query.stream():
+        for doc in docs:
             company_data = doc.to_dict()
-            companies.append({"id": doc.id, **serialize_firestore_doc(company_data)})
-        
+            company_data["id"] = doc.id
+            companies.append(serialize_firestore_doc(company_data))
+            
         return companies
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing companies: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching companies: {str(e)}")
 
 
 @router.get("/{company_id}", response_model=CompanyOut)
-async def get_company(company_id: str):
-    """Get a specific company from Firestore (Global Collection)"""
+async def get_company(
+    company_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get a specific company for the current user"""
     try:
         db = get_firestore_db()
-        doc = db.collection("companies").document(company_id).get()
+        doc_ref = db.collection("users").document(user_id).collection("companies").document(company_id)
+        doc = doc_ref.get()
         
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Company not found")
+            
+        company_data = doc.to_dict()
+        company_data["id"] = doc.id
+        return serialize_firestore_doc(company_data)
         
-        return {"id": doc.id, **serialize_firestore_doc(doc.to_dict())}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting company: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching company: {str(e)}")
 
 
 @router.put("/{company_id}", response_model=CompanyOut)
-async def update_company(company_id: str, company: CompanyUpdate):
-    """Update a company in Firestore (Global Collection)"""
+async def update_company(
+    company_id: str, 
+    company_update: CompanyUpdate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Update a company for the current user"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("companies").document(company_id)
+        doc_ref = db.collection("users").document(user_id).collection("companies").document(company_id)
         
+        # Check if exists
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Company not found")
         
-        update_data = {
-            "name": company.name,
-            "gstin": company.gstin,
-            "pan": company.pan,
-            "address": company.address or {},
-            "contact": company.contact or {},
-            "bankDetails": company.bank_details or {},
-            "logoUrl": company.logo_url,
-            "signatureUrl": company.signature_url,
-            "website": company.website,
-            "additionalNotes": company.additional_notes,
-            "termsAndConditions": company.terms_and_conditions,
-            "invoiceNumbering": company.invoice_numbering,
-            "quotationNumbering": company.quotation_numbering,
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        update_data = company_update.dict(by_alias=True, exclude_unset=True)
+        update_data["updatedAt"] = datetime.utcnow()
         
         doc_ref.update(update_data)
+        
+        # Return updated document
         updated_doc = doc_ref.get()
+        company_data = updated_doc.to_dict()
+        company_data["id"] = updated_doc.id
+        return serialize_firestore_doc(company_data)
         
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating company: {str(e)}")
-
-
-@router.patch("/{company_id}", response_model=CompanyOut)
-async def patch_company(company_id: str, company: CompanyUpdate):
-    """Partially update a company in Firestore"""
-    try:
-        db = get_firestore_db()
-        doc_ref = db.collection("companies").document(company_id)
-        
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Company not found")
-            
-        # Filter out None values and use aliases (camelCase) for Firestore keys
-        update_data = company.model_dump(exclude_unset=True, by_alias=True)
-        
-        if not update_data:
-             return {"id": company_id, **serialize_firestore_doc(doc_ref.get().to_dict())}
-
-        update_data["updated_at"] = datetime.utcnow().isoformat()
-        
-        doc_ref.update(update_data)
-        updated_doc = doc_ref.get()
-        
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
     except HTTPException:
         raise
     except Exception as e:
@@ -223,18 +195,23 @@ async def patch_company(company_id: str, company: CompanyUpdate):
 
 
 @router.delete("/{company_id}")
-async def delete_company(company_id: str):
-    """Delete a company from Firestore (Global Collection)"""
+async def delete_company(
+    company_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a company for the current user"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("companies").document(company_id)
+        doc_ref = db.collection("users").document(user_id).collection("companies").document(company_id)
         
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Company not found")
-        
+            
         doc_ref.delete()
-        return {"message": "Company deleted successfully", "id": company_id}
+        return {"message": "Company deleted successfully"}
+        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting company: {str(e)}")
+

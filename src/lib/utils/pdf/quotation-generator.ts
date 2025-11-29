@@ -100,7 +100,7 @@ export async function generateQuotationPDF(data: QuotationPDFData): Promise<void
       buildInvoiceInfo(quotation, customization, 'quotation'),
 
       // Billing and Shipping Address
-      buildAddressSection(client, customization),
+      buildAddressSection(client, customization, quotation),
 
       // Items Table
       buildItemsTable(quotation.items, customization),
@@ -182,7 +182,7 @@ export async function previewQuotationPDF(data: QuotationPDFData): Promise<void>
       buildInvoiceInfo(quotation, customization, 'quotation'),
 
       // Billing and Shipping Address
-      buildAddressSection(client, customization),
+      buildAddressSection(client, customization, quotation),
 
       // Items Table
       buildItemsTable(quotation.items, customization),

@@ -99,7 +99,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   // Auto-fill product name, item code, and GST rate from HSN match
   const autoFillFromCategory = async () => {
     try {
-      const hsnMatch = await findCategoryByHSN(hsn);
+      const hsnMatch = await findCategoryByHSN(companyId, hsn);
       if (hsnMatch) {
         // Auto-fill product name
         setValue('productName', hsnMatch.product.name);
@@ -126,7 +126,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   // Check GST rate by product name (doesn't change name, only GST)
   const checkGSTRateByName = async () => {
     try {
-      const nameMatch = await findCategoryByProductName(productName);
+      const nameMatch = await findCategoryByProductName(companyId, productName);
       if (nameMatch && currentGstRate !== nameMatch.category.defaultGstRate) {
         setValue('gstRate', nameMatch.category.defaultGstRate);
         setAutoFilledFrom(nameMatch.category.categoryName);
@@ -150,7 +150,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
     setIsFetchingHSN(true);
     try {
       // First, check if HSN matches a category
-      const categoryMatch = await findCategoryByHSN(hsn);
+      const categoryMatch = await findCategoryByHSN(companyId, hsn);
       if (categoryMatch) {
         setValue('productName', categoryMatch.product.name);
         setValue('gstRate', categoryMatch.category.defaultGstRate);
@@ -182,11 +182,31 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   const handleFormSubmit = async (data: ProductFormData) => {
     setIsLoading(true);
     try {
-      await onSubmit(data);
+      // Explicitly construct payload to match backend schema
+      const productData = {
+        productName: data.productName,
+        description: data.description || null,
+        itemCode: data.itemCode || null,
+        hsn: data.hsn || null,
+        unit: data.unit,
+        price: data.price,
+        gstRate: data.gstRate,
+        cessRate: data.cessRate || 0,
+        stock: data.stock || 0,
+        type: data.type,
+        hasSerialNumber: data.hasSerialNumber || false,
+      };
+
+      await onSubmit(productData as any);
       toast.success(product ? 'Product updated successfully' : 'Product created successfully');
-    } catch (error) {
-      toast.error('Failed to save product');
-      console.error(error);
+    } catch (error: any) {
+      console.error('Error saving product:', error);
+      const errorMessage = error.response?.data?.detail 
+        ? (Array.isArray(error.response.data.detail) 
+            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
+            : error.response.data.detail)
+        : 'Failed to save product';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

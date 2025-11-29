@@ -26,7 +26,7 @@ type ClientFormData = z.infer<typeof clientFormSchema>;
 
 interface ClientFormProps {
   client?: Client;
-  companyId: string;
+  companyId?: string; // Optional as clients are global
   onSubmit: (data: ClientFormData) => Promise<void>;
   onCancel?: () => void;
 }

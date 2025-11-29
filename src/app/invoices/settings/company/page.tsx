@@ -20,12 +20,14 @@ import { z } from 'zod';
 import { companyFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useAppData } from '@/contexts/AppDataContext';
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 
 export default function CompanySettingsPage() {
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, loading: isLoading, loadCompanies, addCompany, updateCompany: updateCompanyInStore, removeCompany } = useCompanies();
+  const { refreshCompanies } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -35,6 +37,13 @@ export default function CompanySettingsPage() {
   useEffect(() => {
     loadCompanies();
   }, []);
+
+  // Auto-open form if no companies exist
+  useEffect(() => {
+    if (!isLoading && companies.length === 0) {
+      setIsFormOpen(true);
+    }
+  }, [isLoading, companies]);
 
   const handleCreateCompany = () => {
     setEditingCompany(undefined);
@@ -57,6 +66,7 @@ export default function CompanySettingsPage() {
     try {
       await companiesApi.delete(companyToDelete);
       removeCompany(companyToDelete); // Update global store
+      await refreshCompanies(); // Refresh AppDataContext
       toast.success('Company deleted successfully');
       
       // If deleted company was selected, select another one
@@ -127,6 +137,7 @@ export default function CompanySettingsPage() {
         const updatedCompany = await companiesApi.update(editingCompany.id, cleanedData);
         
         updateCompanyInStore(editingCompany.id, updatedCompany); // Update global store
+        await refreshCompanies(); // Refresh AppDataContext
         
         // CRITICAL FIX: Update selectedCompany if it's the one being edited
         if (selectedCompany?.id === editingCompany.id) {
@@ -141,6 +152,7 @@ export default function CompanySettingsPage() {
         const newCompany = await companiesApi.create(cleanedData);
         console.log('Created company with ID:', newCompany.id);
         addCompany(newCompany); // Add to global store
+        await refreshCompanies(); // Refresh AppDataContext
         
         // Set as selected if it's the first company
         if (companies.length === 0) {
@@ -184,6 +196,16 @@ export default function CompanySettingsPage() {
               Add Company
             </Button>
           </PageHeader>
+
+          {companies.length === 0 && !isLoading && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
+              <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Welcome! Let's get started.</h3>
+              <p className="text-yellow-700 dark:text-yellow-300">
+                You need to create a company profile before you can start creating invoices. 
+                Please click the "Add Company" button or fill out the form that just opened.
+              </p>
+            </div>
+          )}
 
           <CompanyList
             companies={companies}

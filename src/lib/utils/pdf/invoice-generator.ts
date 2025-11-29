@@ -103,7 +103,7 @@ export async function generateInvoicePDF(data: InvoicePDFData): Promise<void> {
       buildInvoiceInfo(invoice, customization, 'invoice'),
 
       // Billing and Shipping Address
-      buildAddressSection(client, customization),
+      buildAddressSection(client, customization, invoice),
 
       // Items Table
       buildItemsTable(invoice.items, customization),
@@ -169,7 +169,7 @@ export async function previewInvoicePDF(data: InvoicePDFData): Promise<void> {
       buildInvoiceInfo(invoice, customization, 'invoice'),
 
       // Billing and Shipping Address
-      buildAddressSection(client, customization),
+      buildAddressSection(client, customization, invoice),
 
       // Items Table
       buildItemsTable(invoice.items, customization),

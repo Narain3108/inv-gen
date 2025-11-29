@@ -10,8 +10,9 @@ export const customizationsApi = {
   /**
    * Get customization for a company (returns single object, not array)
    */
-  getByCompanyId: async (companyId: string): Promise<InvoiceCustomization> => {
-    return apiClient.get<InvoiceCustomization>(`/companies/${companyId}/customizations`);
+  getByCompanyId: async (companyId: string, type: 'invoice' | 'quotation' = 'invoice'): Promise<InvoiceCustomization> => {
+    // Backend will use x-user-id to find user, then companyId to find company
+    return apiClient.get<InvoiceCustomization>(`/companies/${companyId}/customizations?type=${type}`);
   },
 
   /**

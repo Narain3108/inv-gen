@@ -156,7 +156,7 @@ export interface ProductFormData {
 
 export interface Client {
   id: string;
-  companyId: string;
+  companyId?: string; // Optional now as clients are global
   clientName: string;
   gstin?: string;
   address: Address;
@@ -165,6 +165,7 @@ export interface Client {
   bankDetails?: BankDetails;
   billingAddress?: Address;
   shippingAddress?: Address;
+  shippingAddresses?: Address[];
   autoFetched?: boolean;
   createdAt: string | Date;
   updatedAt?: string | Date;
@@ -227,9 +228,11 @@ export type InvoicePaymentStatus = 'pending' | 'partially_paid' | 'paid';
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  referenceNumber?: string;
   companyId: string;
   clientId: string;
   date: string | Date;
+  shippingAddress?: Address;
   items: InvoiceItem[];
   totalAmount: number;
   totalAmountInWords: string;
@@ -271,6 +274,7 @@ export interface Quotation {
   date: string | Date;
   validUntil: string | Date; // Validity period for quotation
   status: QuotationStatus;
+  shippingAddress?: Address;
   items: InvoiceItem[]; // Same structure as invoice items
   totalAmount: number;
   totalAmountInWords: string;

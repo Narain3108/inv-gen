@@ -2,13 +2,13 @@
  * PDF Address Section Builder
  */
 
-import { Client } from '@/types';
+import { Client, Invoice, Quotation } from '@/types';
 import { InvoiceCustomization } from '@/types/customization';
 
 /**
  * Build billing and shipping address section
  */
-export const buildAddressSection = (client: Client, customization?: InvoiceCustomization): any => {
+export const buildAddressSection = (client: Client, customization?: InvoiceCustomization, document?: Invoice | Quotation): any => {
   const showBilling = customization?.addresses?.showBillingAddress !== false;
   const showShipping = customization?.addresses?.showShippingAddress !== false;
   const showGSTIN = customization?.addresses?.showGSTIN !== false;
@@ -17,6 +17,10 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
 
   const billingLabel = customization?.addresses?.billingLabel || 'BILLING ADDRESS';
   const shippingLabel = customization?.addresses?.shippingLabel || 'SHIPPING ADDRESS';
+
+  // Use shipping address from document if available, otherwise fallback to client's shipping address, then client's main address
+  const shippingAddress = document?.shippingAddress || client.shippingAddress || client.address;
+  const billingAddress = client.billingAddress || client.address;
 
   return {
     columns: [
@@ -38,14 +42,12 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
             margin: [0, 0, 0, 4]
           },
           {
-            text: client.billingAddress?.street || client.address.street,
+            text: billingAddress.street,
             fontSize: 9,
             margin: [0, 0, 0, 2]
           },
           {
-            text: client.billingAddress
-              ? `${client.billingAddress.city}, ${client.billingAddress.state} - ${client.billingAddress.pincode}`
-              : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+            text: `${billingAddress.city}, ${billingAddress.state} - ${billingAddress.pincode}`,
             fontSize: 9,
             margin: [0, 0, 0, 3]
           },
@@ -65,7 +67,7 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
             margin: [0, 0, 0, 2]
           }] : []),
           {
-            text: `Place of Supply: ${client.billingAddress?.state || client.address.state}`,
+            text: `Place of Supply: ${billingAddress.state}`,
             fontSize: 9,
             margin: [0, 3, 0, 0],
             bold: true,
@@ -92,14 +94,12 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
             margin: [0, 0, 0, 4]
           },
           {
-            text: client.shippingAddress?.street || client.address.street,
+            text: shippingAddress.street,
             fontSize: 9,
             margin: [0, 0, 0, 2]
           },
           {
-            text: client.shippingAddress
-              ? `${client.shippingAddress.city}, ${client.shippingAddress.state} - ${client.shippingAddress.pincode}`
-              : `${client.address.city}, ${client.address.state} - ${client.address.pincode}`,
+            text: `${shippingAddress.city}, ${shippingAddress.state} - ${shippingAddress.pincode}`,
             fontSize: 9,
             margin: [0, 0, 0, 3]
           },
@@ -119,7 +119,7 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
             margin: [0, 0, 0, 2]
           }] : []),
           {
-            text: `Place of Supply: ${client.shippingAddress?.state || client.address.state}`,
+            text: `Place of Supply: ${shippingAddress.state}`,
             fontSize: 9,
             margin: [0, 3, 0, 0],
             bold: true,

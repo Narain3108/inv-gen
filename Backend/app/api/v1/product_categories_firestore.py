@@ -1,12 +1,13 @@
 """
 Firestore-based Product Categories API
-Product Categories is a SUBCOLLECTION under companies: companies/{companyId}/productCategories
+Product Categories are nested under Users: users/{uid}/product_categories
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.deps import get_current_user_id
 from datetime import datetime
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Convert Firestore datetime objects to ISO format strings"""
     result = {}
     for key, value in doc_dict.items():
-        if hasattr(value, 'isoformat'):  # datetime object
+        if hasattr(value, "isoformat"):  # datetime object
             result[key] = value.isoformat()
         elif isinstance(value, dict):
             result[key] = serialize_firestore_doc(value)
@@ -41,7 +42,6 @@ class ProductCategoryCreate(BaseModel):
 
 class ProductCategoryOut(BaseModel):
     id: str
-    company_id: Optional[str] = None
     name: Optional[str] = Field(None, alias="categoryName")
     description: Optional[str] = None
     products: Optional[List[Dict[str, Any]]] = None
@@ -55,130 +55,125 @@ class ProductCategoryOut(BaseModel):
         populate_by_name = True
 
 
-@router.post("/companies/{company_id}/product-categories", response_model=ProductCategoryOut)
-async def create_product_category(company_id: str, category: ProductCategoryCreate):
-    """Create a new product category in Firestore (Subcollection under company)"""
+@router.post("", response_model=ProductCategoryOut)
+async def create_product_category(
+    category: ProductCategoryCreate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Create a new product category for the current user"""
     try:
         db = get_firestore_db()
         
-        # Verify company exists
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
+        category_data = category.dict(by_alias=True, exclude_unset=True)
+        category_data["created_at"] = datetime.utcnow().isoformat()
+        category_data["updated_at"] = datetime.utcnow().isoformat()
         
-        category_data = {
-            "company_id": company_id,
-            "name": category.name,
-            "description": category.description,
-            "products": category.products or [],
-            "default_gst_rate": category.default_gst_rate,
-            "color": category.color or "#6366f1",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        # Add to user"s product_categories collection
+        doc_ref = db.collection("users").document(user_id).collection("product_categories").document()
+        doc_ref.set(category_data)
         
-        # Add to subcollection: companies/{companyId}/productCategories
-        timestamp, doc_ref = db.collection("companies").document(company_id)\
-            .collection("productCategories").add(category_data)
-        category_id = doc_ref.id
+        # Return the created category
+        category_data["id"] = doc_ref.id
+        return serialize_firestore_doc(category_data)
         
-        return {"id": category_id, **category_data}
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating product category: {str(e)}")
 
 
-@router.get("/companies/{company_id}/product-categories", response_model=List[ProductCategoryOut])
-async def list_product_categories(company_id: str, skip: int = 0, limit: int = 50):
-    """Get all product categories from a company's subcollection"""
+@router.get("", response_model=List[ProductCategoryOut])
+async def list_product_categories(
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get all product categories for the current user"""
     try:
         db = get_firestore_db()
-        
-        # Verify company exists
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
-        
-        query = db.collection("companies").document(company_id)\
-            .collection("productCategories")\
-            .order_by("name").limit(limit).offset(skip)
+        categories_ref = db.collection("users").document(user_id).collection("product_categories")
+        docs = categories_ref.stream()
         
         categories = []
-        for doc in query.stream():
+        for doc in docs:
             category_data = doc.to_dict()
-            categories.append({"id": doc.id, **serialize_firestore_doc(category_data)})
-        
+            category_data["id"] = doc.id
+            categories.append(serialize_firestore_doc(category_data))
+            
         return categories
-    except HTTPException:
-        raise
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing product categories: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching product categories: {str(e)}")
 
 
-@router.get("/companies/{company_id}/product-categories/{category_id}", response_model=ProductCategoryOut)
-async def get_product_category(company_id: str, category_id: str):
-    """Get a specific product category from a company's subcollection"""
+@router.get("/{category_id}", response_model=ProductCategoryOut)
+async def get_product_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get a specific product category for the current user"""
     try:
         db = get_firestore_db()
-        
-        doc = db.collection("companies").document(company_id)\
-            .collection("productCategories").document(category_id).get()
+        doc_ref = db.collection("users").document(user_id).collection("product_categories").document(category_id)
+        doc = doc_ref.get()
         
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Product category not found")
+            
+        category_data = doc.to_dict()
+        category_data["id"] = doc.id
+        return serialize_firestore_doc(category_data)
         
-        return {"id": doc.id, **serialize_firestore_doc(doc.to_dict())}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting product category: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching product category: {str(e)}")
 
 
-@router.put("/companies/{company_id}/product-categories/{category_id}", response_model=ProductCategoryOut)
-async def update_product_category(company_id: str, category_id: str, category: ProductCategoryCreate):
-    """Update a product category in a company's subcollection"""
+@router.put("/{category_id}", response_model=ProductCategoryOut)
+async def update_product_category(
+    category_id: str,
+    category_update: ProductCategoryCreate,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Update a product category for the current user"""
     try:
         db = get_firestore_db()
-        
-        doc_ref = db.collection("companies").document(company_id)\
-            .collection("productCategories").document(category_id)
+        doc_ref = db.collection("users").document(user_id).collection("product_categories").document(category_id)
         
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Product category not found")
-        
-        update_data = {
-            "name": category.name,
-            "description": category.description,
-            "color": category.color or "#6366f1",
-            "updated_at": datetime.utcnow().isoformat()
-        }
+            
+        update_data = category_update.dict(by_alias=True, exclude_unset=True)
+        update_data["updated_at"] = datetime.utcnow().isoformat()
         
         doc_ref.update(update_data)
-        updated_doc = doc_ref.get()
         
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
+        updated_doc = doc_ref.get()
+        category_data = updated_doc.to_dict()
+        category_data["id"] = updated_doc.id
+        return serialize_firestore_doc(category_data)
+        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating product category: {str(e)}")
 
 
-@router.delete("/companies/{company_id}/product-categories/{category_id}")
-async def delete_product_category(company_id: str, category_id: str):
-    """Delete a product category from a company's subcollection"""
+@router.delete("/{category_id}")
+async def delete_product_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a product category for the current user"""
     try:
         db = get_firestore_db()
-        
-        doc_ref = db.collection("companies").document(company_id)\
-            .collection("productCategories").document(category_id)
+        doc_ref = db.collection("users").document(user_id).collection("product_categories").document(category_id)
         
         if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Product category not found")
-        
+            
         doc_ref.delete()
-        return {"message": "Product category deleted successfully", "id": category_id}
+        return {"message": "Product category deleted successfully"}
+        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting product category: {str(e)}")
+

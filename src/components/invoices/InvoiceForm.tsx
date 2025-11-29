@@ -9,20 +9,21 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { invoiceFormSchema } from '@/lib/validations';
-import { Invoice, Product, Client, Company, InvoiceItem } from '@/types';
+import { Invoice, Product, Client, Company, InvoiceItem, Address } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate, formatClientDropdownLabel } from '@/utils/formatters';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
+import { clientsApi } from '@/lib/api/clients.api';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -53,6 +54,17 @@ export function InvoiceForm({
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [serialNumbers, setSerialNumbers] = useState<Record<number, string[]>>({});
   const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
+  
+  // Shipping Address State
+  const [shippingAddressMode, setShippingAddressMode] = useState<'default' | 'select' | 'new'>('default');
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
+  const [newShippingAddress, setNewShippingAddress] = useState<Address>({
+    street: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
+  });
 
   const {
     register,
@@ -65,6 +77,7 @@ export function InvoiceForm({
     resolver: zodResolver(invoiceFormSchema) as any,
     defaultValues: invoice ? {
       invoiceNumber: invoice.invoiceNumber,
+      referenceNumber: invoice.referenceNumber || '',
       clientId: invoice.clientId,
       date: (() => {
         if (!invoice.date) return new Date().toISOString().split('T')[0];
@@ -132,6 +145,16 @@ export function InvoiceForm({
     if (watchClientId) {
       const client = clients.find(c => c.id === watchClientId);
       setSelectedClient(client || null);
+      // Reset shipping address selection
+      setShippingAddressMode('default');
+      setSelectedAddressIndex('default');
+      setNewShippingAddress({
+        street: '',
+        city: '',
+        state: '',
+        pincode: '',
+        country: 'India',
+      });
     } else {
       setSelectedClient(null);
     }
@@ -311,21 +334,67 @@ export function InvoiceForm({
       return;
     }
 
+    // Determine Shipping Address
+    let finalShippingAddress = selectedClient?.shippingAddress;
+
+    if (shippingAddressMode === 'select' && selectedClient?.shippingAddresses) {
+      const index = parseInt(selectedAddressIndex);
+      if (!isNaN(index) && selectedClient.shippingAddresses[index]) {
+        finalShippingAddress = selectedClient.shippingAddresses[index];
+      }
+    } else if (shippingAddressMode === 'new') {
+      // Validate new address
+      if (!newShippingAddress.street || !newShippingAddress.city || !newShippingAddress.state || !newShippingAddress.pincode) {
+        toast.error('Please fill in all shipping address fields');
+        return;
+      }
+      finalShippingAddress = newShippingAddress;
+      
+      // Update client with new address
+      if (selectedClient) {
+        try {
+          const updatedAddresses = [...(selectedClient.shippingAddresses || []), newShippingAddress];
+          // We don't await this to block invoice creation, but we should probably await it to ensure data consistency
+          // Or we can fire and forget, but let's await to be safe
+          await clientsApi.update(selectedClient.id, { shippingAddresses: updatedAddresses });
+        } catch (err) {
+          console.error('Failed to update client shipping addresses', err);
+          toast.warning('Failed to save new shipping address to client profile');
+        }
+      }
+    }
+
     setIsLoading(true);
     try {
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
+        referenceNumber: data.referenceNumber,
         clientId: data.clientId,
         date: data.date,
         companyId,
-        ...totals,
+        shippingAddress: finalShippingAddress,
+        items: totals.items,
+        taxableAmount: totals.taxableAmount,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        totalAmount: totals.totalAmount,
+        totalAmountInWords: totals.totalAmountInWords,
+        taxBreakdown: totals.taxBreakdown,
+        status: 'draft',
+        paymentStatus: 'unpaid',
       };
 
       await onSubmit(invoiceData as any);
       toast.success(invoice ? 'Invoice updated successfully' : 'Invoice created successfully');
-    } catch (error) {
-      toast.error('Failed to save invoice');
-      console.error(error);
+    } catch (error: any) {
+      console.error('Error saving invoice:', error);
+      const errorMessage = error.response?.data?.detail 
+        ? (Array.isArray(error.response.data.detail) 
+            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
+            : error.response.data.detail)
+        : 'Failed to save invoice';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -356,8 +425,21 @@ export function InvoiceForm({
               )}
             </div>
 
-            {/* Client Selection */}
+            {/* Reference Number */}
             <div className="space-y-2">
+              <Label htmlFor="referenceNumber">Reference Number</Label>
+              <Input
+                id="referenceNumber"
+                {...register('referenceNumber')}
+                placeholder="Optional (e.g. PO Number)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional reference
+              </p>
+            </div>
+
+            {/* Client Selection */}
+            <div className="space-y-2 col-span-2">
               <Label htmlFor="clientId">Client *</Label>
               <Select
                 value={watch('clientId') || ''}
@@ -380,6 +462,95 @@ export function InvoiceForm({
                 <p className="text-sm text-red-500">{errors.clientId.message}</p>
               )}
             </div>
+
+            {/* Shipping Address Selection */}
+            {selectedClient && (
+              <div className="col-span-2 space-y-3 border rounded-md p-3 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Shipping Address
+                  </Label>
+                  <Select
+                    value={shippingAddressMode}
+                    onValueChange={(val: any) => setShippingAddressMode(val)}
+                  >
+                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default Address</SelectItem>
+                      {selectedClient.shippingAddresses && selectedClient.shippingAddresses.length > 0 && (
+                        <SelectItem value="select">Select Saved Address</SelectItem>
+                      )}
+                      <SelectItem value="new">Add New Address</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {shippingAddressMode === 'default' && (
+                  <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
+                    {selectedClient.shippingAddress ? (
+                      <>
+                        <p>{selectedClient.shippingAddress.street}</p>
+                        <p>{selectedClient.shippingAddress.city}, {selectedClient.shippingAddress.state} - {selectedClient.shippingAddress.pincode}</p>
+                        <p>{selectedClient.shippingAddress.country}</p>
+                      </>
+                    ) : (
+                      <p className="italic">Using billing address as shipping address</p>
+                    )}
+                  </div>
+                )}
+
+                {shippingAddressMode === 'select' && selectedClient.shippingAddresses && (
+                  <Select
+                    value={selectedAddressIndex}
+                    onValueChange={setSelectedAddressIndex}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an address" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedClient.shippingAddresses.map((addr, idx) => (
+                        <SelectItem key={idx} value={idx.toString()}>
+                          {addr.street}, {addr.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {shippingAddressMode === 'new' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input 
+                      placeholder="Street" 
+                      value={newShippingAddress.street}
+                      onChange={(e) => setNewShippingAddress({...newShippingAddress, street: e.target.value})}
+                      className="col-span-2"
+                    />
+                    <Input 
+                      placeholder="City" 
+                      value={newShippingAddress.city}
+                      onChange={(e) => setNewShippingAddress({...newShippingAddress, city: e.target.value})}
+                    />
+                    <Input 
+                      placeholder="State" 
+                      value={newShippingAddress.state}
+                      onChange={(e) => setNewShippingAddress({...newShippingAddress, state: e.target.value})}
+                    />
+                    <Input 
+                      placeholder="Pincode" 
+                      value={newShippingAddress.pincode}
+                      onChange={(e) => setNewShippingAddress({...newShippingAddress, pincode: e.target.value})}
+                    />
+                    <Input 
+                      placeholder="Country" 
+                      value={newShippingAddress.country}
+                      onChange={(e) => setNewShippingAddress({...newShippingAddress, country: e.target.value})}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4">

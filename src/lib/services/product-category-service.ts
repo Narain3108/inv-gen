@@ -1,17 +1,18 @@
 /**
  * Product Category Service
- * Manages product categories (per company subcollection)
+ * Manages product categories (Global for User)
  */
 
 import { categoriesApi } from '@/lib/api/categories.api';
 import { ProductCategory, ProductCategoryFormData, CategoryProduct } from '@/types';
 
 /**
- * Fetch all product categories for a company
+ * Fetch all product categories (Global)
  */
-export async function fetchProductCategories(companyId: string): Promise<ProductCategory[]> {
+export async function fetchProductCategories(companyId?: string): Promise<ProductCategory[]> {
   try {
-    return await categoriesApi.getByCompanyId(companyId);
+    // companyId is ignored as categories are now global
+    return await categoriesApi.getAll();
   } catch (error) {
     console.error('Error fetching product categories:', error);
     throw error;
@@ -22,11 +23,11 @@ export async function fetchProductCategories(companyId: string): Promise<Product
  * Create a new product category
  */
 export async function createProductCategory(
-  companyId: string,
+  companyId: string, // Kept for compatibility but ignored
   data: ProductCategoryFormData
 ): Promise<string> {
   try {
-    const category = await categoriesApi.create(companyId, {
+    const category = await categoriesApi.create({
       categoryName: data.categoryName,
       description: data.description || '',
       products: data.products || [],
@@ -45,12 +46,12 @@ export async function createProductCategory(
  * Update an existing product category
  */
 export async function updateProductCategory(
-  companyId: string,
+  companyId: string, // Kept for compatibility but ignored
   id: string,
   data: ProductCategoryFormData
 ): Promise<void> {
   try {
-    await categoriesApi.update(companyId, id, {
+    await categoriesApi.update(id, {
       categoryName: data.categoryName,
       description: data.description || '',
       products: data.products || [],
@@ -69,7 +70,7 @@ export async function updateProductCategory(
  */
 export async function deleteProductCategory(companyId: string, id: string): Promise<void> {
   try {
-    await categoriesApi.delete(companyId, id);
+    await categoriesApi.delete(id);
     console.log('✅ Deleted product category:', id);
   } catch (error) {
     console.error('Error deleting product category:', error);
@@ -81,7 +82,7 @@ export async function deleteProductCategory(companyId: string, id: string): Prom
  * Find category by HSN code
  * Returns the category and matched product if found
  */
-export async function findCategoryByHSN(companyId: string, hsn: string): Promise<{
+export async function findCategoryByHSN(companyId: string | undefined, hsn: string): Promise<{
   category: ProductCategory;
   product: CategoryProduct;
 } | null> {
@@ -109,7 +110,7 @@ export async function findCategoryByHSN(companyId: string, hsn: string): Promise
  * Find category by product name
  * Returns the category and matched product if found
  */
-export async function findCategoryByProductName(companyId: string, name: string): Promise<{
+export async function findCategoryByProductName(companyId: string | undefined, name: string): Promise<{
   category: ProductCategory;
   product: CategoryProduct;
 } | null> {
@@ -139,7 +140,7 @@ export async function findCategoryByProductName(companyId: string, name: string)
  * Returns the GST rate if a matching category is found, otherwise null
  */
 export async function getSuggestedGSTRate(
-  companyId: string,
+  companyId: string | undefined,
   hsn?: string,
   productName?: string
 ): Promise<number | null> {

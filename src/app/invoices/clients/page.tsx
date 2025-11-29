@@ -61,8 +61,14 @@ function ClientsContent() {
 
     try {
       // Clients are global in backend
+      // Sanitize data to match backend expectations
       const clientData = {
         ...data,
+        billingAddress: data.billingAddress || null,
+        shippingAddress: data.shippingAddress || null,
+        bankDetails: data.bankDetails || null,
+        gstin: data.gstin || null,
+        pan: data.pan || null,
       };
 
       if (editingClient) {
@@ -77,8 +83,14 @@ function ClientsContent() {
 
       handleCloseForm();
       await refreshClients();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving client:', error);
+      const errorMessage = error.response?.data?.detail 
+        ? (Array.isArray(error.response.data.detail) 
+            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
+            : error.response.data.detail)
+        : 'Failed to save client';
+      toast.error(errorMessage);
       throw error;
     }
   };

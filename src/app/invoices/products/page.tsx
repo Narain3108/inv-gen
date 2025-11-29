@@ -106,7 +106,7 @@ function ProductsContent() {
     if (!deletingProduct) return;
 
     try {
-      await productsApi.delete(deletingProduct.id);
+      await productsApi.delete(deletingProduct.id, deletingProduct.companyId);
       toast.success('Product deleted successfully');
       setDeletingProduct(null);
       await refreshProducts();

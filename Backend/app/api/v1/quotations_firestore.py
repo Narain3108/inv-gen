@@ -1,12 +1,13 @@
 """
 Firestore-based Quotations API
-Quotations is a SUBCOLLECTION under companies: companies/{companyId}/quotations
+Quotations are nested under Companies: users/{uid}/companies/{cid}/quotations
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.deps import get_current_user_id
 from datetime import datetime
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Convert Firestore datetime objects to ISO format strings"""
     result = {}
     for key, value in doc_dict.items():
-        if hasattr(value, 'isoformat'):  # datetime object
+        if hasattr(value, "isoformat"):  # datetime object
             result[key] = value.isoformat()
         elif isinstance(value, dict):
             result[key] = serialize_firestore_doc(value)
@@ -54,10 +55,11 @@ class QuotationItemCreate(BaseModel):
 
 class QuotationCreate(BaseModel):
     client_id: str = Field(..., alias="clientId")
-    company_id: Optional[str] = Field(None, alias="companyId")
+    company_id: str = Field(..., alias="companyId") # Required for nesting
     quotation_number: Optional[str] = Field(None, alias="quotationNumber")
     date: Optional[str] = None
     valid_until: Optional[str] = Field(None, alias="validUntil")
+    shipping_address: Optional[Dict[str, Any]] = Field(None, alias="shippingAddress")
     items: List[QuotationItemCreate]
     notes: Optional[str] = None
     terms: Optional[str] = None
@@ -82,6 +84,7 @@ class QuotationUpdate(BaseModel):
     quotation_number: Optional[str] = Field(None, alias="quotationNumber")
     date: Optional[str] = None
     valid_until: Optional[str] = Field(None, alias="validUntil")
+    shipping_address: Optional[Dict[str, Any]] = Field(None, alias="shippingAddress")
     items: Optional[List[QuotationItemCreate]] = None
     notes: Optional[str] = None
     terms: Optional[str] = None
@@ -99,6 +102,7 @@ class QuotationOut(BaseModel):
     quotation_number: Optional[str] = Field(None, alias="quotationNumber")
     date: Optional[str] = None
     valid_until: Optional[str] = Field(None, alias="validUntil")
+    shipping_address: Optional[Dict[str, Any]] = Field(None, alias="shippingAddress")
     items: Optional[List[dict]] = None
     subtotal: Optional[float] = None
     tax_total: Optional[float] = Field(None, alias="taxTotal")
@@ -108,6 +112,7 @@ class QuotationOut(BaseModel):
     notes: Optional[str] = None
     terms: Optional[str] = None
     status: Optional[str] = None
+    converted_to_invoice_id: Optional[str] = Field(None, alias="convertedToInvoiceId")
     created_at: Optional[str] = Field(None, alias="createdAt")
     updated_at: Optional[str] = Field(None, alias="updatedAt")
     
@@ -116,543 +121,265 @@ class QuotationOut(BaseModel):
         populate_by_name = True
 
 
-def calculate_quotation_totals(items: List[QuotationItemCreate]) -> dict:
-    """Calculate quotation totals with GST"""
-    subtotal = 0
-    tax_total = 0
-    
-    calculated_items = []
-    for item in items:
-        item_total = (item.quantity * item.unit_price) - item.discount
-        
-        # Calculate taxes
-        gst_amount = item_total * (item.gst_rate / 100)
-        cess_amount = item_total * (item.cess_rate / 100)
-        item_tax = gst_amount + cess_amount
-        
-        subtotal += item_total
-        tax_total += item_tax
-        
-        calculated_items.append({
-            "description": item.description,
-            "hsn": item.hsn,
-            "quantity": item.quantity,
-            "unit": item.unit,
-            "unit_price": item.unit_price,
-            "discount": item.discount,
-            "gst_rate": item.gst_rate,
-            "cess_rate": item.cess_rate,
-            "product_id": item.product_id,
-            "item_code": item.item_code,
-            "serial_numbers": item.serial_numbers,
-            "item_total": item_total,
-            "tax_amount": item_tax,
-            "total_with_tax": item_total + item_tax,
-            "cgst": gst_amount / 2,
-            "sgst": gst_amount / 2,
-            "igst": 0,
-            "cess": cess_amount
-        })
-    
-    return {
-        "items": calculated_items,
-        "subtotal": subtotal,
-        "tax_total": tax_total,
-        "grand_total": subtotal + tax_total,
-        "total_amount": subtotal + tax_total
-    }
-
-
-@router.get("/quotations", response_model=List[QuotationOut])
-async def list_all_quotations(
-    company_id: Optional[str] = None,
-    client_id: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50
+@router.post("", response_model=QuotationOut)
+async def create_quotation(
+    quotation: QuotationCreate,
+    user_id: str = Depends(get_current_user_id)
 ):
-    """Get quotations from top-level collection filtered by companyId (Frontend compatibility)"""
+    """Create a new quotation nested under a company"""
     try:
         db = get_firestore_db()
         
-        query_ref = db.collection("quotations")
+        quotation_data = quotation.dict(by_alias=True, exclude_unset=True)
+        quotation_data["createdAt"] = datetime.utcnow()
+        quotation_data["updatedAt"] = datetime.utcnow()
+        quotation_data["user_id"] = user_id # Store user_id for collection group queries
+        
+        # Add to users/{uid}/companies/{cid}/quotations
+        doc_ref = db.collection("users").document(user_id)\
+            .collection("companies").document(quotation.company_id)\
+            .collection("quotations").document()
+            
+        # Store ID in the document
+        quotation_data["id"] = doc_ref.id
+        
+        doc_ref.set(quotation_data)
+        
+        return serialize_firestore_doc(quotation_data)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating quotation: {str(e)}")
+
+
+@router.get("", response_model=List[QuotationOut])
+async def get_quotations(
+    company_id: Optional[str] = Query(None, alias="company_id"),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get quotations. If company_id is provided, fetch from that company. Else fetch all user quotations."""
+    try:
+        db = get_firestore_db()
+        quotations = []
+        
+        # Handle both snake_case and camelCase
+        target_company_id = company_id or companyId
+        
+        if target_company_id:
+            # Fetch from specific company
+            quotations_ref = db.collection("users").document(user_id)\
+                .collection("companies").document(target_company_id)\
+                .collection("quotations")
+            docs = quotations_ref.stream()
+            for doc in docs:
+                data = doc.to_dict()
+                data["id"] = doc.id
+                quotations.append(serialize_firestore_doc(data))
+        else:
+            # Fetch all quotations for user using Collection Group Query
+            quotations_query = db.collection_group("quotations").where("user_id", "==", user_id)
+            docs = quotations_query.stream()
+            for doc in docs:
+                data = doc.to_dict()
+                data["id"] = doc.id
+                quotations.append(serialize_firestore_doc(data))
+            
+        return quotations
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quotations: {str(e)}")
+
+
+@router.get("/{quotation_id}", response_model=QuotationOut)
+async def get_quotation(
+    quotation_id: str,
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get a specific quotation by ID. Provide companyId for faster, index-free lookup."""
+    try:
+        db = get_firestore_db()
         
         if company_id:
-            query_ref = query_ref.where("companyId", "==", company_id)
-        
-        if client_id:
-            query_ref = query_ref.where("clientId", "==", client_id)
-        
-        # Note: orderBy removed to avoid composite index requirement
-        # Frontend should handle sorting if needed
-        query_ref = query_ref.limit(limit).offset(skip)
-        quotations = []
-        
-        for doc in query_ref.stream():
-            quotation_data = doc.to_dict()
-            # Backfill totalAmount for frontend compatibility
-            if "totalAmount" not in quotation_data and "grandTotal" in quotation_data:
-                quotation_data["totalAmount"] = quotation_data["grandTotal"]
-            elif "total_amount" not in quotation_data and "grand_total" in quotation_data:
-                quotation_data["total_amount"] = quotation_data["grand_total"]
+            # Direct lookup
+            doc_ref = db.collection("users").document(user_id)\
+                .collection("companies").document(company_id)\
+                .collection("quotations").document(quotation_id)
+            doc = doc_ref.get()
+            
+            if not doc.exists:
+                raise HTTPException(status_code=404, detail="Quotation not found")
                 
-            quotations.append({"id": doc.id, **serialize_firestore_doc(quotation_data)})
-        
-        return quotations
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing quotations: {str(e)}")
-
-
-@router.post("/quotations", response_model=QuotationOut)
-async def create_quotation_toplevel(quotation: QuotationCreate):
-    """Create quotation in top-level collection (Frontend compatibility)"""
-    try:
-        db = get_firestore_db()
-        
-        # Extract company_id from request
-        company_id = quotation.company_id
-        if not company_id:
-            raise HTTPException(status_code=400, detail="company_id is required")
-        
-        # Verify company exists
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
-        
-        # Calculate totals
-        calculations = calculate_quotation_totals(quotation.items)
-        
-        # Generate quotation number
-        # Get all quotations for company and find max number (avoid composite index)
-        all_quotations = db.collection("quotations")\
-            .where("companyId", "==", company_id)\
-            .stream()
-        
-        last_num = 0
-        for doc in all_quotations:
             quotation_data = doc.to_dict()
-            if quotation_data.get("quotationNumber"):
-                try:
-                    num = int(quotation_data["quotationNumber"].split("-")[-1])
-                    if num > last_num:
-                        last_num = num
-                except:
-                    pass
+            if "id" not in quotation_data:
+                quotation_data["id"] = doc.id
+            return serialize_firestore_doc(quotation_data)
+        else:
+            # Use Collection Group Query
+            query = db.collection_group("quotations")\
+                .where("user_id", "==", user_id)\
+                .where("id", "==", quotation_id)\
+                .limit(1)
+                
+            docs = list(query.stream())
+            
+            if not docs:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+                
+            quotation_data = docs[0].to_dict()
+            return serialize_firestore_doc(quotation_data)
         
-        quotation_number = f"QUO-{str(last_num + 1).zfill(3)}"
-        # Use date field, fallback to current date. Note: quotation_date is not in schema.
-        quotation_date = quotation.date or datetime.utcnow().strftime("%Y-%m-%d")
-        
-        quotation_data = {
-            "companyId": company_id,
-            "clientId": quotation.client_id,
-            "quotationNumber": quotation_number,
-            "date": quotation_date,
-            "validUntil": quotation.valid_until,
-            "items": calculations["items"],
-            "subtotal": calculations["subtotal"],
-            "taxTotal": calculations["tax_total"],
-            "grandTotal": calculations["grand_total"],
-            "totalAmount": calculations["total_amount"],
-            "notes": quotation.notes,
-            "terms": quotation.terms,
-            "status": quotation.status or "pending",
-            "createdAt": datetime.utcnow().isoformat(),
-            "updatedAt": datetime.utcnow().isoformat()
-        }
-        
-        timestamp, doc_ref = db.collection("quotations").add(quotation_data)
-        quotation_id = doc_ref.id
-        
-        return {"id": quotation_id, **quotation_data}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating quotation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/quotations/{quotation_id}", response_model=QuotationOut)
-async def get_quotation_toplevel(quotation_id: str):
-    """Get single quotation from top-level collection (Frontend compatibility)"""
-    try:
-        db = get_firestore_db()
-        doc = db.collection("quotations").document(quotation_id).get()
-        
-        if not doc.exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        
-        quotation_data = doc.to_dict()
-        # Backfill totalAmount for frontend compatibility
-        if "totalAmount" not in quotation_data and "grandTotal" in quotation_data:
-            quotation_data["totalAmount"] = quotation_data["grandTotal"]
-        elif "total_amount" not in quotation_data and "grand_total" in quotation_data:
-            quotation_data["total_amount"] = quotation_data["grand_total"]
-            
-        return {"id": doc.id, **serialize_firestore_doc(quotation_data)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting quotation: {str(e)}")
-
-
-@router.put("/quotations/{quotation_id}", response_model=QuotationOut)
-async def update_quotation_toplevel(quotation_id: str, quotation: QuotationCreate):
-    """Update quotation in top-level collection (Frontend compatibility)"""
-    try:
-        db = get_firestore_db()
-        doc_ref = db.collection("quotations").document(quotation_id)
-        
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        
-        calculations = calculate_quotation_totals(quotation.items)
-        # Use date field, fallback to current date
-        quotation_date = quotation.date or datetime.utcnow().strftime("%Y-%m-%d")
-        
-        update_data = {
-            "clientId": quotation.client_id,
-            "date": quotation_date,
-            "validUntil": quotation.valid_until,
-            "items": calculations["items"],
-            "subtotal": calculations["subtotal"],
-            "taxTotal": calculations["tax_total"],
-            "grandTotal": calculations["grand_total"],
-            "totalAmount": calculations["total_amount"],
-            "notes": quotation.notes,
-            "terms": quotation.terms,
-            "status": quotation.status or "pending",
-            "updatedAt": datetime.utcnow().isoformat()
-        }
-        
-        doc_ref.update(update_data)
-        updated_doc = doc_ref.get()
-        
-        return {"id": updated_doc.id, **serialize_firestore_doc(updated_doc.to_dict())}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating quotation: {str(e)}")
-
-
-@router.patch("/quotations/{quotation_id}", response_model=QuotationOut)
-async def patch_quotation_toplevel(quotation_id: str, quotation: QuotationUpdate):
-    """Partially update quotation in top-level collection"""
-    try:
-        db = get_firestore_db()
-        doc_ref = db.collection("quotations").document(quotation_id)
-        
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-            
-        current_data = doc.to_dict()
-        
-        # Prepare update data
-        update_data = {}
-        
-        if quotation.client_id:
-            update_data["clientId"] = quotation.client_id
-        if quotation.company_id:
-            update_data["companyId"] = quotation.company_id
-        if quotation.quotation_number:
-            update_data["quotationNumber"] = quotation.quotation_number
-        if quotation.date:
-            update_data["date"] = quotation.date
-        if quotation.valid_until:
-            update_data["validUntil"] = quotation.valid_until
-        if quotation.notes is not None:
-            update_data["notes"] = quotation.notes
-        if quotation.terms is not None:
-            update_data["terms"] = quotation.terms
-        if quotation.status:
-            update_data["status"] = quotation.status
-        if quotation.converted_to_invoice_id:
-            update_data["convertedToInvoiceId"] = quotation.converted_to_invoice_id
-            
-        if quotation.items:
-            calculations = calculate_quotation_totals(quotation.items)
-            update_data["items"] = calculations["items"]
-            update_data["subtotal"] = calculations["subtotal"]
-            update_data["taxTotal"] = calculations["tax_total"]
-            update_data["grandTotal"] = calculations["grand_total"]
-            update_data["totalAmount"] = calculations["total_amount"]
-            
-        if not update_data:
-            return {"id": doc.id, **serialize_firestore_doc(current_data)}
-            
-        update_data["updatedAt"] = datetime.utcnow().isoformat()
-        
-        doc_ref.update(update_data)
-        
-        # Merge updates into current data for response
-        updated_data = {**current_data, **update_data}
-        
-        return {"id": doc.id, **serialize_firestore_doc(updated_data)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error patching quotation: {str(e)}")
-
-
-@router.post("/quotations/{quotation_id}/convert_to_invoice")
-async def convert_to_invoice(quotation_id: str):
-    """Convert a quotation to an invoice"""
-    try:
-        db = get_firestore_db()
-        
-        # 1. Get the quotation
-        quotation_ref = db.collection("quotations").document(quotation_id)
-        quotation_doc = quotation_ref.get()
-        
-        if not quotation_doc.exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-            
-        quotation_data = quotation_doc.to_dict()
-        
-        # Check if already converted
-        if quotation_data.get("status") == "converted":
-             raise HTTPException(status_code=400, detail="Quotation already converted")
-
-        company_id = quotation_data.get("companyId")
-        if not company_id:
-             raise HTTPException(status_code=400, detail="Quotation has no company ID")
-
-        # 2. Get company for invoice numbering
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
-            
-        company_data = company_doc.to_dict()
-        invoice_numbering = company_data.get("invoiceNumbering", {})
-        
-        # 3. Generate Invoice Number
-        prefix = invoice_numbering.get("prefix", "INV-")
-        suffix = invoice_numbering.get("suffix", "")
-        # Default to 1 if nextNumber is missing
-        next_num = int(invoice_numbering.get("nextNumber", 1))
-        
-        invoice_number = f"{prefix}{str(next_num).zfill(3)}{suffix}"
-        
-        # Update nextNumber in company config
-        invoice_numbering["nextNumber"] = next_num + 1
-        db.collection("companies").document(company_id).update({
-            "invoiceNumbering": invoice_numbering
-        })
-        
-        # 4. Create Invoice Data
-        current_time = datetime.utcnow().isoformat()
-        
-        # Handle potential snake_case vs camelCase in source data
-        subtotal = float(quotation_data.get("subtotal") or 0)
-        tax_total = float(quotation_data.get("taxTotal") or quotation_data.get("tax_total") or 0)
-        grand_total = float(quotation_data.get("grandTotal") or quotation_data.get("grand_total") or 0)
-        total_amount = float(quotation_data.get("totalAmount") or quotation_data.get("total_amount") or grand_total)
-        
-        invoice_data = {
-            "companyId": company_id,
-            "clientId": quotation_data.get("clientId") or quotation_data.get("client_id"),
-            "invoiceNumber": invoice_number,
-            "date": current_time[:10], 
-            "dueDate": quotation_data.get("validUntil") or quotation_data.get("valid_until"),
-            "items": quotation_data.get("items", []),
-            "subtotal": subtotal,
-            "taxTotal": tax_total,
-            "grandTotal": grand_total,
-            "totalAmount": total_amount,
-            "notes": quotation_data.get("notes"),
-            "terms": quotation_data.get("terms"),
-            "status": "draft",
-            "paymentStatus": "unpaid",
-            "createdAt": current_time,
-            "updatedAt": current_time
-        }
-        
-        # Add to invoices TOP-LEVEL collection (to match list_all_invoices)
-        inv_ref = db.collection("invoices").document()
-        inv_ref.set(invoice_data)
-        
-        # 5. Update Quotation
-        quotation_ref.update({
-            "status": "converted",
-            "convertedToInvoiceId": inv_ref.id,
-            "updatedAt": current_time
-        })
-        
-        return {"id": inv_ref.id, **serialize_firestore_doc(invoice_data)}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error converting quotation: {str(e)}")
-
-
-@router.delete("/quotations/{quotation_id}")
-async def delete_quotation_toplevel(quotation_id: str):
-    """Delete quotation from top-level collection (Frontend compatibility)"""
-    try:
-        db = get_firestore_db()
-        doc_ref = db.collection("quotations").document(quotation_id)
-        
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        
-        doc_ref.delete()
-        return {"message": "Quotation deleted successfully", "id": quotation_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting quotation: {str(e)}")
-
-
-@router.post("/companies/{company_id}/quotations", response_model=QuotationOut)
-async def create_quotation(company_id: str, quotation: QuotationCreate):
-    """Create a new quotation in Firestore (Subcollection under company)"""
-    try:
-        db = get_firestore_db()
-        
-        # Verify company exists
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
-        
-        # Calculate totals
-        calculations = calculate_quotation_totals(quotation.items)
-        
-        # Generate quotation number if not provided
-        quotation_number = quotation.quotation_number
-        if not quotation_number:
-            # Get last quotation number for this company
-            last_quotation = db.collection("companies").document(company_id)\
-                .collection("quotations")\
-                .order_by("created_at", direction="DESCENDING")\
-                .limit(1)\
-                .stream()
-            
-            last_num = 0
-            for doc in last_quotation:
-                last_quotation_data = doc.to_dict()
-                if last_quotation_data.get("quotation_number"):
-                    try:
-                        last_num = int(last_quotation_data["quotation_number"].split("-")[-1])
-                    except:
-                        pass
-            
-            quotation_number = f"QUO-{str(last_num + 1).zfill(3)}"
-        
-        # Use either date or quotation_date field
-        quotation_date = quotation.date or quotation.quotation_date or datetime.utcnow().strftime("%Y-%m-%d")
-        
-        quotation_data = {
-            "company_id": company_id,
-            "client_id": quotation.client_id,
-            "quotation_number": quotation_number,
-            "date": quotation_date,
-            "valid_until": quotation.valid_until,
-            "items": calculations["items"],
-            "subtotal": calculations["subtotal"],
-            "tax_total": calculations["tax_total"],
-            "grand_total": calculations["grand_total"],
-            "total_amount": calculations["total_amount"],
-            "notes": quotation.notes,
-            "terms": quotation.terms,
-            "status": quotation.status or "pending",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Add to subcollection: companies/{companyId}/quotations
-        timestamp, doc_ref = db.collection("companies").document(company_id)\
-            .collection("quotations").add(quotation_data)
-        quotation_id = doc_ref.id
-        
-        return {"id": quotation_id, **quotation_data}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating quotation: {str(e)}")
-
-
-@router.get("/companies/{company_id}/quotations", response_model=List[QuotationOut])
-async def list_quotations(
-    company_id: str,
-    client_id: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50
+@router.put("/{quotation_id}", response_model=QuotationOut)
+async def update_quotation(
+    quotation_id: str, 
+    quotation_update: QuotationUpdate,
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    user_id: str = Depends(get_current_user_id)
 ):
-    """Get all quotations from a company's subcollection"""
+    """Update a quotation. Provide companyId for faster, index-free lookup."""
     try:
         db = get_firestore_db()
         
-        # Verify company exists
-        company_doc = db.collection("companies").document(company_id).get()
-        if not company_doc.exists:
-            raise HTTPException(status_code=404, detail="Company not found")
+        doc_ref = None
         
-        query = db.collection("companies").document(company_id).collection("quotations")
-        
-        if client_id:
-            query = query.where("client_id", "==", client_id)
-        
-        query = query.order_by("created_at", direction="DESCENDING").limit(limit).offset(skip)
-        quotations = []
-        
-        for doc in query.stream():
-            quotation_data = doc.to_dict()
-            # Backfill totalAmount for frontend compatibility
-            if "totalAmount" not in quotation_data and "grandTotal" in quotation_data:
-                quotation_data["totalAmount"] = quotation_data["grandTotal"]
-            elif "total_amount" not in quotation_data and "grand_total" in quotation_data:
-                quotation_data["total_amount"] = quotation_data["grand_total"]
+        if company_id:
+            doc_ref = db.collection("users").document(user_id)\
+                .collection("companies").document(company_id)\
+                .collection("quotations").document(quotation_id)
                 
-            quotations.append({"id": doc.id, **serialize_firestore_doc(quotation_data)})
-        
-        return quotations
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing quotations: {str(e)}")
-
-
-@router.get("/companies/{company_id}/quotations/{quotation_id}", response_model=QuotationOut)
-async def get_quotation(company_id: str, quotation_id: str):
-    """Get a specific quotation from a company's subcollection"""
-    try:
-        db = get_firestore_db()
-        
-        doc = db.collection("companies").document(company_id)\
-            .collection("quotations").document(quotation_id).get()
-        
-        if not doc.exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
-        
-        quotation_data = doc.to_dict()
-        # Backfill totalAmount for frontend compatibility
-        if "totalAmount" not in quotation_data and "grandTotal" in quotation_data:
-            quotation_data["totalAmount"] = quotation_data["grandTotal"]
-        elif "total_amount" not in quotation_data and "grand_total" in quotation_data:
-            quotation_data["total_amount"] = quotation_data["grand_total"]
+            if not doc_ref.get().exists:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+        else:
+            # Find the quotation first
+            query = db.collection_group("quotations")\
+                .where("user_id", "==", user_id)\
+                .where("id", "==", quotation_id)\
+                .limit(1)
+                
+            docs = list(query.stream())
             
-        return {"id": doc.id, **serialize_firestore_doc(quotation_data)}
+            if not docs:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+                
+            doc_ref = docs[0].reference
+        
+        update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
+        update_data["updatedAt"] = datetime.utcnow()
+        
+        doc_ref.update(update_data)
+        
+        updated_doc = doc_ref.get()
+        quotation_data = updated_doc.to_dict()
+        if "id" not in quotation_data:
+            quotation_data["id"] = updated_doc.id
+        return serialize_firestore_doc(quotation_data)
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting quotation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/companies/{company_id}/quotations/{quotation_id}")
-async def delete_quotation(company_id: str, quotation_id: str):
-    """Delete a quotation from a company's subcollection"""
+@router.patch("/{quotation_id}", response_model=QuotationOut)
+async def patch_quotation(
+    quotation_id: str, 
+    quotation_update: QuotationUpdate,
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Partially update a quotation. Provide companyId for faster, index-free lookup."""
     try:
         db = get_firestore_db()
         
-        doc_ref = db.collection("companies").document(company_id)\
-            .collection("quotations").document(quotation_id)
+        doc_ref = None
         
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Quotation not found")
+        if company_id:
+            doc_ref = db.collection("users").document(user_id)\
+                .collection("companies").document(company_id)\
+                .collection("quotations").document(quotation_id)
+                
+            if not doc_ref.get().exists:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+        else:
+            # Find the quotation first
+            query = db.collection_group("quotations")\
+                .where("user_id", "==", user_id)\
+                .where("id", "==", quotation_id)\
+                .limit(1)
+                
+            docs = list(query.stream())
+            
+            if not docs:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+                
+            doc_ref = docs[0].reference
         
-        doc_ref.delete()
-        return {"message": "Quotation deleted successfully", "id": quotation_id}
+        update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
+        update_data["updatedAt"] = datetime.utcnow()
+        
+        doc_ref.update(update_data)
+        
+        updated_doc = doc_ref.get()
+        quotation_data = updated_doc.to_dict()
+        if "id" not in quotation_data:
+            quotation_data["id"] = updated_doc.id
+        return serialize_firestore_doc(quotation_data)
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting quotation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{quotation_id}")
+async def delete_quotation(
+    quotation_id: str,
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a quotation. Provide companyId for faster, index-free lookup."""
+    try:
+        db = get_firestore_db()
+        
+        doc_ref = None
+        
+        if company_id:
+            doc_ref = db.collection("users").document(user_id)\
+                .collection("companies").document(company_id)\
+                .collection("quotations").document(quotation_id)
+                
+            if not doc_ref.get().exists:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+        else:
+            # Find the quotation first
+            query = db.collection_group("quotations")\
+                .where("user_id", "==", user_id)\
+                .where("id", "==", quotation_id)\
+                .limit(1)
+                
+            docs = list(query.stream())
+            
+            if not docs:
+                raise HTTPException(status_code=404, detail="Quotation not found")
+                
+            docs[0].reference.delete()
+
+        if doc_ref:
+            doc_ref.delete()
+            
+        return {"message": "Quotation deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        if "requires an index" in error_msg:
+             raise HTTPException(status_code=400, detail=f"Firestore query requires an index. Please provide 'companyId' query parameter for a direct lookup to avoid this error. Original error: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Error deleting quotation: {error_msg}")
+

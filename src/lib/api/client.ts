@@ -82,9 +82,12 @@ class ApiClient {
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      // FastAPI uses 'detail', others might use 'message'
+      const errorMessage = errorData.detail || errorData.message || response.statusText;
+      
       throw new ApiError(
         response.status,
-        errorData.message || response.statusText,
+        errorMessage,
         errorData
       );
     }
@@ -98,13 +101,25 @@ class ApiClient {
   }
 
   private getHeaders(customHeaders?: HeadersInit): HeadersInit {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+    };
+
+    // Add User ID if available (for new hierarchical DB structure)
+    if (typeof window !== 'undefined') {
+      const userId = localStorage.getItem('userId');
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
+    }
+
+    return {
+      ...headers,
       ...customHeaders,
     };
   }
 
-  async get<T>(endpoint: string, params?: Record<string, any>, transformCase = true): Promise<T> {
+  async get<T>(endpoint: string, params?: Record<string, any>, transformCase = false): Promise<T> {
     const url = new URL(`${this.baseURL}${endpoint}`);
     
     if (params) {
@@ -124,7 +139,7 @@ class ApiClient {
     return transformCase ? snakeToCamel(result) : result;
   }
 
-  async post<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+  async post<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',
@@ -136,7 +151,7 @@ class ApiClient {
     return transformCase ? snakeToCamel(result) : result;
   }
 
-  async put<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+  async put<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'PUT',
@@ -148,7 +163,7 @@ class ApiClient {
     return transformCase ? snakeToCamel(result) : result;
   }
 
-  async patch<T>(endpoint: string, data?: any, transformCase = true): Promise<T> {
+  async patch<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'PATCH',

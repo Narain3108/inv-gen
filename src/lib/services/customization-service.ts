@@ -31,7 +31,7 @@ export async function loadCustomization(
     }
 
     // Then fetch customization from API (returns single object)
-    const customization = await customizationsApi.getByCompanyId(companyId);
+    const customization = await customizationsApi.getByCompanyId(companyId, type);
 
     if (customization && customization.id !== 'default') {
       const data = customization as InvoiceCustomization;

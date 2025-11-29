@@ -9,6 +9,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Company, Client, Product } from '@/types';
 import { useCompany } from '@/hooks/useCompany';
+import { useAuth } from '@/hooks/useAuth';
 import { companiesApi } from '@/lib/api/companies.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
@@ -38,6 +39,7 @@ interface AppDataContextType {
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
   
   // Companies state
@@ -122,16 +124,28 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   // Initial load on mount
   useEffect(() => {
-    const initializeData = async () => {
-      // Load companies and clients in parallel
-      await Promise.all([
-        loadCompanies(),
-        loadClients(),
-      ]);
-    };
-    
-    initializeData();
-  }, []); // Only run once on mount
+    if (authLoading) return;
+
+    if (user) {
+      const initializeData = async () => {
+        // Load companies and clients in parallel
+        await Promise.all([
+          loadCompanies(),
+          loadClients(),
+        ]);
+      };
+      
+      initializeData();
+    } else {
+      // Clear data on logout
+      setCompanies([]);
+      setClients([]);
+      setProducts([]);
+      setCompaniesInitialized(false);
+      setClientsInitialized(false);
+      setProductsInitialized(false);
+    }
+  }, [user, authLoading, loadCompanies, loadClients]);
 
   // Reload products when company changes
   useEffect(() => {

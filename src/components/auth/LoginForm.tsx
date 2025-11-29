@@ -36,7 +36,7 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
     try {
       setIsLoading(true);
       await signIn(data.email, data.password);
-      toast.success('Login successful!');
+      // Success toast is handled in AuthContext
       onSuccess?.();
     } catch (error: any) {
       console.error('Login error:', error);

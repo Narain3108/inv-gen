@@ -124,6 +124,9 @@ class InvoiceUpdate(BaseSchema):
     date: Optional[datetime] = None
     items: Optional[List[InvoiceItemCreate]] = None
     payment_status: Optional[Literal["pending", "partially_paid", "paid"]] = None
+    payments: Optional[List[PaymentOut]] = None
+    amount_paid: Optional[Decimal] = None
+    amount_pending: Optional[Decimal] = None
 
 
 class InvoiceOut(InvoiceBase):
