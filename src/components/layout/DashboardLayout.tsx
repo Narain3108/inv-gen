@@ -36,9 +36,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     if (authLoading || companiesLoading || !companiesInitialized) return;
     
-    // If user has no companies and is not already on the settings page (where they can create one)
-    if (companies.length === 0 && !pathname.includes('/invoices/settings')) {
-      router.push('/invoices/settings');
+    // If user has no companies and is not already on the onboarding page
+    if (companies.length === 0 && !pathname.includes('/onboarding')) {
+      router.push('/onboarding');
     }
   }, [companies, companiesLoading, companiesInitialized, pathname, router, authLoading]);
 

@@ -7,6 +7,7 @@ import { authApi } from '@/lib/api/auth.api';
 import { usersApi } from '@/lib/api/users.api';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useCompany } from '@/hooks/useCompany';
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { clearSelectedCompany } = useCompany();
 
   useEffect(() => {
     const initAuth = async () => {
@@ -48,6 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
+      // Clear any existing session data first
+      clearSelectedCompany();
+      localStorage.removeItem('selected-company-storage');
+
       const response = await authApi.signup(email, password, name);
       // Store user ID for API requests
       localStorage.setItem('userId', response.uid);
@@ -58,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       
       toast.success('Account created successfully');
-      // Redirect to settings to create a company
-      router.push('/invoices/settings');
+      // Redirect to onboarding to create a company
+      router.push('/onboarding');
     } catch (error: any) {
       console.error('Signup error:', error);
       throw error;
@@ -68,6 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any existing session data first
+      clearSelectedCompany();
+      localStorage.removeItem('selected-company-storage');
+
       const response = await authApi.login(email, password);
       // Store user ID for API requests
       localStorage.setItem('userId', response.localId);
@@ -93,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');
     localStorage.removeItem('selected-company-storage'); // Clear persisted company
+    clearSelectedCompany(); // Clear in-memory state
     setUser(null);
     router.push('/auth/login');
     toast.success('Logged out');

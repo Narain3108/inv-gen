@@ -248,8 +248,9 @@ function InvoicesContent() {
         onEdit={handleEditInvoice}
         onDelete={setDeleteInvoice}
         onView={handleViewInvoice}
-        onDownload={handleDownloadInvoice}
-      />
+        onDownload={handleDownloadInvoice} onPayment={function (invoice: Invoice): void {
+          throw new Error('Function not implemented.');
+        } }      />
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
