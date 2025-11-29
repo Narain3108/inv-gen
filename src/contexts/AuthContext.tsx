@@ -8,6 +8,8 @@ import { usersApi } from '@/lib/api/users.api';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
+import { auth, googleProvider } from '@/lib/firebase/config';
+import { signInWithPopup } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -99,7 +101,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    toast.error('Google Sign-In not supported in this version');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const token = await user.getIdToken();
+
+      // Clear any existing session data first
+      clearSelectedCompany();
+      localStorage.removeItem('selected-company-storage');
+
+      const response = await authApi.googleLogin(token);
+      
+      // Store user ID for API requests
+      localStorage.setItem('userId', response.localId);
+      localStorage.setItem('authToken', response.token);
+      
+      // Fetch full user profile
+      const userData = await usersApi.getById(response.localId);
+      setUser(userData);
+      
+      toast.success('Signed in with Google successfully');
+      router.push('/invoices/dashboard');
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
+      toast.error('Failed to sign in with Google');
+    }
   };
 
   const logout = async () => {

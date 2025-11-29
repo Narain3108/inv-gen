@@ -9,6 +9,9 @@ class SignupRequest(BaseModel):
     password: str
     name: str
 
+class GoogleLoginRequest(BaseModel):
+    token: str
+
 class LoginResponse(BaseModel):
     token: str
     refreshToken: str

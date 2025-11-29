@@ -22,7 +22,17 @@ import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
 
-type CompanyFormData = z.infer<typeof companyFormSchema>;
+type Numbering = {
+  prefix?: string;
+  suffix?: string;
+  order?: string;
+  nextNumber?: number;
+};
+
+type CompanyFormData = z.infer<typeof companyFormSchema> & {
+  invoiceNumbering?: Numbering;
+  quotationNumbering?: Numbering;
+};
 
 export default function CompanySettingsPage() {
   const { selectedCompany, setSelectedCompany } = useCompany();

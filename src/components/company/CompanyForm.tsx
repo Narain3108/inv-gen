@@ -150,34 +150,11 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           <CardTitle>Basic Information</CardTitle>
           <CardDescription>Enter your company's basic details</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Company Logo Upload */}
-          <ImageUpload
-            label="Company Logo"
-            currentImageUrl={logoUrl}
-            onImageUploaded={(url) => {
-              setLogoUrl(url);
-              setValue('logoUrl', url);
-            }}
-            onImageRemoved={() => {
-              setLogoUrl('');
-              setValue('logoUrl', '');
-            }}
-          />
 
-          {/* Company Signature Upload */}
-          <ImageUpload
-            label="Authorized Signature"
-            currentImageUrl={signatureUrl}
-            onImageUploaded={(url) => {
-              setSignatureUrl(url);
-              setValue('signatureUrl', url);
-            }}
-            onImageRemoved={() => {
-              setSignatureUrl('');
-              setValue('signatureUrl', '');
-            }}
-          />
+
+        <CardContent className="space-y-4">
+        
+          
        
           {/* GSTIN */}
           <div className="space-y-2">
@@ -497,10 +474,44 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
             </p>
             {errors.additionalNotes && (
               <p className="text-sm text-red-500">{errors.additionalNotes.message}</p>
+
+            
             )}
           </div>
         </CardContent>
+        <CardContent className="space-y-4">
+          {/* Company Logo Upload */}
+          <ImageUpload
+            label="Company Logo"
+            currentImageUrl={logoUrl}
+            onImageUploaded={(url) => {
+              setLogoUrl(url);
+              setValue('logoUrl', url);
+            }}
+            onImageRemoved={() => {
+              setLogoUrl('');
+              setValue('logoUrl', '');
+            }}
+          />
+
+          {/* Company Signature Upload */}
+          <ImageUpload
+            label="Authorized Signature"
+            currentImageUrl={signatureUrl}
+            onImageUploaded={(url) => {
+              setSignatureUrl(url);
+              setValue('signatureUrl', url);
+            }}
+            onImageRemoved={() => {
+              setSignatureUrl('');
+              setValue('signatureUrl', '');
+            }}
+          />
+        </CardContent>
       </Card>
+
+
+      
 
       {/* Form Actions */}
       <div className="flex justify-end gap-4">

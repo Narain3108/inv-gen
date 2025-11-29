@@ -24,6 +24,10 @@ export const authApi = {
     return apiClient.post<SignupResponse>('/auth/signup', { email, password, name });
   },
 
+  googleLogin: async (token: string): Promise<LoginResponse> => {
+    return apiClient.post<LoginResponse>('/auth/google', { token });
+  },
+
   logout: async (): Promise<void> => {
     return apiClient.post<void>('/auth/logout');
   },

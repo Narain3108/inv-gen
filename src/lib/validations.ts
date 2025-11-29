@@ -21,63 +21,61 @@ export const addressSchema = z.object({
 export const contactSchema = z.object({
   phone: z.string().regex(VALIDATION_PATTERNS.phone, 'Invalid phone number'),
   email: z.string().email('Invalid email address'),
-  website: z.string().optional().refine((val) => !val || val === '' || z.string().url().safeParse(val).success, {
-    message: 'Invalid website URL',
-  }),
+  website: z.string().url().optional().or(z.literal('')).nullish(),
 });
 
 // ==================== Bank Details Schema ====================
 
 export const bankDetailsSchema = z.object({
-  bankName: z.string().min(2, 'Bank name is required').optional().or(z.literal('')),
-  accountNumber: z.string().min(9, 'Invalid account number').max(18).optional().or(z.literal('')),
-  ifscCode: z.string().regex(VALIDATION_PATTERNS.ifsc, 'Invalid IFSC code').optional().or(z.literal('')),
-  accountHolderName: z.string().min(2, 'Account holder name is required').optional().or(z.literal('')),
-  branch: z.string().optional().or(z.literal('')),
-  upiId: z.string().regex(VALIDATION_PATTERNS.upi, 'Invalid UPI ID').optional().or(z.literal('')),
-}).optional();
+  bankName: z.string().min(2, 'Bank name is required').optional().or(z.literal('')).nullish(),
+  accountNumber: z.string().min(9, 'Invalid account number').max(18).optional().or(z.literal('')).nullish(),
+  ifscCode: z.string().regex(VALIDATION_PATTERNS.ifsc, 'Invalid IFSC code').optional().or(z.literal('')).nullish(),
+  accountHolderName: z.string().min(2, 'Account holder name is required').optional().or(z.literal('')).nullish(),
+  branch: z.string().optional().or(z.literal('')).nullish(),
+  upiId: z.string().regex(VALIDATION_PATTERNS.upi, 'Invalid UPI ID').optional().or(z.literal('')).nullish(),
+}).optional().nullable();
 
 // ==================== Company Schema ====================
 
 export const companyFormSchema = z.object({
   name: z.string().min(2, 'Company name is required').max(200),
-  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')),
+  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')).nullish(),
   address: addressSchema,
   contact: contactSchema,
-  bankDetails: bankDetailsSchema.optional(),
-  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')),
-  website: z.string().url('Invalid website URL').optional().or(z.literal('')),
-  logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')),
-  signatureUrl: z.string().url('Invalid signature URL').optional().or(z.literal('')),
-  termsAndConditions: z.string().max(1000, 'Terms must be less than 1000 characters').optional().or(z.literal('')),
-  additionalNotes: z.string().max(500, 'Notes must be less than 500 characters').optional().or(z.literal('')),
+  bankDetails: bankDetailsSchema,
+  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')).nullish(),
+  website: z.string().url('Invalid website URL').optional().or(z.literal('')).nullish(),
+  logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')).nullish(),
+  signatureUrl: z.string().url('Invalid signature URL').optional().or(z.literal('')).nullish(),
+  termsAndConditions: z.string().max(1000, 'Terms must be less than 1000 characters').optional().or(z.literal('')).nullish(),
+  additionalNotes: z.string().max(500, 'Notes must be less than 500 characters').optional().or(z.literal('')).nullish(),
 });
 
 // ==================== Product Schema ====================
 
 export const productFormSchema = z.object({
   productName: z.string().min(2, 'Product/Service name is required').max(200),
-  description: z.string().max(500).optional(),
-  itemCode: z.string().length(5, 'Item code must be exactly 5 digits').regex(/^\d{5}$/, 'Item code must contain only digits').optional().or(z.literal('')),
+  description: z.string().max(500).optional().nullish(),
+  itemCode: z.string().length(5, 'Item code must be exactly 5 digits').regex(/^\d{5}$/, 'Item code must contain only digits').optional().or(z.literal('')).nullish(),
   hsn: z.string().min(4, 'HSN/SAC code is required (min 4 digits)').max(8),
   unit: z.string().min(1, 'Unit is required'),
   price: z.number().min(0, 'Price must be positive'),
   gstRate: z.number().min(0).max(28),
-  cessRate: z.number().min(0).max(100).optional(),
-  stock: z.number().min(0).optional(),
+  cessRate: z.number().min(0).max(100).optional().nullish(),
+  stock: z.number().min(0).optional().nullish(),
   type: z.enum(['product', 'service']),
-  hasSerialNumber: z.boolean().optional(),
+  hasSerialNumber: z.boolean().optional().nullish(),
 });
 
 // ==================== Client Schema ====================
 
 export const clientFormSchema = z.object({
   clientName: z.string().min(2, 'Client name is required').max(200),
-  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')),
+  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')).nullish(),
   address: addressSchema,
   contact: contactSchema,
-  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')),
-  bankDetails: bankDetailsSchema.optional(),
+  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')).nullish(),
+  bankDetails: bankDetailsSchema,
   billingAddress: addressSchema.nullish(),
   shippingAddress: addressSchema.nullish(),
 });
