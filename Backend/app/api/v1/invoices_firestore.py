@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
-from app.core.deps import get_current_user_id
+from app.core.deps import get_current_user
 from datetime import datetime
 
 router = APIRouter()
@@ -139,29 +139,31 @@ class InvoiceOut(BaseModel):
 @router.post("", response_model=InvoiceOut)
 async def create_invoice(
     invoice: InvoiceCreate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Create a new invoice nested under a company"""
+    """Create a new invoice"""
     try:
         db = get_firestore_db()
         
+        # Verify Company Access
+        if user.get("role") != "super_admin" and invoice.company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
+
         invoice_data = invoice.dict(by_alias=True, exclude_unset=True)
         invoice_data["createdAt"] = datetime.utcnow()
         invoice_data["updatedAt"] = datetime.utcnow()
-        invoice_data["user_id"] = user_id # Store user_id for collection group queries
+        invoice_data["createdBy"] = user.get("id")
         
-        # Add to users/{uid}/companies/{cid}/invoices
-        doc_ref = db.collection("users").document(user_id)\
-            .collection("companies").document(invoice.company_id)\
-            .collection("invoices").document()
-            
-        # Store ID in the document
-        invoice_data["id"] = doc_ref.id
-        
+        # Add to global invoices collection
+        doc_ref = db.collection("invoices").document()
         doc_ref.set(invoice_data)
         
+        # Return the created invoice
+        invoice_data["id"] = doc_ref.id
         return serialize_firestore_doc(invoice_data)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating invoice: {str(e)}")
 
@@ -170,9 +172,9 @@ async def create_invoice(
 async def get_invoices(
     company_id: Optional[str] = Query(None, alias="company_id"),
     companyId: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get invoices. If company_id is provided, fetch from that company. Else fetch all user invoices."""
+    """Get invoices. If company_id is provided, fetch from that company. Else fetch all accessible invoices."""
     try:
         db = get_firestore_db()
         invoices = []
@@ -180,27 +182,34 @@ async def get_invoices(
         # Handle both snake_case and camelCase
         target_company_id = company_id or companyId
         
+        # Determine accessible company IDs
+        allowed_companies = user.get("allowedCompanyIds", [])
+        
+        query = db.collection("invoices")
+        
         if target_company_id:
-            # Fetch from specific company
-            invoices_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(target_company_id)\
-                .collection("invoices")
-            docs = invoices_ref.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                invoices.append(serialize_firestore_doc(data))
+            # Verify access
+            if user.get("role") != "super_admin" and target_company_id not in allowed_companies:
+                 raise HTTPException(status_code=403, detail="Access denied to this company")
+            query = query.where("companyId", "==", target_company_id)
         else:
-            # Fetch all invoices for user using Collection Group Query
-            invoices_query = db.collection_group("invoices").where("user_id", "==", user_id)
-            docs = invoices_query.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                invoices.append(serialize_firestore_doc(data))
+            # If no company specified, filter by allowed companies
+            if user.get("role") != "super_admin":
+                if not allowed_companies:
+                    return []
+                if len(allowed_companies) > 0:
+                     query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
+            
+        docs = query.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            invoices.append(serialize_firestore_doc(data))
             
         return invoices
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching invoices: {str(e)}")
 
@@ -208,82 +217,55 @@ async def get_invoices(
 @router.get("/{invoice_id}", response_model=InvoiceOut)
 async def get_invoice(
     invoice_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get a specific invoice by ID. Provide companyId for faster, index-free lookup."""
+    """Get a specific invoice by ID."""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("invoices").document(invoice_id)
+        doc = doc_ref.get()
         
-        if company_id:
-            # Direct lookup
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("invoices").document(invoice_id)
-            doc = doc_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Invoice not found")
             
-            if not doc.exists:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-                
-            invoice_data = doc.to_dict()
-            if "id" not in invoice_data:
-                invoice_data["id"] = doc.id
-            return serialize_firestore_doc(invoice_data)
-        else:
-            # Use Collection Group Query
-            query = db.collection_group("invoices")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", invoice_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
-            
-            if not docs:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-                
-            invoice_data = docs[0].to_dict()
-            return serialize_firestore_doc(invoice_data)
+        invoice_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = invoice_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+             
+        invoice_data["id"] = doc.id
+        return serialize_firestore_doc(invoice_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error fetching invoice: {str(e)}")
 
 
 @router.put("/{invoice_id}", response_model=InvoiceOut)
 async def update_invoice(
     invoice_id: str, 
     invoice_update: InvoiceCreate, # Using Create schema for update as it has all fields
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Update an invoice. Provide companyId for faster, index-free lookup."""
+    """Update an invoice"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("invoices").document(invoice_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("invoices").document(invoice_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-        else:
-            # Find the invoice first
-            query = db.collection_group("invoices")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", invoice_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Invoice not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-                
-            doc_ref = docs[0].reference
+        invoice_data = doc.to_dict()
         
+        # Verify Access
+        company_id = invoice_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = invoice_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
@@ -291,50 +273,37 @@ async def update_invoice(
         
         updated_doc = doc_ref.get()
         invoice_data = updated_doc.to_dict()
-        if "id" not in invoice_data:
-            invoice_data["id"] = updated_doc.id
+        invoice_data["id"] = updated_doc.id
         return serialize_firestore_doc(invoice_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error updating invoice: {str(e)}")
 
 
 @router.patch("/{invoice_id}", response_model=InvoiceOut)
 async def patch_invoice(
     invoice_id: str, 
     invoice_update: InvoiceUpdate,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Partially update an invoice. Provide companyId for faster, index-free lookup."""
+    """Partially update an invoice"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("invoices").document(invoice_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("invoices").document(invoice_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-        else:
-            # Find the invoice first
-            query = db.collection_group("invoices")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", invoice_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Invoice not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-                
-            doc_ref = docs[0].reference
+        invoice_data = doc.to_dict()
         
+        # Verify Access
+        company_id = invoice_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = invoice_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
@@ -342,57 +311,42 @@ async def patch_invoice(
         
         updated_doc = doc_ref.get()
         invoice_data = updated_doc.to_dict()
-        if "id" not in invoice_data:
-            invoice_data["id"] = updated_doc.id
+        invoice_data["id"] = updated_doc.id
         return serialize_firestore_doc(invoice_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error patching invoice: {str(e)}")
 
 
 @router.delete("/{invoice_id}")
 async def delete_invoice(
     invoice_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Delete an invoice. Provide companyId for faster, index-free lookup."""
+    """Delete an invoice"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("invoices").document(invoice_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("invoices").document(invoice_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-        else:
-            # Find the invoice first
-            query = db.collection_group("invoices")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", invoice_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Invoice not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Invoice not found")
-                
-            doc_ref = docs[0].reference
-
+        invoice_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = invoice_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+        
         doc_ref.delete()
+        
         return {"message": "Invoice deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        if "requires an index" in error_msg:
-             raise HTTPException(status_code=400, detail=f"Firestore query requires an index. Please provide 'companyId' query parameter for a direct lookup to avoid this error. Original error: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Error deleting invoice: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Error deleting invoice: {str(e)}")
 

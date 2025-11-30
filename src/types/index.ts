@@ -5,11 +5,25 @@
 
 // ==================== User Types ====================
 
+export type UserRole = 'super_admin' | 'admin' | 'employee';
+
+export interface Organization {
+  id: string;
+  name: string;
+  orgCode: string; // Unique ID for login
+  createdAt: string | Date;
+  updatedAt?: string | Date;
+  ownerId: string; // Super Admin ID
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   photoURL?: string;
+  role: UserRole;
+  organizationId: string;
+  allowedCompanyIds: string[]; // Empty for Super Admin (implies all)
   createdAt: string | Date;
   updatedAt?: string | Date;
 }

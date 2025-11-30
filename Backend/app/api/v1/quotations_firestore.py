@@ -1,13 +1,13 @@
 """
 Firestore-based Quotations API
-Quotations are nested under Companies: users/{uid}/companies/{cid}/quotations
+Quotations are stored in a global 'quotations' collection with 'companyId' field.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
-from app.core.deps import get_current_user_id
+from app.core.deps import get_current_user
 from datetime import datetime
 
 router = APIRouter()
@@ -124,22 +124,29 @@ class QuotationOut(BaseModel):
 @router.post("", response_model=QuotationOut)
 async def create_quotation(
     quotation: QuotationCreate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Create a new quotation nested under a company"""
+    """Create a new quotation"""
     try:
         db = get_firestore_db()
         
         quotation_data = quotation.dict(by_alias=True, exclude_unset=True)
+        
+        # Verify Access
+        company_id = quotation_data.get("companyId")
+        if not company_id:
+             raise HTTPException(status_code=400, detail="companyId is required")
+             
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
+
         quotation_data["createdAt"] = datetime.utcnow()
         quotation_data["updatedAt"] = datetime.utcnow()
-        quotation_data["user_id"] = user_id # Store user_id for collection group queries
+        quotation_data["createdBy"] = user.get("id")
         
-        # Add to users/{uid}/companies/{cid}/quotations
-        doc_ref = db.collection("users").document(user_id)\
-            .collection("companies").document(quotation.company_id)\
-            .collection("quotations").document()
-            
+        # Add to global quotations collection
+        doc_ref = db.collection("quotations").document()
+        
         # Store ID in the document
         quotation_data["id"] = doc_ref.id
         
@@ -147,6 +154,8 @@ async def create_quotation(
         
         return serialize_firestore_doc(quotation_data)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating quotation: {str(e)}")
 
@@ -155,9 +164,9 @@ async def create_quotation(
 async def get_quotations(
     company_id: Optional[str] = Query(None, alias="company_id"),
     companyId: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get quotations. If company_id is provided, fetch from that company. Else fetch all user quotations."""
+    """Get quotations. If company_id is provided, fetch from that company. Else fetch all accessible quotations."""
     try:
         db = get_firestore_db()
         quotations = []
@@ -165,27 +174,34 @@ async def get_quotations(
         # Handle both snake_case and camelCase
         target_company_id = company_id or companyId
         
+        # Determine accessible company IDs
+        allowed_companies = user.get("allowedCompanyIds", [])
+        
+        query = db.collection("quotations")
+        
         if target_company_id:
-            # Fetch from specific company
-            quotations_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(target_company_id)\
-                .collection("quotations")
-            docs = quotations_ref.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                quotations.append(serialize_firestore_doc(data))
+            # Verify access
+            if user.get("role") != "super_admin" and target_company_id not in allowed_companies:
+                 raise HTTPException(status_code=403, detail="Access denied to this company")
+            query = query.where("companyId", "==", target_company_id)
         else:
-            # Fetch all quotations for user using Collection Group Query
-            quotations_query = db.collection_group("quotations").where("user_id", "==", user_id)
-            docs = quotations_query.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                quotations.append(serialize_firestore_doc(data))
+            # If no company specified, filter by allowed companies
+            if user.get("role") != "super_admin":
+                if not allowed_companies:
+                    return []
+                if len(allowed_companies) > 0:
+                     query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
+            
+        docs = query.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            quotations.append(serialize_firestore_doc(data))
             
         return quotations
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching quotations: {str(e)}")
 
@@ -193,82 +209,55 @@ async def get_quotations(
 @router.get("/{quotation_id}", response_model=QuotationOut)
 async def get_quotation(
     quotation_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get a specific quotation by ID. Provide companyId for faster, index-free lookup."""
+    """Get a specific quotation by ID"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("quotations").document(quotation_id)
+        doc = doc_ref.get()
         
-        if company_id:
-            # Direct lookup
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("quotations").document(quotation_id)
-            doc = doc_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Quotation not found")
             
-            if not doc.exists:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-                
-            quotation_data = doc.to_dict()
-            if "id" not in quotation_data:
-                quotation_data["id"] = doc.id
-            return serialize_firestore_doc(quotation_data)
-        else:
-            # Use Collection Group Query
-            query = db.collection_group("quotations")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", quotation_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
-            
-            if not docs:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-                
-            quotation_data = docs[0].to_dict()
-            return serialize_firestore_doc(quotation_data)
+        quotation_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = quotation_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+             
+        quotation_data["id"] = doc.id
+        return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error fetching quotation: {str(e)}")
 
 
 @router.put("/{quotation_id}", response_model=QuotationOut)
 async def update_quotation(
     quotation_id: str, 
     quotation_update: QuotationUpdate,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Update a quotation. Provide companyId for faster, index-free lookup."""
+    """Update a quotation"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("quotations").document(quotation_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("quotations").document(quotation_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-        else:
-            # Find the quotation first
-            query = db.collection_group("quotations")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", quotation_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Quotation not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-                
-            doc_ref = docs[0].reference
+        quotation_data = doc.to_dict()
         
+        # Verify Access
+        company_id = quotation_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
@@ -276,50 +265,37 @@ async def update_quotation(
         
         updated_doc = doc_ref.get()
         quotation_data = updated_doc.to_dict()
-        if "id" not in quotation_data:
-            quotation_data["id"] = updated_doc.id
+        quotation_data["id"] = updated_doc.id
         return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error updating quotation: {str(e)}")
 
 
 @router.patch("/{quotation_id}", response_model=QuotationOut)
 async def patch_quotation(
     quotation_id: str, 
     quotation_update: QuotationUpdate,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Partially update a quotation. Provide companyId for faster, index-free lookup."""
+    """Partially update a quotation"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("quotations").document(quotation_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("quotations").document(quotation_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-        else:
-            # Find the quotation first
-            query = db.collection_group("quotations")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", quotation_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Quotation not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-                
-            doc_ref = docs[0].reference
+        quotation_data = doc.to_dict()
         
+        # Verify Access
+        company_id = quotation_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
@@ -327,59 +303,42 @@ async def patch_quotation(
         
         updated_doc = doc_ref.get()
         quotation_data = updated_doc.to_dict()
-        if "id" not in quotation_data:
-            quotation_data["id"] = updated_doc.id
+        quotation_data["id"] = updated_doc.id
         return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error patching quotation: {str(e)}")
 
 
 @router.delete("/{quotation_id}")
 async def delete_quotation(
     quotation_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Delete a quotation. Provide companyId for faster, index-free lookup."""
+    """Delete a quotation"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("quotations").document(quotation_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Quotation not found")
+            
+        quotation_data = doc.to_dict()
         
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("quotations").document(quotation_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-        else:
-            # Find the quotation first
-            query = db.collection_group("quotations")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", quotation_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
-            
-            if not docs:
-                raise HTTPException(status_code=404, detail="Quotation not found")
-                
-            docs[0].reference.delete()
-
-        if doc_ref:
-            doc_ref.delete()
-            
+        # Verify Access
+        company_id = quotation_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+        
+        doc_ref.delete()
+        
         return {"message": "Quotation deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        if "requires an index" in error_msg:
-             raise HTTPException(status_code=400, detail=f"Firestore query requires an index. Please provide 'companyId' query parameter for a direct lookup to avoid this error. Original error: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Error deleting quotation: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Error deleting quotation: {str(e)}")
 

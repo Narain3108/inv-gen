@@ -37,7 +37,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     if (authLoading || companiesLoading || !companiesInitialized) return;
     
     // If user has no companies and is not already on the onboarding page
-    if (companies.length === 0 && !pathname.includes('/onboarding')) {
+    // AND user is not on an admin page (Super Admins manage companies differently)
+    if (companies.length === 0 && !pathname.includes('/onboarding') && !pathname.startsWith('/admin')) {
       router.push('/onboarding');
     }
   }, [companies, companiesLoading, companiesInitialized, pathname, router, authLoading]);

@@ -1,13 +1,13 @@
 """
 Firestore-based Customizations API
-Customizations are nested under Companies: users/{uid}/companies/{cid}/customizations
+Customizations are stored in a global 'customizations' collection with 'companyId' field.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
-from app.core.deps import get_current_user_id
+from app.core.deps import get_current_user
 from datetime import datetime
 
 router = APIRouter()
@@ -89,47 +89,44 @@ class CustomizationOut(BaseModel):
 async def create_customization(
     company_id: str, 
     customization: CustomizationCreate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
     """Create or update customization for a company"""
     try:
         db = get_firestore_db()
         
-        # Verify company exists
-        company_ref = db.collection("users").document(user_id).collection("companies").document(company_id)
-        if not company_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Company not found")
+        # Verify Access
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
         
         # Check if customization already exists for this type
-        customizations_ref = company_ref.collection("customizations")
-        
-        # Query by type if possible, otherwise we might need to filter in memory or use a composite index
-        # Since we don't want to force index creation, we'll fetch all (should be few) and filter
-        docs = list(customizations_ref.stream())
-        existing_doc = None
-        
         target_type = customization.type or "invoice"
         
-        for doc in docs:
-            data = doc.to_dict()
-            if data.get("type") == target_type:
-                existing_doc = doc
-                break
+        query = db.collection("customizations")\
+            .where("companyId", "==", company_id)\
+            .where("type", "==", target_type)\
+            .limit(1)
+            
+        docs = list(query.stream())
+        existing_doc = docs[0] if docs else None
         
         customization_data = customization.dict(by_alias=True, exclude_unset=True)
-        customization_data["company_id"] = company_id
-        customization_data["updated_at"] = datetime.utcnow().isoformat()
+        customization_data["companyId"] = company_id
+        customization_data["updatedAt"] = datetime.utcnow().isoformat()
         
         if existing_doc:
             # Update existing
             doc_ref = existing_doc.reference
             doc_ref.update(customization_data)
             doc_id = doc_ref.id
-            customization_data["created_at"] = existing_doc.to_dict().get("created_at")
+            # Preserve createdAt
+            existing_data = existing_doc.to_dict()
+            customization_data["createdAt"] = existing_data.get("createdAt")
         else:
             # Create new
-            customization_data["created_at"] = datetime.utcnow().isoformat()
-            timestamp, doc_ref = customizations_ref.add(customization_data)
+            customization_data["createdAt"] = datetime.utcnow().isoformat()
+            doc_ref = db.collection("customizations").document()
+            doc_ref.set(customization_data)
             doc_id = doc_ref.id
         
         return {"id": doc_id, **customization_data}
@@ -144,46 +141,40 @@ async def create_customization(
 async def get_customization(
     company_id: str,
     type: Optional[str] = Query("invoice", description="Type of customization (invoice or quotation)"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
     """Get customization for a company"""
     try:
         db = get_firestore_db()
         
-        # Verify company exists
-        company_ref = db.collection("users").document(user_id).collection("companies").document(company_id)
-        if not company_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Company not found")
+        # Verify Access
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
             
-        customizations_ref = company_ref.collection("customizations")
+        query = db.collection("customizations")\
+            .where("companyId", "==", company_id)\
+            .where("type", "==", type)\
+            .limit(1)
+            
+        docs = list(query.stream())
         
-        # Fetch all and filter by type to avoid index requirements
-        docs = list(customizations_ref.stream())
-        target_doc = None
-        
-        for doc in docs:
-            data = doc.to_dict()
-            if data.get("type") == type:
-                target_doc = doc
-                break
-        
-        if not target_doc:
+        if not docs:
             # Return default if not found
             return {
                 "id": "default",
-                "company_id": company_id,
+                "companyId": company_id,
                 "type": type,
-                "invoice_prefix": "INV",
-                "quotation_prefix": "QUO",
-                "invoice_starting_number": 1,
-                "quotation_starting_number": 1,
-                "theme_color": "#000000",
-                "font_family": "Arial",
-                "logo_position": "left"
+                "invoicePrefix": "INV",
+                "quotationPrefix": "QUO",
+                "invoiceStartingNumber": 1,
+                "quotationStartingNumber": 1,
+                "colorScheme": {"primary": "#000000"},
+                "pageSize": "A4",
+                "orientation": "portrait"
             }
             
-        data = target_doc.to_dict()
-        data["id"] = target_doc.id
+        data = docs[0].to_dict()
+        data["id"] = docs[0].id
         return serialize_firestore_doc(data)
         
     except HTTPException:

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, DollarSign } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { useAuth } from '@/hooks/useAuth';
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -40,6 +41,8 @@ export function InvoiceList({
   onPayment,
 }: InvoiceListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
+  const canEdit = user?.role === 'super_admin' || user?.role === 'admin';
 
   const getClientName = (clientId: string) => {
     // Safety check: if clients isn't loaded yet, show loading indicator
@@ -191,17 +194,21 @@ export function InvoiceList({
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onEdit(invoice)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onDelete(invoice)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
+                            {canEdit && (
+                              <>
+                                <DropdownMenuItem onClick={() => onEdit(invoice)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => onDelete(invoice)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

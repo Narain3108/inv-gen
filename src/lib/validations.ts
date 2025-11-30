@@ -6,6 +6,44 @@
 import { z } from 'zod';
 import { VALIDATION_PATTERNS } from '@/lib/constants';
 
+// ==================== Auth Schemas ====================
+
+export const orgLoginSchema = z.object({
+  orgCode: z.string().min(3, 'Organization Code is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+export const userLoginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+export const orgSignupSchema = z.object({
+  orgName: z.string().min(2, 'Organization Name is required'),
+  orgCode: z.string().min(3, 'Organization Code must be at least 3 characters').regex(/^[a-zA-Z0-9_-]+$/, 'Only letters, numbers, hyphens and underscores allowed'),
+  orgPassword: z.string().min(6, 'Organization Password must be at least 6 characters'),
+  adminName: z.string().min(2, 'Admin Name is required'),
+  adminEmail: z.string().email('Invalid email address'),
+  adminPassword: z.string().min(6, 'Admin Password must be at least 6 characters'),
+  confirmAdminPassword: z.string(),
+}).refine((data) => data.adminPassword === data.confirmAdminPassword, {
+  message: "Passwords don't match",
+  path: ["confirmAdminPassword"],
+});
+
+export const subUserFormSchema = z.object({
+  name: z.string().min(2, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['admin', 'employee']),
+  allowedCompanyIds: z.array(z.string()),
+});
+
+export type OrgLoginValues = z.infer<typeof orgLoginSchema>;
+export type UserLoginValues = z.infer<typeof userLoginSchema>;
+export type OrgSignupValues = z.infer<typeof orgSignupSchema>;
+export type SubUserFormValues = z.infer<typeof subUserFormSchema>;
+
 // ==================== Address Schema ====================
 
 export const addressSchema = z.object({

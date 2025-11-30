@@ -83,7 +83,16 @@ class ApiClient {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       // FastAPI uses 'detail', others might use 'message'
-      const errorMessage = errorData.detail || errorData.message || response.statusText;
+      let errorMessage = errorData.detail || errorData.message || response.statusText;
+      
+      // Handle Pydantic validation errors (array of objects)
+      if (Array.isArray(errorMessage)) {
+        errorMessage = errorMessage
+          .map((err: any) => err.msg || JSON.stringify(err))
+          .join(', ');
+      } else if (typeof errorMessage === 'object') {
+        errorMessage = JSON.stringify(errorMessage);
+      }
       
       throw new ApiError(
         response.status,
@@ -111,6 +120,12 @@ class ApiClient {
       if (userId) {
         headers['x-user-id'] = userId;
       }
+      
+      // Also send token in Authorization header as fallback if cookie fails
+      const userToken = localStorage.getItem('userToken');
+      if (userToken) {
+        headers['Authorization'] = `Bearer ${userToken}`;
+      }
     }
 
     return {
@@ -130,6 +145,11 @@ class ApiClient {
       });
     }
 
+    // Debug log for outgoing request
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] GET', url.toString());
+    }
+
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: this.getHeaders(),
@@ -137,12 +157,22 @@ class ApiClient {
     });
 
     const result = await this.handleResponse<T>(response);
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] GET response', url.toString(), result);
+    }
+
     return transformCase ? snakeToCamel(result) : result;
   }
 
   async post<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const url = `${this.baseURL}${endpoint}`;
+
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] POST', url, bodyData);
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
@@ -150,12 +180,21 @@ class ApiClient {
     });
 
     const result = await this.handleResponse<T>(response);
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] POST response', url, result);
+    }
+
     return transformCase ? snakeToCamel(result) : result;
   }
 
   async put<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const url = `${this.baseURL}${endpoint}`;
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] PUT', url, bodyData);
+    }
+
+    const response = await fetch(url, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
@@ -163,12 +202,21 @@ class ApiClient {
     });
 
     const result = await this.handleResponse<T>(response);
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] PUT response', url, result);
+    }
+
     return transformCase ? snakeToCamel(result) : result;
   }
 
   async patch<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const url = `${this.baseURL}${endpoint}`;
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] PATCH', url, bodyData);
+    }
+
+    const response = await fetch(url, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify(bodyData),
@@ -176,17 +224,31 @@ class ApiClient {
     });
 
     const result = await this.handleResponse<T>(response);
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] PATCH response', url, result);
+    }
+
     return transformCase ? snakeToCamel(result) : result;
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const url = `${this.baseURL}${endpoint}`;
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] DELETE', url);
+    }
+
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: this.getHeaders(),
       credentials: 'include', // Send cookies
     });
 
-    return this.handleResponse<T>(response);
+    const result = await this.handleResponse<T>(response);
+    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+      console.debug('[apiClient] DELETE response', url, result);
+    }
+
+    return result;
   }
 
   async uploadFile<T>(endpoint: string, file: File, additionalData?: Record<string, any>): Promise<T> {

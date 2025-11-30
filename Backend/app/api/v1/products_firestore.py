@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any, Annotated
 from pydantic import BaseModel, Field, BeforeValidator
 from app.core.firebase import get_firestore_db
-from app.core.deps import get_current_user_id
+from app.core.deps import get_current_user
 from datetime import datetime
 
 router = APIRouter()
@@ -104,29 +104,31 @@ class ProductOut(BaseModel):
 @router.post("", response_model=ProductOut)
 async def create_product(
     product: ProductCreate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Create a new product nested under a company"""
+    """Create a new product"""
     try:
         db = get_firestore_db()
         
+        # Verify Company Access
+        if user.get("role") != "super_admin" and product.company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
+
         product_data = product.dict(by_alias=True, exclude_unset=True)
         product_data["createdAt"] = datetime.utcnow()
         product_data["updatedAt"] = datetime.utcnow()
-        product_data["user_id"] = user_id # Store user_id for collection group queries
+        product_data["createdBy"] = user.get("id")
         
-        # Add to users/{uid}/companies/{cid}/products
-        doc_ref = db.collection("users").document(user_id)\
-            .collection("companies").document(product.company_id)\
-            .collection("products").document()
-            
-        # Store ID in the document for easier querying
-        product_data["id"] = doc_ref.id
-        
+        # Add to global products collection
+        doc_ref = db.collection("products").document()
         doc_ref.set(product_data)
         
+        # Return the created product
+        product_data["id"] = doc_ref.id
         return serialize_firestore_doc(product_data)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating product: {str(e)}")
 
@@ -135,9 +137,9 @@ async def create_product(
 async def get_products(
     company_id: Optional[str] = Query(None, alias="company_id"),
     companyId: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get products. If company_id is provided, fetch from that company. Else fetch all user products."""
+    """Get products. If company_id is provided, fetch from that company. Else fetch all accessible products."""
     try:
         db = get_firestore_db()
         products = []
@@ -145,28 +147,34 @@ async def get_products(
         # Handle both snake_case and camelCase
         target_company_id = company_id or companyId
         
+        # Determine accessible company IDs
+        allowed_companies = user.get("allowedCompanyIds", [])
+        
+        query = db.collection("products")
+        
         if target_company_id:
-            # Fetch from specific company
-            products_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(target_company_id)\
-                .collection("products")
-            docs = products_ref.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                products.append(serialize_firestore_doc(data))
+            # Verify access
+            if user.get("role") != "super_admin" and target_company_id not in allowed_companies:
+                 raise HTTPException(status_code=403, detail="Access denied to this company")
+            query = query.where("companyId", "==", target_company_id)
         else:
-            # Fetch all products for user using Collection Group Query
-            # Note: This requires an index on `user_id`
-            products_query = db.collection_group("products").where("user_id", "==", user_id)
-            docs = products_query.stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                products.append(serialize_firestore_doc(data))
+            # If no company specified, filter by allowed companies
+            if user.get("role") != "super_admin":
+                if not allowed_companies:
+                    return []
+                if len(allowed_companies) > 0:
+                     query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
+            
+        docs = query.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            products.append(serialize_firestore_doc(data))
             
         return products
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
 
@@ -174,86 +182,55 @@ async def get_products(
 @router.get("/{product_id}", response_model=ProductOut)
 async def get_product(
     product_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get a specific product by ID. Provide companyId for faster, index-free lookup."""
+    """Get a specific product"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("products").document(product_id)
+        doc = doc_ref.get()
         
-        if company_id:
-            # Direct lookup (No index required)
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("products").document(product_id)
-            doc = doc_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Product not found")
             
-            if not doc.exists:
-                raise HTTPException(status_code=404, detail="Product not found")
-            
-            product_data = doc.to_dict()
-            # Ensure ID is in data
-            if "id" not in product_data:
-                product_data["id"] = doc.id
-            return serialize_firestore_doc(product_data)
-            
-        else:
-            # Use Collection Group Query (Requires Index)
-            query = db.collection_group("products")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", product_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
-            
-            if not docs:
-                raise HTTPException(status_code=404, detail="Product not found")
-                
-            product_data = docs[0].to_dict()
-            return serialize_firestore_doc(product_data)
+        product_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = product_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
+        product_data["id"] = doc.id
+        return serialize_firestore_doc(product_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        # Return the actual error message which might contain the index creation link
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error fetching product: {str(e)}")
 
 
 @router.put("/{product_id}", response_model=ProductOut)
 async def update_product(
     product_id: str, 
     product_update: ProductUpdate,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Update a product. Provide companyId for faster, index-free lookup."""
+    """Update a product"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("products").document(product_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            # Direct lookup
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("products").document(product_id)
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Product not found")
             
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Product not found")
-        else:
-            # Find the product first to get its reference (Requires Index)
-            query = db.collection_group("products")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", product_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
-            
-            if not docs:
-                raise HTTPException(status_code=404, detail="Product not found")
-                
-            doc_ref = docs[0].reference
+        product_data = doc.to_dict()
         
+        # Verify Access
+        company_id = product_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = product_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
@@ -261,57 +238,42 @@ async def update_product(
         
         updated_doc = doc_ref.get()
         product_data = updated_doc.to_dict()
-        if "id" not in product_data:
-            product_data["id"] = updated_doc.id
+        product_data["id"] = updated_doc.id
         return serialize_firestore_doc(product_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error updating product: {str(e)}")
 
 
 @router.delete("/{product_id}")
 async def delete_product(
     product_id: str,
-    company_id: Optional[str] = Query(None, alias="companyId"),
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Delete a product. Provide companyId for faster, index-free lookup."""
+    """Delete a product"""
     try:
         db = get_firestore_db()
+        doc_ref = db.collection("products").document(product_id)
+        doc = doc_ref.get()
         
-        doc_ref = None
-        
-        if company_id:
-            doc_ref = db.collection("users").document(user_id)\
-                .collection("companies").document(company_id)\
-                .collection("products").document(product_id)
-                
-            if not doc_ref.get().exists:
-                raise HTTPException(status_code=404, detail="Product not found")
-        else:
-            # Find the product first (Requires Index)
-            query = db.collection_group("products")\
-                .where("user_id", "==", user_id)\
-                .where("id", "==", product_id)\
-                .limit(1)
-                
-            docs = list(query.stream())
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Product not found")
             
-            if not docs:
-                raise HTTPException(status_code=404, detail="Product not found")
-                
-            doc_ref = docs[0].reference
-
+        product_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = product_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+        
         doc_ref.delete()
+        
         return {"message": "Product deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        if "requires an index" in error_msg:
-             raise HTTPException(status_code=400, detail=f"Firestore query requires an index. Please provide 'companyId' query parameter for a direct lookup to avoid this error. Original error: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Error deleting product: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Error deleting product: {str(e)}")
 

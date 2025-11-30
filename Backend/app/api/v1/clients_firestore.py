@@ -1,13 +1,13 @@
 """
 Firestore-based Clients API
-Clients are nested under Users: users/{uid}/clients
+Clients are stored in a global 'clients' collection with 'companyId' field.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
-from app.core.deps import get_current_user_id
+from app.core.deps import get_current_user
 from datetime import datetime
 
 router = APIRouter()
@@ -99,46 +99,78 @@ class ClientOut(BaseModel):
 @router.post("", response_model=ClientOut)
 async def create_client(
     client: ClientCreate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Create a new client for the current user"""
+    """Create a new client"""
     try:
         db = get_firestore_db()
         
         client_data = client.dict(by_alias=True, exclude_unset=True)
+        
+        # Verify Access
+        company_id = client_data.get("companyId")
+        if not company_id:
+             raise HTTPException(status_code=400, detail="companyId is required")
+             
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied to this company")
+
         client_data["createdAt"] = datetime.utcnow()
         client_data["updatedAt"] = datetime.utcnow()
+        client_data["createdBy"] = user.get("id")
         
-        # Add to user"s clients collection
-        doc_ref = db.collection("users").document(user_id).collection("clients").document()
+        # Add to global clients collection
+        doc_ref = db.collection("clients").document()
         doc_ref.set(client_data)
         
         # Return the created client
         client_data["id"] = doc_ref.id
         return serialize_firestore_doc(client_data)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating client: {str(e)}")
 
 
 @router.get("", response_model=List[ClientOut])
 async def get_clients(
-    user_id: str = Depends(get_current_user_id)
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    user: Dict = Depends(get_current_user)
 ):
-    """Get all clients for the current user"""
+    """Get clients. If companyId is provided, fetch from that company. Else fetch all accessible clients."""
     try:
         db = get_firestore_db()
-        clients_ref = db.collection("users").document(user_id).collection("clients")
-        docs = clients_ref.stream()
-        
         clients = []
+        
+        # Determine accessible company IDs
+        allowed_companies = user.get("allowedCompanyIds", [])
+        
+        query = db.collection("clients")
+        
+        if company_id:
+            # Verify access
+            if user.get("role") != "super_admin" and company_id not in allowed_companies:
+                 raise HTTPException(status_code=403, detail="Access denied to this company")
+            query = query.where("companyId", "==", company_id)
+        else:
+            # If no company specified, filter by allowed companies
+            if user.get("role") != "super_admin":
+                if not allowed_companies:
+                    return []
+                if len(allowed_companies) > 0:
+                     query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
+            
+        docs = query.stream()
         for doc in docs:
-            client_data = doc.to_dict()
-            client_data["id"] = doc.id
-            clients.append(serialize_firestore_doc(client_data))
+            data = doc.to_dict()
+            data["id"] = doc.id
+            clients.append(serialize_firestore_doc(data))
             
         return clients
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching clients: {str(e)}")
 
@@ -146,18 +178,24 @@ async def get_clients(
 @router.get("/{client_id}", response_model=ClientOut)
 async def get_client(
     client_id: str,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Get a specific client for the current user"""
+    """Get a specific client by ID"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
+        doc_ref = db.collection("clients").document(client_id)
         doc = doc_ref.get()
         
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Client not found")
             
         client_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = client_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+             
         client_data["id"] = doc.id
         return serialize_firestore_doc(client_data)
         
@@ -171,23 +209,29 @@ async def get_client(
 async def update_client(
     client_id: str, 
     client_update: ClientUpdate,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Update a client for the current user"""
+    """Update a client"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
+        doc_ref = db.collection("clients").document(client_id)
+        doc = doc_ref.get()
         
-        # Check if exists
-        if not doc_ref.get().exists:
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Client not found")
+            
+        client_data = doc.to_dict()
         
+        # Verify Access
+        company_id = client_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+
         update_data = client_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
         
         doc_ref.update(update_data)
         
-        # Return updated document
         updated_doc = doc_ref.get()
         client_data = updated_doc.to_dict()
         client_data["id"] = updated_doc.id
@@ -202,16 +246,24 @@ async def update_client(
 @router.delete("/{client_id}")
 async def delete_client(
     client_id: str,
-    user_id: str = Depends(get_current_user_id)
+    user: Dict = Depends(get_current_user)
 ):
-    """Delete a client for the current user"""
+    """Delete a client"""
     try:
         db = get_firestore_db()
-        doc_ref = db.collection("users").document(user_id).collection("clients").document(client_id)
+        doc_ref = db.collection("clients").document(client_id)
+        doc = doc_ref.get()
         
-        if not doc_ref.get().exists:
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Client not found")
             
+        client_data = doc.to_dict()
+        
+        # Verify Access
+        company_id = client_data.get("companyId")
+        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+             raise HTTPException(status_code=403, detail="Access denied")
+        
         doc_ref.delete()
         return {"message": "Client deleted successfully"}
         
