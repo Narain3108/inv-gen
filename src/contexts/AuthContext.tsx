@@ -155,13 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // No companies -> Onboarding
             router.push('/onboarding');
           } else {
-            // Has companies -> Admin Dashboard
-            router.push('/admin/dashboard');
+            // Has companies -> Main Dashboard
+            router.push('/invoices/dashboard');
           }
         } catch (error) {
           console.error('Error checking companies:', error);
           // Fallback to dashboard if check fails
-          router.push('/admin/dashboard');
+          router.push('/invoices/dashboard');
         }
       } else {
         router.push('/invoices/dashboard');

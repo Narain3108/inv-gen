@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, ArrowRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { useAuth } from '@/hooks/useAuth';
 
 interface QuotationListProps {
   quotations: Quotation[];
@@ -43,6 +44,7 @@ export function QuotationList({
   onUpdateStatus,
 }: QuotationListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -224,6 +226,8 @@ export function QuotationList({
                               </DropdownMenuItem>
                             </>
                           )}
+                          {user?.role !== 'employee' && (
+                          <>
                           {quotation.status === 'pending' && !isExpired && (
                             <>
                               <DropdownMenuSeparator />
@@ -249,6 +253,8 @@ export function QuotationList({
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
+                          </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -323,6 +329,8 @@ export function QuotationList({
                         <Download className="mr-2 h-4 w-4" />
                         Download PDF
                       </DropdownMenuItem>
+                      {user?.role !== 'employee' && (
+                      <>
                       {quotation.status === 'pending' && !isExpired && (
                         <>
                           <DropdownMenuSeparator />
@@ -348,6 +356,8 @@ export function QuotationList({
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
+                      </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

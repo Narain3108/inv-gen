@@ -45,7 +45,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
   // Define public pages where we shouldn't fetch app data
-  const isPublicPage = ['/', '/login', '/signup', '/register', '/forgot-password', '/onboarding'].includes(pathname || '');
+  const isPublicPage = React.useMemo(() => {
+    const path = pathname || '';
+    return ['/', '/onboarding'].includes(path) || path.startsWith('/auth/');
+  }, [pathname]);
   
   // Companies state
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -62,9 +65,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsInitialized, setProductsInitialized] = useState(false);
 
+  // Track user ID to detect user switches
+  const [prevUserId, setPrevUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id && user.id !== prevUserId) {
+      // User changed (e.g. login as different user, or profile update)
+      // Reset initialization flags to force reload
+      setCompaniesInitialized(false);
+      setClientsInitialized(false);
+      setProductsInitialized(false);
+      setPrevUserId(user.id);
+    } else if (!user && prevUserId) {
+      // Logout
+      setPrevUserId(null);
+    }
+  }, [user, prevUserId]);
+
   // Load companies once on mount
-  const loadCompanies = useCallback(async () => {
-    if (companiesInitialized && !companiesLoading) return; // Already loaded
+  const loadCompanies = useCallback(async (force = false) => {
+    if (!force && companiesInitialized && !companiesLoading) return; // Already loaded
     
     setCompaniesLoading(true);
     try {
@@ -86,8 +106,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [companiesInitialized, companiesLoading]);
 
   // Load clients once on mount (global - not company-specific)
-  const loadClients = useCallback(async () => {
-    if (clientsInitialized && !clientsLoading) return; // Already loaded
+  const loadClients = useCallback(async (force = false) => {
+    if (!force && clientsInitialized && !clientsLoading) return; // Already loaded
     
     setClientsLoading(true);
     try {
@@ -111,6 +131,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setProductsInitialized(false);
       return;
     }
+
+    // Safety check: Ensure selected company is actually in the loaded companies list
+    // This prevents 403 errors when switching users with persisted selectedCompany
+    if (companiesInitialized && companies.length > 0) {
+        const isValid = companies.find(c => c.id === selectedCompany.id);
+        if (!isValid) {
+            console.log('⚠️ Skipping product load for invalid company:', selectedCompany.name);
+            return;
+        }
+    }
     
     setProductsLoading(true);
     try {
@@ -125,7 +155,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setProductsLoading(false);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, companies, companiesInitialized]);
 
   // Initial load on mount
   useEffect(() => {
@@ -155,6 +185,27 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, authLoading, loadCompanies, loadClients, isPublicPage]);
 
+  // Validate selected company against loaded companies
+  useEffect(() => {
+    if (!companiesInitialized || companiesLoading) return;
+
+    if (selectedCompany) {
+      const isValid = companies.find(c => c.id === selectedCompany.id);
+      if (!isValid) {
+        console.log('⚠️ Selected company not found in allowed list. Resetting...');
+        if (companies.length > 0) {
+          setSelectedCompany(companies[0]);
+        } else {
+          setSelectedCompany(null);
+        }
+      }
+    } else if (companies.length > 0) {
+      // Auto-select first company if none selected
+      console.log('👉 Auto-selecting first company:', companies[0].name);
+      setSelectedCompany(companies[0]);
+    }
+  }, [companies, companiesInitialized, companiesLoading, selectedCompany, setSelectedCompany]);
+
   // Reload products when company changes
   useEffect(() => {
     if (companiesInitialized) {
@@ -165,12 +216,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Refresh methods
   const refreshCompanies = useCallback(async () => {
     setCompaniesInitialized(false);
-    await loadCompanies();
+    await loadCompanies(true);
   }, [loadCompanies]);
 
   const refreshClients = useCallback(async () => {
     setClientsInitialized(false);
-    await loadClients();
+    await loadClients(true);
   }, [loadClients]);
 
   const refreshProducts = useCallback(async () => {

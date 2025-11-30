@@ -27,7 +27,7 @@ export default function OnboardingPage() {
       toast.success('Company profile set up successfully!');
       
       if (user?.role === 'super_admin') {
-        router.push('/admin/dashboard');
+        router.push('/invoices/dashboard');
       } else {
         router.push('/invoices/dashboard');
       }

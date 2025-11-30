@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Search, Trash2, Users } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ClientListProps {
   clients: Client[];
@@ -28,6 +29,7 @@ interface ClientListProps {
 
 export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch =
@@ -118,6 +120,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                     <span className="text-sm">{client.address.state}</span>
                   </td>
                   <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    {user?.role !== 'employee' && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
@@ -138,6 +141,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -168,6 +172,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                   )}
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
+                  {user?.role !== 'employee' && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
@@ -188,6 +193,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </div>
               </div>
 

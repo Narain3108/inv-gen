@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Package, Search, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ProductListProps {
   products: Product[];
@@ -29,6 +30,7 @@ interface ProductListProps {
 export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'product' | 'service'>('all');
+  const { user } = useAuth();
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
@@ -165,6 +167,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                     )}
                   </td>
                   <td className="p-4 text-center">
+                    {user?.role !== 'employee' && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
@@ -185,6 +188,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -214,6 +218,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                     <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
                   )}
                 </div>
+                {user?.role !== 'employee' && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
@@ -234,6 +239,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                )}
               </div>
 
               {/* Details Grid */}

@@ -19,6 +19,7 @@ import {
   FileCheck,
   LayoutDashboard,
   Sparkles,
+  UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +33,7 @@ import {
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Company } from '@/types';
 
 interface NavItem {
@@ -74,6 +76,14 @@ const navItems: NavItem[] = [
   },
 ];
 
+const superAdminNavItems: NavItem[] = [
+  {
+    title: 'User Management',
+    href: '/invoices/settings/users',
+    icon: UserCog,
+  },
+];
+
 interface SidebarProps {
   className?: string;
 }
@@ -83,26 +93,8 @@ export function Sidebar({ className }: SidebarProps) {
   const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, companiesLoading } = useAppData();
-  const [hasAutoSelected, setHasAutoSelected] = React.useState(false);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    if (hasAutoSelected || companies.length === 0 || companiesLoading) return;
-    
-    const timer = setTimeout(() => {
-      if (selectedCompany) {
-        const companyStillExists = companies.find(c => c.id === selectedCompany.id);
-        if (!companyStillExists) {
-          setSelectedCompany(companies[0]);
-        }
-      } else {
-        setSelectedCompany(companies[0]);
-      }
-      
-      setHasAutoSelected(true);
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [companies, companiesLoading, selectedCompany, setSelectedCompany, hasAutoSelected]);
 
   return (
     <div className={cn(
@@ -169,20 +161,29 @@ export function Sidebar({ className }: SidebarProps) {
                 </DropdownMenuItem>
               ))
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/invoices/settings/company" className="flex w-full items-center cursor-pointer text-sm">
-                <Settings className="mr-2 h-4 w-4" />
-                Manage Companies
-              </Link>
-            </DropdownMenuItem>
+            {user?.role !== 'employee' && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/invoices/settings/company" className="flex w-full items-center cursor-pointer text-sm">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Manage Companies
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3 sm:p-4 overflow-y-auto hide-scrollbar">
-        {navItems.map((item) => {
+        {navItems.filter(item => {
+          if (user?.role === 'employee') {
+            return item.title !== 'Settings';
+          }
+          return true;
+        }).map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 
@@ -213,6 +214,37 @@ export function Sidebar({ className }: SidebarProps) {
                   {item.badge}
                 </span>
               )}
+            </Link>
+          );
+        })}
+
+        {/* Super Admin Items */}
+        {user?.role === 'super_admin' && superAdminNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                'transition-all duration-200 group relative overflow-hidden',
+                'active:scale-[0.97]',
+                isActive
+                  ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+              )}
+            >
+              <div className={cn(
+                "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                isActive 
+                  ? "bg-white/20 backdrop-blur-sm" 
+                  : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+              )}>
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="font-semibold relative z-10 truncate">{item.title}</span>
             </Link>
           );
         })}

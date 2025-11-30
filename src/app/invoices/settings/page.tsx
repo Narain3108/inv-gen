@@ -32,7 +32,14 @@ const settingsLinks = [
 ];
 
 function SettingsContent() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  const filteredLinks = settingsLinks.filter(link => {
+    if (user?.role === 'employee' && link.href === '/invoices/settings/company') {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -49,7 +56,7 @@ function SettingsContent() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {settingsLinks.map((link) => (
+        {filteredLinks.map((link) => (
           <Link key={link.href} href={link.href}>
             <Card className="h-full hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
               <CardHeader>

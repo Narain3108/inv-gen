@@ -193,6 +193,10 @@ async def update_product_category(
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
              raise HTTPException(status_code=403, detail="Access denied")
 
+        # Restrict Employee from Update
+        if user.get("role") == "employee":
+             raise HTTPException(status_code=403, detail="Employees cannot update records")
+
         update_data = category_update.dict(by_alias=True, exclude_unset=True)
         update_data["updated_at"] = datetime.utcnow().isoformat()
         
@@ -230,6 +234,10 @@ async def delete_product_category(
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
              raise HTTPException(status_code=403, detail="Access denied")
         
+        # Restrict Employee from Delete
+        if user.get("role") == "employee":
+             raise HTTPException(status_code=403, detail="Employees cannot delete records")
+
         doc_ref.delete()
         return {"message": "Product category deleted successfully"}
         

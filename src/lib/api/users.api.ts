@@ -10,10 +10,13 @@ export const usersApi = {
     // Fallback to /me if requesting own profile, or if backend doesn't support /:id
     return apiClient.get<User>('/users/me');
   },
-  create: async (data: Partial<User>): Promise<User> => {
-    return apiClient.post<User>('/users', data);
+  getOrgUsers: async (orgId: string): Promise<User[]> => {
+    return apiClient.get<User[]>(`/auth/org/${orgId}/users`);
+  },
+  create: async (data: any): Promise<User> => {
+    return apiClient.post<User>('/auth/users', data);
   },
   update: async (id: string, data: Partial<User>): Promise<User> => {
-    return apiClient.put<User>(`/users/${id}`, data);
+    return apiClient.put<User>(`/auth/users/${id}`, data);
   }
 };

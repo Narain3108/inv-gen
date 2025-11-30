@@ -22,10 +22,12 @@ import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatClientsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { clientsApi } from '@/lib/api/clients.api';
+import { useAuth } from '@/hooks/useAuth';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
 
 function ClientsContent() {
+  const { user } = useAuth();
   const { selectedCompany } = useCompany();
   const { clients, clientsLoading, refreshClients } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -64,6 +66,7 @@ function ClientsContent() {
       // Sanitize data to match backend expectations
       const clientData = {
         ...data,
+        companyId: selectedCompany.id, // Add companyId from context
         billingAddress: data.billingAddress || null,
         shippingAddress: data.shippingAddress || null,
         bankDetails: data.bankDetails || null,
@@ -151,10 +154,12 @@ function ClientsContent() {
             onExportExcel={handleExportExcel}
             onExportCSV={handleExportCSV}
           />
-          <Button onClick={() => handleOpenForm()}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Client
-          </Button>
+          {user?.role !== 'employee' && (
+            <Button onClick={() => handleOpenForm()}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Client
+            </Button>
+          )}
         </div>
       </PageHeader>
 

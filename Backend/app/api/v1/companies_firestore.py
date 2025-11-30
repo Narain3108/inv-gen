@@ -105,6 +105,10 @@ async def create_company(
         if not org_id:
             raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
+        # Restrict Employee from Creating Companies
+        if user.get("role") == "employee":
+             raise HTTPException(status_code=403, detail="Employees cannot create companies")
+
         company_data = company.dict(by_alias=True, exclude_unset=True)
         company_data["organizationId"] = org_id
         company_data["createdBy"] = user.get("id")

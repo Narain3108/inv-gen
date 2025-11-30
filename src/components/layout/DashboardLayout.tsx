@@ -39,9 +39,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     // If user has no companies and is not already on the onboarding page
     // AND user is not on an admin page (Super Admins manage companies differently)
     if (companies.length === 0 && !pathname.includes('/onboarding') && !pathname.startsWith('/admin')) {
-      router.push('/onboarding');
+      // Only redirect Super Admins to onboarding. Employees should see "No Access" or similar.
+      if (user?.role === 'super_admin') {
+        router.push('/onboarding');
+      } else {
+        // For employees with no companies, we might want to show a toast or redirect to a specific error page
+        // For now, we'll just not redirect to onboarding to avoid the loop
+        console.warn('Employee has no assigned companies');
+      }
     }
-  }, [companies, companiesLoading, companiesInitialized, pathname, router, authLoading]);
+  }, [companies, companiesLoading, companiesInitialized, pathname, router, authLoading, user]);
 
   if (authLoading || (user && companiesLoading && !companiesInitialized)) {
     return (
