@@ -1,3 +1,137 @@
+# InvoiceHub (inv-gen)
+
+A full-stack GST invoice / billing system combining a Next.js 14 frontend and a FastAPI backend using Firestore as the primary datastore. The codebase contains both the frontend app (Next.js + shadcn/ui + Tailwind) and a Python FastAPI backend that exposes REST endpoints under `/api/v1`.
+
+This README reflects the current state of the repository on branch `withfast` (Nov 2025): features, architecture, running instructions and where to look for role-based access control (RBAC) and user management code.
+
+---
+
+**Quick summary**
+- Frontend: Next.js (TypeScript), shadcn/ui, Tailwind CSS — UI, routing, client-side state.
+- Backend: FastAPI (Python) — REST API, Firestore access, auth and RBAC logic.
+- Data: Google Firestore collections (users, organizations, companies, products, clients, invoices, ...).
+- Auth: JWT + cookie-based sessions handled in `AuthContext` (frontend) and `app/core/deps.py` (backend). Role-based permissions enforced server-side.
+
+---
+
+**Key features (current)**
+- Organization and user signup/login (organization-scoped auth).
+- Role-based access control: `super_admin`, `admin`, `employee`.
+- Centralized User Management (Super Admin): Create/update users, set role, manage `allowedCompanyIds` (company allotment).
+- Company-level access control: users only see and act on companies in their `allowedCompanyIds` (unless `super_admin`).
+- CRUD for companies, clients, products, invoices, quotations — enforced on server by company access checks.
+- Mobile-first responsive UI with a dedicated User Management page in `Settings` (visible only to `super_admin`).
+
+---
+
+Project structure (high level)
+
+- `Backend/` — FastAPI app
+  - `app/api/v1/*.py` — API routes (see `auth_firestore.py`, `companies_firestore.py`, `invoices_firestore.py`, etc.)
+  - `app/core/` — helpers: `deps.py`, `firebase.py`, `security.py`
+  - `app/schemas/` — Pydantic models (e.g., `user.py` defines `UserCreate` and `UserUpdate` and required fields)
+
+- `src/` — Next.js frontend
+  - `src/app/` — pages and app routes (for invoices, settings, onboarding)
+  - `src/components/` — UI components (layout, settings, clients, invoices, shared)
+  - `src/contexts/` — `AuthContext`, `AppDataContext` (companies/clients/products loader)
+  - `src/lib/api/` — frontend API clients (`client.ts`, `users.api.ts`, `companies.api.ts`)
+  - `src/hooks/` — custom hooks (`useAuth`, `useCompany`, etc.)
+
+---
+
+Notable files and locations
+
+- Backend API routing aggregation: `Backend/app/api/v1/__init__.py` (includes `auth_firestore` as `/auth`).
+- User management endpoints (create/update/list) live in: `Backend/app/api/v1/auth_firestore.py` (prefixed with `/auth`).
+- RBAC and current-user resolution: `Backend/app/core/deps.py` and `app/core/security.py`.
+- Frontend User Management page (Super Admin): `src/app/invoices/settings/users/page.tsx`.
+- Frontend User form & list components: `src/components/settings/UserForm.tsx`, `UserList.tsx`.
+- Frontend app-wide data loader that enforces user-scoped companies: `src/contexts/AppDataContext.tsx`.
+- API client and error handling: `src/lib/api/client.ts` (throws ApiError on status >=400).
+
+---
+
+RBAC and company allotment (how it works)
+
+- Each user document contains fields: `role` and `allowedCompanyIds` (array of company IDs).
+- Backend endpoints verify company-level access. Example: creating/fetching invoices or products checks that `companyId` is in the caller's `allowedCompanyIds` unless the caller is `super_admin`.
+- User management: a `super_admin` can create/update users and set `allowedCompanyIds` for each user. The frontend `UserForm` provides a multi-select checkbox list for companies.
+
+---
+
+Running locally
+
+Prereqs
+- Python 3.10+ and `pip` for backend
+- Node 18+ and `pnpm` (or npm/yarn) for frontend
+- Google service account credentials (for Firestore admin access) placed in the backend config as expected (see `Backend/app/core/firebase.py` and `Backend/firbase-credentials.json` or similar).
+
+Backend (FastAPI)
+
+1. Create a virtual environment and install backend requirements:
+
+```powershell
+cd Backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+2. Ensure Firestore credentials are available to the backend (follow `Backend/README` or `app/core/firebase.py`).
+
+3. Start the backend:
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+The backend API will be available at `http://127.0.0.1:8000/api/v1` by default.
+
+Frontend (Next.js)
+
+1. Install dependencies and run dev server:
+
+```powershell
+cd ..\src
+pnpm install
+pnpm dev
+```
+
+2. Open `http://localhost:3000`.
+
+Notes: The frontend expects `NEXT_PUBLIC_API_URL` set to the backend (default `http://127.0.0.1:8000/api/v1`). See `src/lib/api/client.ts` for base URL logic.
+
+---
+
+Common troubleshooting
+
+- 403 Forbidden when switching users: caused when the frontend still has a persisted/selected company that the new user is not allowed to access. The app includes guards in `AppDataContext` to revalidate and re-load companies when the logged-in user changes.
+- 422 Unprocessable Content when creating users: the backend requires `organizationId` and other required fields defined in `Backend/app/schemas/user.py`. Make sure the frontend includes `organizationId` in the create payload (the user creation page does this automatically if you are a super admin).
+- ApiError from `src/lib/api/client.ts`: inspect `error.response?.data` in the console to see backend `detail` or validation errors. Backend uses Pydantic/HTTPException to return clear messages (e.g., `Field required`).
+
+---
+
+UX / UI notes
+
+- There is a single canonical User Management UI under `Settings -> User Management` (`/invoices/settings/users`). That page is the authoritative place for creating/editing users and setting `allowedCompanyIds`.
+- The `Sidebar` renders links conditionally based on the logged-in user's role (example: `User Management` link is shown only to `super_admin`). Certain actions like `Add Client` are hidden for `employee` users in the UI, and server-side checks enforce the same restrictions.
+
+---
+
+Contributing & next steps
+
+- Add unit & integration tests for backend endpoints (FastAPI `pytest`).
+- Harden permission checks and add logging for denied accesses.
+- Add better onboarding flow for first `super_admin` and sample seed data.
+
+---
+
+If you need a short walkthrough for a specific piece (example: how to run the backend locally with Firestore emulator, or how to seed companies/users), tell me which part and I will add a step-by-step section.
+
+---
+
+Author: team working on `inv-gen` (branch `withfast`)
 # 🧾 GST Invoice Billing System
 
 A modern, professional invoice billing system built with Next.js 14, React, TypeScript, Tailwind CSS, shadcn/ui, and Firebase. Designed for Indian businesses to create GST-compliant invoices with automatic tax calculations, GSTIN validation, and professional PDF generation.
