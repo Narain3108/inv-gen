@@ -161,7 +161,7 @@ export function Sidebar({ className }: SidebarProps) {
                 </DropdownMenuItem>
               ))
             )}
-            {user?.role !== 'employee' && (
+            {user?.role === 'super_admin' && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

@@ -119,6 +119,7 @@ async def create_client(
         if user.get("role") == "employee":
              raise HTTPException(status_code=403, detail="Employees cannot create clients")
 
+        client_data["organizationId"] = user.get("organizationId")
         client_data["createdAt"] = datetime.utcnow()
         client_data["updatedAt"] = datetime.utcnow()
         client_data["createdBy"] = user.get("id")
@@ -142,28 +143,17 @@ async def get_clients(
     company_id: Optional[str] = Query(None, alias="companyId"),
     user: Dict = Depends(get_current_user)
 ):
-    """Get clients. If companyId is provided, fetch from that company. Else fetch all accessible clients."""
+    """Get clients. Fetch all clients for the user's organization."""
     try:
         db = get_firestore_db()
         clients = []
         
-        # Determine accessible company IDs
-        allowed_companies = user.get("allowedCompanyIds", [])
-        
-        query = db.collection("clients")
-        
-        if company_id:
-            # Verify access
-            if user.get("role") != "super_admin" and company_id not in allowed_companies:
-                 raise HTTPException(status_code=403, detail="Access denied to this company")
-            query = query.where("companyId", "==", company_id)
-        else:
-            # If no company specified, filter by allowed companies
-            if user.get("role") != "super_admin":
-                if not allowed_companies:
-                    return []
-                if len(allowed_companies) > 0:
-                     query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
+        org_id = user.get("organizationId")
+        if not org_id:
+            return []
+
+        # Fetch all clients for the organization
+        query = db.collection("clients").where("organizationId", "==", org_id)
             
         docs = query.stream()
         for doc in docs:
@@ -195,9 +185,8 @@ async def get_client(
             
         client_data = doc.to_dict()
         
-        # Verify Access
-        company_id = client_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        # Verify Access (Organization Level)
+        if client_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
              
         client_data["id"] = doc.id
@@ -226,9 +215,8 @@ async def update_client(
             
         client_data = doc.to_dict()
         
-        # Verify Access
-        company_id = client_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        # Verify Access (Organization Level)
+        if client_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
 
         # Restrict Employee from Update
@@ -267,9 +255,8 @@ async def delete_client(
             
         client_data = doc.to_dict()
         
-        # Verify Access
-        company_id = client_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        # Verify Access (Organization Level)
+        if client_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
         
         # Restrict Employee from Delete

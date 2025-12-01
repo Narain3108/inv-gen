@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { CompanyForm, CompanyList } from '@/components/company';
@@ -21,6 +22,7 @@ import { companyFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useAuth } from '@/hooks/useAuth';
 
 type Numbering = {
   prefix?: string;
@@ -35,6 +37,8 @@ type CompanyFormData = z.infer<typeof companyFormSchema> & {
 };
 
 export default function CompanySettingsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, loading: isLoading, loadCompanies, addCompany, updateCompany: updateCompanyInStore, removeCompany } = useCompanies();
   const { refreshCompanies } = useAppData();
@@ -43,10 +47,22 @@ export default function CompanySettingsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
 
+  // Redirect if not super_admin
+  useEffect(() => {
+    if (!authLoading && user && user.role !== 'super_admin') {
+      router.push('/invoices/dashboard');
+      toast.error('Access denied. Only Super Admins can manage companies.');
+    }
+  }, [user, authLoading, router]);
+
   // Load companies from Firestore on mount
   useEffect(() => {
     loadCompanies();
   }, []);
+
+  if (authLoading || (user && user.role !== 'super_admin')) {
+    return null; // Or a loading spinner
+  }
 
   // Auto-open form if no companies exist
   useEffect(() => {

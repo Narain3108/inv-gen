@@ -105,9 +105,9 @@ async def create_company(
         if not org_id:
             raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
-        # Restrict Employee from Creating Companies
-        if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot create companies")
+        # Only Super Admin can create companies
+        if user.get("role") != "super_admin":
+             raise HTTPException(status_code=403, detail="Only Super Admins can create companies")
 
         company_data = company.dict(by_alias=True, exclude_unset=True)
         company_data["organizationId"] = org_id
@@ -217,9 +217,9 @@ async def update_company(
         if company_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
              
-        # Verify User Access (Admin or Super Admin only)
-        if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot update companies")
+        # Only Super Admin can update companies
+        if user.get("role") != "super_admin":
+             raise HTTPException(status_code=403, detail="Only Super Admins can update companies")
         
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
              raise HTTPException(status_code=403, detail="Access denied")
