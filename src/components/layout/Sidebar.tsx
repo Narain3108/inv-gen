@@ -41,6 +41,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
+  excludeActivePaths?: string[];
 }
 
 const navItems: NavItem[] = [
@@ -73,6 +74,7 @@ const navItems: NavItem[] = [
     title: 'Settings',
     href: '/invoices/settings',
     icon: Settings,
+    excludeActivePaths: ['/invoices/settings/users'],
   },
 ];
 
@@ -185,7 +187,11 @@ export function Sidebar({ className }: SidebarProps) {
           return true;
         }).map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          const matchesBasePath = pathname === item.href || pathname.startsWith(item.href + '/');
+          const isExcluded = item.excludeActivePaths?.some((path) =>
+            pathname === path || pathname.startsWith(path + '/')
+          );
+          const isActive = matchesBasePath && !isExcluded;
 
           return (
             <Link

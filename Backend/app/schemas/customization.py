@@ -3,7 +3,7 @@ Customization Pydantic Schemas
 """
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import Field
