@@ -7,10 +7,11 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Bell, Menu, Search } from 'lucide-react';
+import { LogOut, Menu, Search } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -18,6 +19,8 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick, className }: HeaderProps) {
+  const { logout } = useAuth();
+
   return (
     <header className={cn(
       'sticky top-0 z-40 flex h-14 sm:h-16 items-center gap-2 sm:gap-4',
@@ -49,7 +52,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
       <div className="flex-1 sm:hidden" />
 
       {/* Actions */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
         {/* Search Button - Mobile Only */}
         <Button
           variant="ghost"
@@ -60,10 +63,28 @@ export function Header({ onMenuClick, className }: HeaderProps) {
           <Search className="h-5 w-5" />
         </Button>
 
-
-
         {/* Theme Toggle */}
         <ThemeToggle className="shrink-0" />
+
+        {/* Logout */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={logout}
+          className="hidden sm:inline-flex gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={logout}
+          className="sm:hidden shrink-0 hover:bg-destructive/10 text-destructive"
+          aria-label="Logout"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
       </div>
     </header>
   );
