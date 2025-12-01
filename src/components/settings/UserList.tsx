@@ -80,18 +80,28 @@ export function UserList({ users, onEdit }: UserListProps) {
       {/* Mobile View */}
       <div className="grid gap-4 md:hidden">
         {users.map((user) => (
-          <Card key={user.id} className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="font-medium">{user.name}</div>
-              <div className="text-sm text-muted-foreground">{user.email}</div>
-              <Badge variant={user.role === 'super_admin' ? 'default' : user.role === 'admin' ? 'secondary' : 'outline'} className="mt-1">
+          <Card key={user.id} className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="font-semibold text-base">{user.name}</div>
+                <div className="text-sm text-muted-foreground break-all">{user.email}</div>
+              </div>
+              <Badge variant={user.role === 'super_admin' ? 'default' : user.role === 'admin' ? 'secondary' : 'outline'}>
                 {user.role.replace('_', ' ').toUpperCase()}
               </Badge>
             </div>
+            {user.allowedCompanyIds?.length ? (
+              <div className="text-xs text-muted-foreground">
+                Access to {user.allowedCompanyIds.length} compan{user.allowedCompanyIds.length === 1 ? 'y' : 'ies'}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">All companies</div>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="outline" size="sm" className="w-full">
                   <MoreVertical className="h-4 w-4" />
+                  <span className="ml-2">Manage</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

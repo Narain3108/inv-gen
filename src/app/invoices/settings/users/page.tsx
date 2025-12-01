@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
 import { DashboardLayout } from '@/components/layout';
+import { useAppData } from '@/contexts/AppDataContext';
 import { User } from '@/types';
 import { UserList } from '@/components/settings/UserList';
 import { UserForm } from '@/components/settings/UserForm';
@@ -33,12 +34,14 @@ import { toast } from 'sonner';
 export default function UsersPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { companies, companiesLoading } = useAppData();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'employee'>('all');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!authLoading && currentUser) {
@@ -131,9 +134,17 @@ export default function UsersPage() {
         user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesRole = roleFilter === 'all' ? true : user.role === roleFilter;
-      return matchesSearch && matchesRole;
+      const hasCompanies = user.allowedCompanyIds?.length > 0;
+      const matchesCompany =
+        companyFilter === 'all'
+          ? true
+          : companyFilter === 'unassigned'
+            ? !hasCompanies
+            : user.role === 'super_admin' || user.allowedCompanyIds?.includes(companyFilter);
+
+      return matchesSearch && matchesRole && matchesCompany;
     }),
-  [users, searchTerm, roleFilter]);
+  [users, searchTerm, roleFilter, companyFilter]);
 
   const stats = useMemo(() => ([
     {
@@ -170,7 +181,7 @@ export default function UsersPage() {
           description="Manage roles, permissions, and company access for your organization."
           icon={UsersIcon}
         />
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={handleRefresh} className="gap-2">
             <RefreshCcw className="h-4 w-4" />
             Refresh
@@ -182,7 +193,7 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label} className="overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -199,11 +210,11 @@ export default function UsersPage() {
         ))}
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-semibold">Quick Filters</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative w-full lg:flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -213,18 +224,39 @@ export default function UsersPage() {
               className="pl-10"
             />
           </div>
-          <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as typeof roleFilter)}>
-            <SelectTrigger className="w-full lg:w-[220px]">
-              <SelectValue placeholder="Filter by role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              <SelectItem value="super_admin">Super Admins</SelectItem>
-              <SelectItem value="admin">Admins</SelectItem>
-              <SelectItem value="employee">Employees</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="text-sm text-muted-foreground lg:w-auto">
+          <div className="grid gap-3 w-full sm:grid-cols-2 lg:flex lg:flex-row">
+            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as typeof roleFilter)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectItem value="all">All roles</SelectItem>
+                <SelectItem value="super_admin">Super Admins</SelectItem>
+                <SelectItem value="admin">Admins</SelectItem>
+                <SelectItem value="employee">Employees</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={companyFilter} onValueChange={(value) => setCompanyFilter(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter by company" />
+              </SelectTrigger>
+              <SelectContent className="max-h-64 overflow-y-auto">
+                <SelectItem value="all">All companies</SelectItem>
+                <SelectItem value="unassigned">No company assigned</SelectItem>
+                {companies.length === 0 && (
+                  <SelectItem value="__empty" disabled>
+                    {companiesLoading ? 'Loading companies...' : 'No companies found'}
+                  </SelectItem>
+                )}
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-sm text-muted-foreground lg:w-auto text-center lg:text-left">
             Showing <span className="font-semibold text-foreground">{filteredUsers.length}</span> of{' '}
             <span className="font-semibold text-foreground">{users.length}</span> users
           </div>
