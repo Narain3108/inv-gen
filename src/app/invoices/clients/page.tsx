@@ -29,7 +29,7 @@ type ClientFormData = z.infer<typeof clientFormSchema>;
 function ClientsContent() {
   const { user } = useAuth();
   const { selectedCompany } = useCompany();
-  const { clients, clientsLoading, refreshClients } = useAppData();
+  const { clients, clientsLoading, refreshClients, deleteClient } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
@@ -101,14 +101,13 @@ function ClientsContent() {
   const handleDelete = async () => {
     if (!deletingClient) return;
 
+    const clientToDelete = deletingClient;
+    setDeletingClient(null);
+
     try {
-      await clientsApi.delete(deletingClient.id);
-      toast.success('Client deleted successfully');
-      setDeletingClient(null);
-      await refreshClients();
+      await deleteClient(clientToDelete.id);
     } catch (error) {
-      console.error('Error deleting client:', error);
-      toast.error('Failed to delete client');
+      // Error handled in context
     }
   };
 

@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { companiesApi } from '@/lib/api/companies.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
+import { toast } from 'sonner';
 
 interface AppDataContextType {
   // Companies
@@ -35,6 +36,8 @@ interface AppDataContextType {
   refreshCompanies: () => Promise<void>;
   refreshClients: () => Promise<void>;
   refreshProducts: () => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -229,6 +232,37 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     await loadProducts();
   }, [loadProducts]);
 
+  const deleteClient = useCallback(async (id: string) => {
+    const previousClients = [...clients];
+    setClients(prev => prev.filter(c => c.id !== id));
+    
+    try {
+      await clientsApi.delete(id);
+      toast.success('Client deleted successfully');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast.error('Failed to delete client');
+      setClients(previousClients);
+      throw error;
+    }
+  }, [clients]);
+
+  const deleteProduct = useCallback(async (id: string) => {
+    const productToDelete = products.find(p => p.id === id);
+    const previousProducts = [...products];
+    setProducts(prev => prev.filter(p => p.id !== id));
+    
+    try {
+      await productsApi.delete(id, productToDelete?.companyId);
+      toast.success('Product deleted successfully');
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Failed to delete product');
+      setProducts(previousProducts);
+      throw error;
+    }
+  }, [products]);
+
   const value: AppDataContextType = {
     companies,
     companiesLoading,
@@ -245,6 +279,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     refreshCompanies,
     refreshClients,
     refreshProducts,
+    deleteClient,
+    deleteProduct,
   };
 
   return (

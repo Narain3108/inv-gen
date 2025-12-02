@@ -89,23 +89,28 @@ export default function CompanySettingsPage() {
   const confirmDelete = async () => {
     if (!companyToDelete) return;
 
+    const idToDelete = companyToDelete;
+    
+    // Optimistic Update
+    removeCompany(idToDelete);
+    setDeleteConfirmOpen(false);
+    setCompanyToDelete(null);
+    toast.success('Company deleted successfully');
+
+    // If deleted company was selected, select another one
+    if (selectedCompany?.id === idToDelete) {
+      const remaining = companies.filter(c => c.id !== idToDelete);
+      setSelectedCompany(remaining.length > 0 ? remaining[0] : null);
+    }
+
     try {
-      await companiesApi.delete(companyToDelete);
-      removeCompany(companyToDelete); // Update global store
+      await companiesApi.delete(idToDelete);
       await refreshCompanies(); // Refresh AppDataContext
-      toast.success('Company deleted successfully');
-      
-      // If deleted company was selected, select another one
-      if (selectedCompany?.id === companyToDelete) {
-        const remaining = companies.filter(c => c.id !== companyToDelete);
-        setSelectedCompany(remaining.length > 0 ? remaining[0] : null);
-      }
     } catch (error) {
       console.error('Error deleting company:', error);
       toast.error('Failed to delete company');
-    } finally {
-      setDeleteConfirmOpen(false);
-      setCompanyToDelete(null);
+      // Revert by reloading
+      loadCompanies();
     }
   };
 

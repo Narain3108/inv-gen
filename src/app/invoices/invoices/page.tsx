@@ -201,9 +201,18 @@ function InvoicesContent() {
     }
 
     if (selectedCompany && companies.length > 0) {
-      loadInvoices();
+      // Validate that the selected company is actually in the user's allowed companies list
+      // This prevents race conditions where a stale selectedCompany (from localStorage) 
+      // triggers a 403 before the global context has a chance to reset it.
+      const isValidCompany = companies.find(c => c.id === selectedCompany.id);
+      
+      if (isValidCompany) {
+        loadInvoices();
+      } else {
+        console.log('⚠️ Skipping invoice load for invalid/stale company:', selectedCompany.name);
+      }
     }
-  }, [selectedCompany, companiesInitialized, clientsInitialized, companies.length, loadInvoices]);
+  }, [selectedCompany, companiesInitialized, clientsInitialized, companies, loadInvoices]);
 
   const handleAddInvoice = async () => {
     // Check if company exists
@@ -330,14 +339,19 @@ function InvoicesContent() {
   const handleDeleteInvoice = async () => {
     if (!deleteInvoice?.id) return;
 
+    // Optimistic Update
+    const previousInvoices = [...invoices];
+    setInvoices(prev => prev.filter(i => i.id !== deleteInvoice.id));
+    setDeleteInvoice(null);
+    toast.success('Invoice deleted successfully');
+
     try {
       await invoicesApi.delete(deleteInvoice.id, deleteInvoice.companyId);
-      toast.success('Invoice deleted successfully');
-      setDeleteInvoice(null);
-      loadInvoices();
     } catch (error) {
       console.error('Error deleting invoice:', error);
       toast.error('Failed to delete invoice');
+      // Revert changes
+      setInvoices(previousInvoices);
     }
   };
 

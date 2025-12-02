@@ -27,7 +27,7 @@ type ProductFormData = z.infer<typeof productFormSchema>;
 
 function ProductsContent() {
   const { selectedCompany } = useCompany();
-  const { products, productsLoading, refreshProducts } = useAppData();
+  const { products, productsLoading, refreshProducts, deleteProduct } = useAppData();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
@@ -105,14 +105,13 @@ function ProductsContent() {
   const handleDelete = async () => {
     if (!deletingProduct) return;
 
+    const productToDelete = deletingProduct;
+    setDeletingProduct(null);
+
     try {
-      await productsApi.delete(deletingProduct.id, deletingProduct.companyId);
-      toast.success('Product deleted successfully');
-      setDeletingProduct(null);
-      await refreshProducts();
+      await deleteProduct(productToDelete.id);
     } catch (error) {
-      console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
+      // Error handled in context
     }
   };
 

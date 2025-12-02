@@ -178,9 +178,16 @@ function QuotationsContent() {
     }
 
     if (selectedCompany && companies.length > 0) {
-      loadData();
+      // Validate company access before loading to prevent 403s
+      const isValidCompany = companies.find(c => c.id === selectedCompany.id);
+      
+      if (isValidCompany) {
+        loadData();
+      } else {
+        console.log('⚠️ Skipping quotation load for invalid/stale company:', selectedCompany.name);
+      }
     }
-  }, [selectedCompany, initialized, companies.length, loadData]);
+  }, [selectedCompany, initialized, companies, loadData]);
 
   const handleAddQuotation = async () => {
     // Check if company exists
@@ -280,14 +287,19 @@ function QuotationsContent() {
   const handleDeleteQuotation = async () => {
     if (!deleteQuotation) return;
 
+    // Optimistic Update
+    const previousQuotations = [...quotations];
+    setQuotations(prev => prev.filter(q => q.id !== deleteQuotation.id));
+    setDeleteQuotation(null);
+    toast.success('Quotation deleted successfully');
+
     try {
       await quotationsApi.delete(deleteQuotation.id, deleteQuotation.companyId);
-      toast.success('Quotation deleted successfully');
-      setDeleteQuotation(null);
-      await loadData();
     } catch (error) {
       console.error('Error deleting quotation:', error);
       toast.error('Failed to delete quotation');
+      // Revert
+      setQuotations(previousQuotations);
     }
   };
 
