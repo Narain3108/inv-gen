@@ -21,10 +21,7 @@ export default function LoginPage() {
         <CardContent>
           <LoginForm />
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link href="/auth/signup" className="text-primary hover:underline font-medium">
-              Create Organization
-            </Link>
+           
           </div>
         </CardContent>
       </Card>
