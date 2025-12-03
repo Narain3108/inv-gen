@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Shield, Trash2, Edit } from 'lucide-react';
+import { Users, Plus, Shield, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies } from '@/hooks/useCompanies';
 import { organizationApi } from '@/lib/api/organization.api';
@@ -29,6 +29,7 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Load users and companies
   useEffect(() => {
@@ -199,7 +200,20 @@ function UserDialog({ open, onOpenChange, companies, orgId, onSuccess }: {
           </div>
           <div className="space-y-2">
             <Label>Password</Label>
-            <Input {...register('password')} type="password" placeholder="••••••••" />
+            <div className="relative">
+              <Input 
+                {...register('password')} 
+                type={showPassword ? "text" : "password"} 
+                placeholder="••••••••" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
           </div>
           <div className="space-y-2">

@@ -9,11 +9,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function OrgSignupForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showOrgPassword, setShowOrgPassword] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { signupOrg } = useAuth();
 
   const {
@@ -64,13 +67,22 @@ export default function OrgSignupForm() {
 
         <div className="space-y-2">
           <Label htmlFor="orgPassword">Organization Shared Password</Label>
-          <Input
-            id="orgPassword"
-            type="password"
-            placeholder="••••••••"
-            {...register('orgPassword')}
-            disabled={isLoading}
-          />
+          <div className="relative">
+            <Input
+              id="orgPassword"
+              type={showOrgPassword ? "text" : "password"}
+              placeholder="••••••••"
+              {...register('orgPassword')}
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowOrgPassword(!showOrgPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            >
+              {showOrgPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {errors.orgPassword && <p className="text-sm text-destructive">{errors.orgPassword.message}</p>}
         </div>
       </div>
@@ -103,24 +115,42 @@ export default function OrgSignupForm() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="adminPassword">Password</Label>
-            <Input
-              id="adminPassword"
-              type="password"
-              placeholder="••••••••"
-              {...register('adminPassword')}
-              disabled={isLoading}
-            />
+            <div className="relative">
+              <Input
+                id="adminPassword"
+                type={showAdminPassword ? "text" : "password"}
+                placeholder="••••••••"
+                {...register('adminPassword')}
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowAdminPassword(!showAdminPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {errors.adminPassword && <p className="text-sm text-destructive">{errors.adminPassword.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmAdminPassword">Confirm Password</Label>
-            <Input
-              id="confirmAdminPassword"
-              type="password"
-              placeholder="••••••••"
-              {...register('confirmAdminPassword')}
-              disabled={isLoading}
-            />
+            <div className="relative">
+              <Input
+                id="confirmAdminPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="••••••••"
+                {...register('confirmAdminPassword')}
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {errors.confirmAdminPassword && <p className="text-sm text-destructive">{errors.confirmAdminPassword.message}</p>}
           </div>
         </div>
