@@ -224,9 +224,9 @@ export default function UsersPage() {
               className="pl-10"
             />
           </div>
-          <div className="grid gap-3 w-full sm:grid-cols-2 lg:flex lg:flex-row">
+          <div className="grid gap-3 w-full sm:grid-cols-2 lg:w-auto lg:flex lg:flex-row">
             <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as typeof roleFilter)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full lg:w-[160px]">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
@@ -237,7 +237,7 @@ export default function UsersPage() {
               </SelectContent>
             </Select>
             <Select value={companyFilter} onValueChange={(value) => setCompanyFilter(value)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full lg:w-[220px]">
                 <SelectValue placeholder="Filter by company" />
               </SelectTrigger>
               <SelectContent className="max-h-64 overflow-y-auto">
@@ -256,7 +256,7 @@ export default function UsersPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="text-sm text-muted-foreground lg:w-auto text-center lg:text-left">
+          <div className="text-sm text-muted-foreground lg:w-auto text-center lg:text-left whitespace-nowrap">
             Showing <span className="font-semibold text-foreground">{filteredUsers.length}</span> of{' '}
             <span className="font-semibold text-foreground">{users.length}</span> users
           </div>
