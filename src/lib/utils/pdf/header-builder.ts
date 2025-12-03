@@ -8,145 +8,83 @@ import { formatDate } from '@/utils/formatters';
 import { getFontSize } from './helpers';
 
 /**
- * Build company header section
+ * Build 3-column header section
  */
-export const buildCompanyHeader = (company: Company, customization?: InvoiceCustomization): any => {
+export const buildHeader = (
+  company: Company, 
+  document: Invoice | Quotation, 
+  customization?: InvoiceCustomization,
+  type: 'invoice' | 'quotation' = 'invoice'
+): any => {
   const showLogo = customization?.companyDetails?.showLogo !== false;
-  const showAddress = customization?.companyDetails?.showAddress !== false;
-  const showGSTIN = customization?.companyDetails?.showGSTIN !== false;
-  const showPhone = customization?.companyDetails?.showPhone !== false;
-  const showEmail = customization?.companyDetails?.showEmail !== false;
-
+  const title = type === 'invoice' ? 'TAX INVOICE' : 'QUOTATION';
+  const documentNumber = type === 'invoice' ? (document as Invoice).invoiceNumber : (document as Quotation).quotationNumber;
+  const dateLabel = type === 'invoice' ? 'Invoice Date' : 'Date';
+  
   return {
     columns: [
-      showLogo && company.logoUrl
-        ? {
-            image: company.logoUrl,
-            width: 80,
-            height: 80,
-            alignment: 'left',
-          }
-        : {
-            text: company.name.substring(0, 2).toUpperCase(),
-            fontSize: 32,
-            bold: true,
-            color: customization?.colorScheme?.primary || '#3b82f6',
-            alignment: 'center',
-            width: 100,
-          },
+      // Left Column: Logo
       {
-        width: '*',
+        width: '30%',
         stack: [
-          { text: company.name, fontSize: 18, bold: true },
-          ...(showAddress ? [
-            { text: company.address.street, fontSize: 9, margin: [0, 2, 0, 0] },
-            {
-              text: `${company.address.city}, ${company.address.state} - ${company.address.pincode}`,
-              fontSize: 9,
-            },
-          ] : []),
-          ...(showGSTIN && company.gstin ? [{
-            text: `GSTIN: ${company.gstin}`,
-            fontSize: 9,
-            margin: [0, 2, 0, 0]
-          }] : []),
-          ...(showPhone ? [{
-            text: `Phone: ${company.contact.phone}`,
-            fontSize: 9
-          }] : []),
-          ...(showEmail ? [{
-            text: `Email: ${company.contact.email}`,
-            fontSize: 9
-          }] : []),
-          {
-            text: `Place of Supply: ${company.address.state}`,
-            fontSize: 9,
-            margin: [0, 2, 0, 0],
-            bold: true
-          },
-        ],
-        alignment: 'right',
+          showLogo && company.logoUrl
+            ? {
+                image: company.logoUrl,
+                width: 80,
+                height: 80,
+                alignment: 'left',
+              }
+            : {
+                text: company.name.substring(0, 2).toUpperCase(),
+                fontSize: 32,
+                bold: true,
+                color: customization?.colorScheme?.primary || '#3b82f6',
+                alignment: 'center',
+                width: 80,
+              }
+        ]
       },
+      // Center Column: Title and Document Details
+      {
+        width: '40%',
+        stack: [
+          { text: title, fontSize: 16, bold: true, alignment: 'center', margin: [0, 5, 0, 2] },
+          { text: `${type === 'invoice' ? 'Invoice' : 'Quotation'} #: ${documentNumber}`, fontSize: 9, bold: true, alignment: 'center' },
+          { text: `${dateLabel}: ${formatDate(document.date)}`, fontSize: 9, alignment: 'center' },
+        ],
+        alignment: 'center'
+      },
+      // Right Column: Company Details
+      {
+        width: '30%',
+        stack: [
+          { text: company.name, fontSize: 10, bold: true, alignment: 'right' },
+          { text: company.address.street, fontSize: 8, alignment: 'right' },
+          { text: `${company.address.city}, ${company.address.state} - ${company.address.pincode}`, fontSize: 8, alignment: 'right' },
+          company.gstin ? { text: `GSTIN: ${company.gstin}`, fontSize: 8, alignment: 'right' } : {},
+          company.contact.email ? { text: `Email: ${company.contact.email}`, fontSize: 8, alignment: 'right' } : {},
+          company.contact.phone ? { text: `Phone: ${company.contact.phone}`, fontSize: 8, alignment: 'right' } : {},
+        ],
+        alignment: 'right'
+      }
     ],
+    margin: [0, 0, 0, 10]
   };
 };
 
-/**
- * Build invoice title section
- */
+// Deprecated builders kept for compatibility if needed, but we will use buildHeader
+export const buildCompanyHeader = (company: Company, customization?: InvoiceCustomization): any => {
+  return {}; 
+};
+
 export const buildInvoiceTitle = (customization?: InvoiceCustomization, type: 'invoice' | 'quotation' = 'invoice'): any => {
-  const defaultTitle = type === 'invoice' ? 'TAX INVOICE' : 'QUOTATION';
-  const title = customization?.header?.title || defaultTitle;
-  const fontSize = getFontSize(customization?.header?.fontSize, 20);
-
-  return {
-    text: title,
-    fontSize,
-    bold: true,
-    alignment: 'center',
-    margin: [0, 20, 0, 15],
-    color: customization?.colorScheme?.primary || '#000000',
-  };
+  return {};
 };
 
-/**
- * Build invoice number and date section
- */
 export const buildInvoiceInfo = (
   data: { invoiceNumber?: string; quotationNumber?: string; referenceNumber?: string; date: any; validUntil?: any },
   customization?: InvoiceCustomization,
   type: 'invoice' | 'quotation' = 'invoice'
 ): any => {
-  const showNumber = customization?.header?.showInvoiceNumber !== false;
-  const showDate = customization?.header?.showDate !== false;
-  const showDueDate = customization?.header?.showDueDate !== false;
-
-  const numberLabel = customization?.header?.invoiceNumberLabel || (type === 'invoice' ? 'Invoice No' : 'Quotation No');
-  const dateLabel = customization?.header?.dateLabel || 'Date';
-  const dueDateLabel = customization?.header?.dueDateLabel || (type === 'quotation' ? 'Valid Until' : 'Due Date');
-
-  const number = type === 'invoice' ? data.invoiceNumber : data.quotationNumber;
-
-  return {
-    columns: [
-      { width: '*', text: '' },
-      {
-        width: 'auto',
-        stack: [
-          ...(showNumber && number ? [{
-            text: [
-              { text: `${numberLabel}: `, fontSize: 10, color: '#4b5563' },
-              { text: number, fontSize: 10, bold: true },
-            ],
-            alignment: 'right',
-          }] : []),
-          ...(type === 'invoice' && data.referenceNumber ? [{
-            text: [
-              { text: 'Ref No: ', fontSize: 10, color: '#4b5563' },
-              { text: data.referenceNumber, fontSize: 10, bold: true },
-            ],
-            alignment: 'right',
-            margin: [0, 3, 0, 0],
-          }] : []),
-          ...(showDate ? [{
-            text: [
-              { text: `${dateLabel}: `, fontSize: 10, color: '#4b5563' },
-              { text: formatDate(data.date), fontSize: 10, bold: true },
-            ],
-            alignment: 'right',
-            margin: [0, 3, 0, 0],
-          }] : []),
-          ...(showDueDate && data.validUntil ? [{
-            text: [
-              { text: `${dueDateLabel}: `, fontSize: 10, color: '#4b5563' },
-              { text: formatDate(data.validUntil), fontSize: 10, bold: true },
-            ],
-            alignment: 'right',
-            margin: [0, 3, 0, 0],
-          }] : []),
-        ],
-      },
-    ],
-    margin: [0, 0, 0, 15],
-  };
+  return {};
 };

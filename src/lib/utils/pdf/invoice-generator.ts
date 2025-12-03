@@ -6,11 +6,11 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import { InvoicePDFData, PDFDocumentDefinition } from './types';
-import { buildCompanyHeader, buildInvoiceTitle, buildInvoiceInfo } from './header-builder';
+import { buildHeader } from './header-builder';
 import { buildAddressSection } from './address-builder';
-import { buildItemsTable } from './items-table-builder';
+import { buildFixedItemsTable } from './items-table-builder';
 import { buildTotalsSection } from './totals-builder';
-import { buildBankDetails, buildTermsAndConditions, buildNotesSection, buildSignature } from './footer-builder';
+import { buildHorizontalFooter, buildSignature } from './footer-builder';
 import { getPageWatermark } from './watermark-builder';
 import { Company } from '@/types';
 import { cloudinaryUrlToBase64 } from '@/lib/services/cloudinary-service';
@@ -84,56 +84,93 @@ export async function generateInvoicePDF(data: InvoicePDFData): Promise<void> {
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
-  const margins = customization?.margins || { top: 60, right: 40, bottom: 60, left: 40 };
+  const margins = customization?.margins || { top: 20, right: 20, bottom: 20, left: 20 };
+
+  // Chunk items for pagination (8 rows per page)
+  const items = invoice.items || [];
+  const itemsPerPage = 8;
+  const chunks = [];
+  if (items.length === 0) {
+    chunks.push([]);
+  } else {
+    for (let i = 0; i < items.length; i += itemsPerPage) {
+      chunks.push(items.slice(i, i + itemsPerPage));
+    }
+  }
+
+  const content: any[] = [];
+
+  // Add watermark
+  content.push(...getPageWatermark(copyType));
+
+  // Build pages
+  chunks.forEach((chunk, index) => {
+    const isLastPage = index === chunks.length - 1;
+    const startIndex = index * itemsPerPage;
+
+    // 1. Header Section (Repeated on every page)
+    content.push(buildHeader(companyWithImages, invoice, customization, 'invoice'));
+
+    // Small vertical spacer (~5 points) between header and addresses
+    content.push({ text: '', margin: [0, 5, 0, 0] });
+
+    // 2. Billing/Shipping Section (Repeated on every page for fixed template)
+    content.push(buildAddressSection(client, customization, invoice));
+
+    // Add a little extra space after addresses before the items table
+    content.push({ text: '', margin: [0, 4, 0, 0] });
+
+    // 3. Items Table (Chunked)
+    content.push(buildFixedItemsTable(chunk, startIndex));
+
+    // 4. Footer Section (Only on last page)
+    if (isLastPage) {
+      // Tax Breakdown & Totals
+      content.push(...buildTotalsSection(invoice, customization));
+      
+      // Horizontal Footer (Bank, Terms, Notes)
+      const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
+      if (horizontalFooter) {
+        content.push(horizontalFooter);
+      }
+      
+      // Signature
+      content.push(buildSignature(companyWithImages, customization));
+    } else {
+      // Add page break if not last page
+      content.push({ text: '', pageBreak: 'after' });
+    }
+  });
 
   const docDefinition: PDFDocumentDefinition = {
     pageSize,
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
-    content: [
-      // Watermark for duplicate copy (top right corner)
-      ...getPageWatermark(copyType),
-
-      // Header with company logo and details
-      buildCompanyHeader(companyWithImages, customization),
-
-      // Invoice Title
-      buildInvoiceTitle(customization, 'invoice'),
-
-      // Invoice Number and Date
-      buildInvoiceInfo(invoice, customization, 'invoice'),
-
-      // Billing and Shipping Address
-      buildAddressSection(client, customization, invoice),
-
-      // Items Table
-      buildItemsTable(invoice.items, customization),
-
-      // Tax Summary and Totals
-      ...buildTotalsSection(invoice, customization),
-
-      // Bank Details
-      ...buildBankDetails(companyWithImages, customization),
-
-      // Terms and Conditions
-      ...buildTermsAndConditions(customization),
-
-      // Notes
-      ...buildNotesSection(customization),
-
-      // Signature
-      buildSignature(companyWithImages, customization),
-    ],
+    content: content,
     styles: {
+      header: {
+        fontSize: 18,
+        bold: true,
+        margin: [0, 0, 0, 10]
+      },
+      subheader: {
+        fontSize: 14,
+        bold: true,
+        margin: [0, 10, 0, 5]
+      },
       tableHeader: {
         bold: true,
-        fontSize: 9,
-        color: '#374151',
+        fontSize: 10,
+        color: 'black',
         fillColor: '#f3f4f6',
       },
+      defaultStyle: {
+        font: 'Roboto'
+      }
     },
     defaultStyle: {
-      font: 'Roboto',
-    },
+      fontSize: 10,
+      font: 'Roboto'
+    }
   };
 
   // Generate and download PDF
@@ -153,53 +190,81 @@ export async function previewInvoicePDF(data: InvoicePDFData): Promise<void> {
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
-  const margins = customization?.margins || { top: 60, right: 40, bottom: 60, left: 40 };
+  const margins = customization?.margins || { top: 20, right: 20, bottom: 20, left: 20 };
+
+  // Chunk items for pagination (8 rows per page)
+  const items = invoice.items || [];
+  const itemsPerPage = 8;
+  const chunks = [];
+  if (items.length === 0) {
+    chunks.push([]);
+  } else {
+    for (let i = 0; i < items.length; i += itemsPerPage) {
+      chunks.push(items.slice(i, i + itemsPerPage));
+    }
+  }
+
+  const content: any[] = [];
+
+  // Build pages
+  chunks.forEach((chunk, index) => {
+    const isLastPage = index === chunks.length - 1;
+    const startIndex = index * itemsPerPage;
+
+    // 1. Header Section
+    content.push(buildHeader(companyWithImages, invoice, customization, 'invoice'));
+
+    // 2. Billing/Shipping Section
+    content.push(buildAddressSection(client, customization, invoice));
+
+    // 3. Items Table
+    content.push(buildFixedItemsTable(chunk, startIndex));
+
+    // 4. Footer Section
+    if (isLastPage) {
+      content.push(...buildTotalsSection(invoice, customization));
+      
+      // Horizontal Footer (Bank, Terms, Notes)
+      const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
+      if (horizontalFooter) {
+        content.push(horizontalFooter);
+      }
+
+      content.push(buildSignature(companyWithImages, customization));
+    } else {
+      content.push({ text: '', pageBreak: 'after' });
+    }
+  });
 
   const docDefinition: PDFDocumentDefinition = {
     pageSize,
     pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
-    content: [
-      // Header with company logo and details
-      buildCompanyHeader(companyWithImages, customization),
-
-      // Invoice Title
-      buildInvoiceTitle(customization, 'invoice'),
-
-      // Invoice Number and Date
-      buildInvoiceInfo(invoice, customization, 'invoice'),
-
-      // Billing and Shipping Address
-      buildAddressSection(client, customization, invoice),
-
-      // Items Table
-      buildItemsTable(invoice.items, customization),
-
-      // Tax Summary and Totals
-      ...buildTotalsSection(invoice, customization),
-
-      // Bank Details
-      ...buildBankDetails(companyWithImages, customization),
-
-      // Terms and Conditions
-      ...buildTermsAndConditions(customization),
-
-      // Notes
-      ...buildNotesSection(customization),
-
-      // Signature
-      buildSignature(companyWithImages, customization),
-    ],
+    content: content,
     styles: {
+      header: {
+        fontSize: 18,
+        bold: true,
+        margin: [0, 0, 0, 10]
+      },
+      subheader: {
+        fontSize: 14,
+        bold: true,
+        margin: [0, 10, 0, 5]
+      },
       tableHeader: {
         bold: true,
-        fontSize: 9,
-        color: '#374151',
+        fontSize: 10,
+        color: 'black',
         fillColor: '#f3f4f6',
       },
+      defaultStyle: {
+        font: 'Roboto'
+      }
     },
     defaultStyle: {
-      font: 'Roboto',
-    },
+      fontSize: 10,
+      font: 'Roboto'
+    }
   };
 
   // Open PDF in new window

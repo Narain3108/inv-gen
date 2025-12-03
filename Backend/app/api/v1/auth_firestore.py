@@ -1,8 +1,10 @@
 from typing import List
+import logging
 from fastapi import APIRouter, HTTPException, Response, Depends
 from firebase_admin import auth
 from google.cloud.firestore import FieldFilter
 from app.core.firebase import get_firestore_db
+from app.core.config import settings
 from app.schemas.auth import (
     LoginRequest, SignupRequest, LoginResponse, SignupResponse, GoogleLoginRequest,
     OrgLoginRequest, OrgSignupRequest, OrgLoginResponse, UserLoginRequest, UserLoginResponse
@@ -14,6 +16,7 @@ from datetime import datetime
 import uuid
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # --- Organization Auth ---
 
@@ -65,6 +68,24 @@ async def org_signup(request: OrgSignupRequest, response: Response):
 
     token = create_access_token(subject=f"org:{org_id}")
 
+    # Also set cookie for organization session (if frontend expects cookie-based sessions)
+    try:
+        max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        cookie_opts = settings.cookie_settings
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            max_age=max_age,
+            httponly=cookie_opts.get("httponly", True),
+            secure=cookie_opts.get("secure", True),
+            samesite=cookie_opts.get("samesite"),
+            domain=cookie_opts.get("domain"),
+            path=cookie_opts.get("path", "/"),
+        )
+        logger.debug("Set cookie for org signup (org_id=%s) secure=%s samesite=%s domain=%s", org_id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+    except Exception:
+        logger.exception("Failed to set cookie for org signup")
+
     return {
         "organization": org_data,
         "token": token
@@ -90,6 +111,23 @@ async def org_login(request: OrgLoginRequest, response: Response):
         raise HTTPException(status_code=400, detail="Invalid organization code or password")
     
     token = create_access_token(subject=f"org:{org_doc.id}")
+
+    try:
+        max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        cookie_opts = settings.cookie_settings
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            max_age=max_age,
+            httponly=cookie_opts.get("httponly", True),
+            secure=cookie_opts.get("secure", True),
+            samesite=cookie_opts.get("samesite"),
+            domain=cookie_opts.get("domain"),
+            path=cookie_opts.get("path", "/"),
+        )
+        logger.debug("Set cookie for org login (org_id=%s) secure=%s samesite=%s domain=%s", org_doc.id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+    except Exception:
+        logger.exception("Failed to set cookie for org login")
     
     return {
         "organization": org_data,
@@ -123,15 +161,22 @@ async def user_login(request: UserLoginRequest, response: Response):
         raise HTTPException(status_code=400, detail="Invalid email or password")
     
     token = create_access_token(subject=user_doc.id)
-    
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7
-    )
+    try:
+        max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        cookie_opts = settings.cookie_settings
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            max_age=max_age,
+            httponly=cookie_opts.get("httponly", True),
+            secure=cookie_opts.get("secure", True),
+            samesite=cookie_opts.get("samesite"),
+            domain=cookie_opts.get("domain"),
+            path=cookie_opts.get("path", "/"),
+        )
+        logger.debug("Set cookie for user login (user_id=%s) secure=%s samesite=%s domain=%s", user_doc.id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+    except Exception:
+        logger.exception("Failed to set cookie for user login")
 
     return {
         "user": user_data,
@@ -175,7 +220,19 @@ async def create_sub_user(user_in: UserCreate):
     user_data["password"] = get_password_hash(user_in.password)
     user_data["createdAt"] = datetime.utcnow().isoformat()
     user_data["updatedAt"] = datetime.utcnow().isoformat()
-    
+    # If allowedCompanyIds not provided, default to all companies within the organization
+    if not user_data.get("allowedCompanyIds") and user_data.get("organizationId"):
+        try:
+            companies_ref = db.collection("companies")
+            query = companies_ref.where("organizationId", "==", user_data.get("organizationId")).stream()
+            company_ids = []
+            for doc in query:
+                company_ids.append(doc.id)
+            user_data["allowedCompanyIds"] = company_ids
+        except Exception:
+            # If company lookup fails, leave allowedCompanyIds as empty list
+            pass
+
     users_ref.document(user_id).set(user_data)
     
     return user_data
@@ -222,6 +279,18 @@ async def signup(request: SignupRequest, response: Response):
     for _ in query:
         raise HTTPException(status_code=400, detail="Email already registered")
     
+    # Create Organization
+    org_id = str(uuid.uuid4())
+    orgs_ref = db.collection("organizations")
+    org_data = {
+        "id": org_id,
+        "name": f"{request.name}'s Organization",
+        "orgCode": str(uuid.uuid4())[:8],
+        "createdAt": datetime.utcnow().isoformat(),
+        "updatedAt": datetime.utcnow().isoformat()
+    }
+    orgs_ref.document(org_id).set(org_data)
+
     # Create new user
     user_id = str(uuid.uuid4())
     user_data = {
@@ -229,6 +298,9 @@ async def signup(request: SignupRequest, response: Response):
         "email": request.email,
         "password": get_password_hash(request.password), # Securely hashed
         "name": request.name,
+        "role": UserRole.SUPER_ADMIN,
+        "organizationId": org_id,
+        "allowedCompanyIds": [],
         "createdAt": datetime.utcnow().isoformat(),
         "updatedAt": datetime.utcnow().isoformat()
     }
@@ -237,16 +309,22 @@ async def signup(request: SignupRequest, response: Response):
     
     # Create Session Token
     access_token = create_access_token(subject=user_id)
-    
-    # Set HTTP-only Cookie
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=False, # Set to True in production (HTTPS)
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7 # 7 days
-    )
+    try:
+        max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        cookie_opts = settings.cookie_settings
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=max_age,
+            httponly=cookie_opts.get("httponly", True),
+            secure=cookie_opts.get("secure", True),
+            samesite=cookie_opts.get("samesite"),
+            domain=cookie_opts.get("domain"),
+            path=cookie_opts.get("path", "/"),
+        )
+        logger.debug("Set cookie for signup (user_id=%s) secure=%s samesite=%s domain=%s", user_id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+    except Exception:
+        logger.exception("Failed to set cookie for signup")
     
     return {"message": "User created successfully", "uid": user_id}
 
@@ -273,16 +351,22 @@ async def login(request: LoginRequest, response: Response):
     
     # Create Session Token
     access_token = create_access_token(subject=user_doc.id)
-    
-    # Set HTTP-only Cookie
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=False, # Set to True in production (HTTPS)
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7 # 7 days
-    )
+    try:
+        max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        cookie_opts = settings.cookie_settings
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=max_age,
+            httponly=cookie_opts.get("httponly", True),
+            secure=cookie_opts.get("secure", True),
+            samesite=cookie_opts.get("samesite"),
+            domain=cookie_opts.get("domain"),
+            path=cookie_opts.get("path", "/"),
+        )
+        logger.debug("Set cookie for login (user_id=%s) secure=%s samesite=%s domain=%s", user_doc.id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+    except Exception:
+        logger.exception("Failed to set cookie for login")
     
     return {
         "token": access_token,
@@ -295,7 +379,12 @@ async def login(request: LoginRequest, response: Response):
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie(key="access_token")
+    try:
+        cookie_opts = settings.cookie_settings
+        response.delete_cookie(key="access_token", path=cookie_opts.get("path", "/"), domain=cookie_opts.get("domain"))
+        logger.debug("Deleted access_token cookie domain=%s path=%s", cookie_opts.get("domain"), cookie_opts.get("path"))
+    except Exception:
+        logger.exception("Failed to delete access_token cookie during logout")
     return {"message": "Logged out successfully"}
 
 
@@ -350,16 +439,22 @@ async def google_login(request: GoogleLoginRequest, response: Response):
 
         # Create Session Token (Our Custom JWT)
         access_token = create_access_token(subject=user_id)
-        
-        # Set HTTP-only Cookie
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=False, # Set to True in production
-            samesite="lax",
-            max_age=60 * 60 * 24 * 7
-        )
+        try:
+            max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            cookie_opts = settings.cookie_settings
+            response.set_cookie(
+                key="access_token",
+                value=access_token,
+                max_age=max_age,
+                httponly=cookie_opts.get("httponly", True),
+                secure=cookie_opts.get("secure", True),
+                samesite=cookie_opts.get("samesite"),
+                domain=cookie_opts.get("domain"),
+                path=cookie_opts.get("path", "/"),
+            )
+            logger.debug("Set cookie for google login (user_id=%s) secure=%s samesite=%s domain=%s", user_id, cookie_opts.get("secure"), cookie_opts.get("samesite"), cookie_opts.get("domain"))
+        except Exception:
+            logger.exception("Failed to set cookie for google login")
         
         return {
             "token": access_token,

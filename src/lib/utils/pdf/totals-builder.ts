@@ -34,9 +34,9 @@ export const buildTotalsSection = (
       // Amount in Words
       ...(showAmountInWords ? [{
         text: `Amount in Words: ${data.totalAmountInWords || amountToWords(data.totalAmount)}`,
-        fontSize: 9,
+        fontSize: 8,
         bold: true,
-        margin: [0, 10, 0, 20],
+        margin: [0, 5, 0, 10],
       }] : []),
     ];
   }
@@ -53,39 +53,39 @@ export const buildTotalsSection = (
             widths: ['*', 80],
             body: [
               ...(showTaxable ? [[
-                { text: 'Taxable Amount:', fontSize: 9 },
-                { text: safeCurrency(data.taxableAmount), fontSize: 9, alignment: 'right' },
+                { text: 'Taxable Amount:', fontSize: 8 },
+                { text: safeCurrency(data.taxableAmount), fontSize: 8, alignment: 'right' },
               ]] : []),
               ...(showCGST && data.cgst > 0 ? [[
-                { text: 'CGST:', fontSize: 9 },
-                { text: safeCurrency(data.cgst), fontSize: 9, alignment: 'right' },
+                { text: 'CGST:', fontSize: 8 },
+                { text: safeCurrency(data.cgst), fontSize: 8, alignment: 'right' },
               ]] : []),
               ...(showSGST && data.sgst > 0 ? [[
-                { text: 'SGST:', fontSize: 9 },
-                { text: safeCurrency(data.sgst), fontSize: 9, alignment: 'right' },
+                { text: 'SGST:', fontSize: 8 },
+                { text: safeCurrency(data.sgst), fontSize: 8, alignment: 'right' },
               ]] : []),
               ...(showIGST && data.igst > 0 ? [[
-                { text: 'IGST:', fontSize: 9 },
-                { text: safeCurrency(data.igst), fontSize: 9, alignment: 'right' },
+                { text: 'IGST:', fontSize: 8 },
+                { text: safeCurrency(data.igst), fontSize: 8, alignment: 'right' },
               ]] : []),
               [
-                { text: 'Total:', fontSize: 11, bold: true },
-                { text: safeCurrency(data.totalAmount), fontSize: 11, bold: true, alignment: 'right' },
+                { text: 'Total:', fontSize: 10, bold: true, fillColor: '#f3f4f6' },
+                { text: safeCurrency(data.totalAmount), fontSize: 10, bold: true, alignment: 'right', fillColor: '#f3f4f6' },
               ],
             ],
           },
           layout: 'noBorders',
         },
       ],
-      margin: [0, 10, 0, 10],
+      margin: [0, 5, 0, 5],
     },
 
     // Amount in Words
     ...(showAmountInWords ? [{
       text: `Amount in Words: ${data.totalAmountInWords || amountToWords(data.totalAmount)}`,
-      fontSize: 9,
+      fontSize: 8,
       bold: true,
-      margin: [0, 10, 0, 20],
+      margin: [0, 5, 0, 10],
     }] : []),
   ];
 };

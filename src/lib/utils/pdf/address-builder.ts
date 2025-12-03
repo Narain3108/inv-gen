@@ -22,112 +22,66 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
   const shippingAddress = document?.shippingAddress || client.shippingAddress || client.address;
   const billingAddress = client.billingAddress || client.address;
 
+  // Layout: billing on left, flexible spacer, shipping on right (right-aligned)
+  const columns: any[] = [];
+
+  if (showBilling) {
+    columns.push({
+      width: 'auto',
+      stack: [
+        // Title highlighted with light background
+        {
+          table: {
+            widths: ['*'],
+            body: [[{ text: billingLabel.toUpperCase(), fontSize: 8, bold: true, fillColor: '#f3f4f6', margin: [4, 2, 4, 2] }]]
+          },
+          layout: 'noBorders',
+          margin: [0, 0, 0, 4]
+        },
+        { text: client.clientName, fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
+        { text: billingAddress.street, fontSize: 8, margin: [0, 0, 0, 1] },
+        { text: `${billingAddress.city}, ${billingAddress.state} - ${billingAddress.pincode}`, fontSize: 8, margin: [0, 0, 0, 2] },
+        ...(showGSTIN && client.gstin ? [{ text: `GSTIN: ${client.gstin}`, fontSize: 8, margin: [0, 0, 0, 1] }] : []),
+        ...(showPhone ? [{ text: `Phone: ${client.contact.phone}`, fontSize: 8, margin: [0, 0, 0, 1] }] : []),
+        ...(showEmail && client.contact?.email ? [{ text: `Email: ${client.contact.email}`, fontSize: 8, margin: [0, 0, 0, 1] }] : []),
+        { text: `Place of Supply: ${billingAddress.state}`, fontSize: 8, margin: [0, 2, 0, 0], bold: true, color: '#059669' },
+      ],
+    });
+  }
+
+  // Flexible spacer to push shipping block to the right-most edge
+  if (showBilling && showShipping) {
+    columns.push({ width: '*', text: '' });
+  }
+
+  if (showShipping) {
+    columns.push({
+      width: 'auto',
+      stack: [
+        // Title highlighted with light background and right aligned
+        {
+          table: {
+            widths: ['*'],
+            body: [[{ text: shippingLabel.toUpperCase(), fontSize: 8, bold: true, fillColor: '#f3f4f6', margin: [4, 2, 4, 2], alignment: 'right' }]]
+          },
+          layout: 'noBorders',
+          margin: [0, 0, 0, 4]
+        },
+        { text: client.clientName, fontSize: 9, bold: true, margin: [0, 0, 0, 2], alignment: 'right' },
+        { text: shippingAddress.street, fontSize: 8, margin: [0, 0, 0, 1], alignment: 'right' },
+        { text: `${shippingAddress.city}, ${shippingAddress.state} - ${shippingAddress.pincode}`, fontSize: 8, margin: [0, 0, 0, 2], alignment: 'right' },
+        ...(showGSTIN && client.gstin ? [{ text: `GSTIN: ${client.gstin}`, fontSize: 8, margin: [0, 0, 0, 1], alignment: 'right' }] : []),
+        ...(showPhone ? [{ text: `Phone: ${client.contact.phone}`, fontSize: 8, margin: [0, 0, 0, 1], alignment: 'right' }] : []),
+        ...(showEmail && client.contact?.email ? [{ text: `Email: ${client.contact.email}`, fontSize: 8, margin: [0, 0, 0, 1], alignment: 'right' }] : []),
+        { text: `Place of Supply: ${shippingAddress.state}`, fontSize: 8, margin: [0, 2, 0, 0], bold: true, color: '#059669', alignment: 'right' },
+      ],
+    });
+  }
+
   return {
-    columns: [
-      // Billing Address
-      ...(showBilling ? [{
-        width: '48%',
-        stack: [
-          {
-            text: billingLabel,
-            fontSize: 9,
-            bold: true,
-            color: '#1f2937',
-            margin: [0, 0, 0, 8]
-          },
-          {
-            text: client.clientName,
-            fontSize: 11,
-            bold: true,
-            margin: [0, 0, 0, 4]
-          },
-          {
-            text: billingAddress.street,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          },
-          {
-            text: `${billingAddress.city}, ${billingAddress.state} - ${billingAddress.pincode}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 3]
-          },
-          ...(showGSTIN && client.gstin ? [{
-            text: `GSTIN: ${client.gstin}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2],
-          }] : []),
-          ...(showPhone ? [{
-            text: `Phone: ${client.contact.phone}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          }] : []),
-          ...(showEmail && client.contact?.email ? [{
-            text: `Email: ${client.contact.email}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          }] : []),
-          {
-            text: `Place of Supply: ${billingAddress.state}`,
-            fontSize: 9,
-            margin: [0, 3, 0, 0],
-            bold: true,
-            color: '#059669'
-          },
-        ],
-      }] : []),
-      ...(showBilling && showShipping ? [{ width: '4%', text: '' }] : []), // Spacer
-      // Shipping Address
-      ...(showShipping ? [{
-        width: '48%',
-        stack: [
-          {
-            text: shippingLabel,
-            fontSize: 9,
-            bold: true,
-            color: '#1f2937',
-            margin: [0, 0, 0, 8]
-          },
-          {
-            text: client.clientName,
-            fontSize: 11,
-            bold: true,
-            margin: [0, 0, 0, 4]
-          },
-          {
-            text: shippingAddress.street,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          },
-          {
-            text: `${shippingAddress.city}, ${shippingAddress.state} - ${shippingAddress.pincode}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 3]
-          },
-          ...(showGSTIN && client.gstin ? [{
-            text: `GSTIN: ${client.gstin}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2],
-          }] : []),
-          ...(showPhone ? [{
-            text: `Phone: ${client.contact.phone}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          }] : []),
-          ...(showEmail && client.contact?.email ? [{
-            text: `Email: ${client.contact.email}`,
-            fontSize: 9,
-            margin: [0, 0, 0, 2]
-          }] : []),
-          {
-            text: `Place of Supply: ${shippingAddress.state}`,
-            fontSize: 9,
-            margin: [0, 3, 0, 0],
-            bold: true,
-            color: '#059669'
-          },
-        ],
-      }] : []),
-    ],
-    margin: [0, 0, 0, 20],
+    columns,
+    // Add a small top margin so there's spacing between header and this section,
+    // and slightly increase bottom margin for separation from the items table.
+    margin: [0, 5, 0, 25],
   };
 };

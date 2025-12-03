@@ -6,11 +6,11 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import { QuotationPDFData, PDFDocumentDefinition } from './types';
-import { buildCompanyHeader, buildInvoiceTitle, buildInvoiceInfo } from './header-builder';
+import { buildHeader } from './header-builder';
 import { buildAddressSection } from './address-builder';
-import { buildItemsTable } from './items-table-builder';
+import { buildFixedItemsTable } from './items-table-builder';
 import { buildTotalsSection } from './totals-builder';
-import { buildTermsAndConditions, buildNotesSection, buildSignature } from './footer-builder';
+import { buildHorizontalFooter, buildSignature } from './footer-builder';
 import { formatDate } from '@/utils/formatters';
 import { Company } from '@/types';
 import { cloudinaryUrlToBase64 } from '@/lib/services/cloudinary-service';
@@ -84,32 +84,42 @@ export async function generateQuotationPDF(data: QuotationPDFData): Promise<void
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
-  const margins = customization?.margins || { top: 60, right: 40, bottom: 60, left: 40 };
+  const margins = customization?.margins || { top: 20, right: 20, bottom: 20, left: 20 };
 
-  const docDefinition: PDFDocumentDefinition = {
-    pageSize,
-    pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
-    content: [
-      // Header with company logo and details
-      buildCompanyHeader(companyWithImages, customization),
+  // Chunk items for pagination (8 rows per page)
+  const items = quotation.items || [];
+  const itemsPerPage = 8;
+  const chunks = [];
+  if (items.length === 0) {
+    chunks.push([]);
+  } else {
+    for (let i = 0; i < items.length; i += itemsPerPage) {
+      chunks.push(items.slice(i, i + itemsPerPage));
+    }
+  }
 
-      // Quotation Title
-      buildInvoiceTitle(customization, 'quotation'),
+  const content: any[] = [];
 
-      // Quotation Number and Date
-      buildInvoiceInfo(quotation, customization, 'quotation'),
+  // Build pages
+  chunks.forEach((chunk, index) => {
+    const isLastPage = index === chunks.length - 1;
+    const startIndex = index * itemsPerPage;
 
-      // Billing and Shipping Address
-      buildAddressSection(client, customization, quotation),
+    // 1. Header Section
+    content.push(buildHeader(companyWithImages, quotation, customization, 'quotation'));
 
-      // Items Table
-      buildItemsTable(quotation.items, customization),
+    // 2. Billing/Shipping Section
+    content.push(buildAddressSection(client, customization, quotation));
 
-      // Tax Summary and Totals
-      ...buildTotalsSection(quotation, customization),
+    // 3. Items Table
+    content.push(buildFixedItemsTable(chunk, startIndex));
 
-      // Quotation Validity Notice
-      {
+    // 4. Footer Section
+    if (isLastPage) {
+      content.push(...buildTotalsSection(quotation, customization));
+      
+      // Validity Notice
+      content.push({
         text: [
           { text: 'Note: ', bold: true, fontSize: 9, color: '#dc2626' },
           { text: 'This quotation is valid until ', fontSize: 9 },
@@ -119,28 +129,49 @@ export async function generateQuotationPDF(data: QuotationPDFData): Promise<void
         margin: [0, 10, 0, 10],
         background: '#fee2e2',
         fillColor: '#fee2e2',
-      },
+      });
 
-      // Terms and Conditions
-      ...buildTermsAndConditions(customization),
+      // Horizontal Footer (Terms, Notes)
+      const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
+      if (horizontalFooter) {
+        content.push(horizontalFooter);
+      }
 
-      // Additional Notes
-      ...buildNotesSection(customization),
+      content.push(buildSignature(companyWithImages, customization));
+    } else {
+      content.push({ text: '', pageBreak: 'after' });
+    }
+  });
 
-      // Signature
-      buildSignature(companyWithImages, customization),
-    ],
+  const docDefinition: PDFDocumentDefinition = {
+    pageSize,
+    pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
+    content: content,
     styles: {
+      header: {
+        fontSize: 18,
+        bold: true,
+        margin: [0, 0, 0, 10]
+      },
+      subheader: {
+        fontSize: 14,
+        bold: true,
+        margin: [0, 10, 0, 5]
+      },
       tableHeader: {
         bold: true,
-        fontSize: 9,
-        color: '#374151',
+        fontSize: 10,
+        color: 'black',
         fillColor: '#f3f4f6',
       },
+      defaultStyle: {
+        font: 'Roboto'
+      }
     },
     defaultStyle: {
-      font: 'Roboto',
-    },
+      fontSize: 10,
+      font: 'Roboto'
+    }
   };
 
   // Generate and download PDF
@@ -166,32 +197,42 @@ export async function previewQuotationPDF(data: QuotationPDFData): Promise<void>
 
   // Apply customization for page settings
   const pageSize = customization?.pageSize || 'A4';
-  const margins = customization?.margins || { top: 60, right: 40, bottom: 60, left: 40 };
+  const margins = customization?.margins || { top: 20, right: 20, bottom: 20, left: 20 };
 
-  const docDefinition: PDFDocumentDefinition = {
-    pageSize,
-    pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
-    content: [
-      // Header with company logo and details
-      buildCompanyHeader(companyWithImages, customization),
+  // Chunk items for pagination (8 rows per page)
+  const items = quotation.items || [];
+  const itemsPerPage = 8;
+  const chunks = [];
+  if (items.length === 0) {
+    chunks.push([]);
+  } else {
+    for (let i = 0; i < items.length; i += itemsPerPage) {
+      chunks.push(items.slice(i, i + itemsPerPage));
+    }
+  }
 
-      // Quotation Title
-      buildInvoiceTitle(customization, 'quotation'),
+  const content: any[] = [];
 
-      // Quotation Number and Date
-      buildInvoiceInfo(quotation, customization, 'quotation'),
+  // Build pages
+  chunks.forEach((chunk, index) => {
+    const isLastPage = index === chunks.length - 1;
+    const startIndex = index * itemsPerPage;
 
-      // Billing and Shipping Address
-      buildAddressSection(client, customization, quotation),
+    // 1. Header Section
+    content.push(buildHeader(companyWithImages, quotation, customization, 'quotation'));
 
-      // Items Table
-      buildItemsTable(quotation.items, customization),
+    // 2. Billing/Shipping Section
+    content.push(buildAddressSection(client, customization, quotation));
 
-      // Tax Summary and Totals
-      ...buildTotalsSection(quotation, customization),
+    // 3. Items Table
+    content.push(buildFixedItemsTable(chunk, startIndex));
 
-      // Quotation Validity Notice
-      {
+    // 4. Footer Section
+    if (isLastPage) {
+      content.push(...buildTotalsSection(quotation, customization));
+      
+      // Validity Notice
+      content.push({
         text: [
           { text: 'Note: ', bold: true, fontSize: 9, color: '#dc2626' },
           { text: 'This quotation is valid until ', fontSize: 9 },
@@ -201,17 +242,24 @@ export async function previewQuotationPDF(data: QuotationPDFData): Promise<void>
         margin: [0, 10, 0, 10],
         background: '#fee2e2',
         fillColor: '#fee2e2',
-      },
+      });
 
-      // Terms and Conditions
-      ...buildTermsAndConditions(customization),
+      // Horizontal Footer (Terms, Notes)
+      const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
+      if (horizontalFooter) {
+        content.push(horizontalFooter);
+      }
 
-      // Additional Notes
-      ...buildNotesSection(customization),
+      content.push(buildSignature(companyWithImages, customization));
+    } else {
+      content.push({ text: '', pageBreak: 'after' });
+    }
+  });
 
-      // Signature
-      buildSignature(companyWithImages, customization),
-    ],
+  const docDefinition: PDFDocumentDefinition = {
+    pageSize,
+    pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
+    content: content,
     styles: {
       tableHeader: {
         bold: true,

@@ -18,27 +18,27 @@ export const buildBankDetails = (company: Company, customization?: InvoiceCustom
   return [
     {
       text: 'Bank Details:',
-      fontSize: 10,
+      fontSize: 9,
       bold: true,
-      margin: [0, 10, 0, 5],
+      margin: [0, 5, 0, 2],
     },
     {
       columns: [
         {
           width: '50%',
           stack: [
-            { text: 'Our Bank Details:', fontSize: 9, bold: true, margin: [0, 0, 0, 3] },
-            { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 9 },
-            { text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 9 },
-            { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 9 },
+            { text: 'Our Bank Details:', fontSize: 8, bold: true, margin: [0, 0, 0, 2] },
+            { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8 },
+            { text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 8 },
+            { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8 },
             {
               text: company.bankDetails.upiId ? `UPI: ${company.bankDetails.upiId}` : '',
-              fontSize: 9,
+              fontSize: 8,
             },
           ],
         },
       ],
-      margin: [0, 0, 0, 20],
+      margin: [0, 0, 0, 10],
     },
   ];
 };
@@ -57,14 +57,14 @@ export const buildTermsAndConditions = (customization?: InvoiceCustomization): a
   return [
     {
       text: 'Terms & Conditions:',
-      fontSize: 10,
+      fontSize: 9,
       bold: true,
-      margin: [0, 10, 0, 5],
+      margin: [0, 5, 0, 2],
     },
     {
       text: termsText,
-      fontSize: 9,
-      margin: [0, 0, 0, 10],
+      fontSize: 8,
+      margin: [0, 0, 0, 5],
     },
   ];
 };
@@ -83,14 +83,14 @@ export const buildNotesSection = (customization?: InvoiceCustomization): any[] =
   return [
     {
       text: 'Notes:',
-      fontSize: 10,
+      fontSize: 9,
       bold: true,
-      margin: [0, 10, 0, 5],
+      margin: [0, 5, 0, 2],
     },
     {
       text: notesText,
-      fontSize: 9,
-      margin: [0, 0, 0, 20],
+      fontSize: 8,
+      margin: [0, 0, 0, 10],
     },
   ];
 };
@@ -148,10 +148,76 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
     columns: [
       { width: '*', text: '' },
       {
-        width: 150,
+        width: 200,
         stack: signatureContent,
       },
     ],
-    margin: [0, 20, 0, 0],
+    margin: [0, 10, 0, 0],
+  };
+};
+
+/**
+ * Build horizontal footer section (Bank, Terms, Notes side-by-side)
+ */
+export const buildHorizontalFooter = (company: Company, customization?: InvoiceCustomization): any => {
+  const showBankDetails = customization?.companyDetails?.showBankDetails !== false;
+  const showTerms = customization?.footer?.showTermsAndConditions !== false;
+  const termsText = customization?.footer?.termsText;
+  const showNotes = customization?.footer?.showThankYouNote !== false;
+  const notesText = customization?.footer?.thankYouText;
+
+  const columns = [];
+
+  // Bank Details Column
+  if (showBankDetails && company.bankDetails) {
+    columns.push({
+      width: '*',
+      stack: [
+        // Title with light background to highlight bank subheading
+        {
+          table: {
+            widths: ['*'],
+            body: [[{ text: 'Bank Details', fontSize: 9, bold: true, fillColor: '#f3f4f6', margin: [4, 2, 4, 2] }]]
+          },
+          layout: 'noBorders',
+          margin: [0, 0, 0, 4]
+        },
+        { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8 },
+        { text: `A/c No: ${company.bankDetails.accountNumber}`, fontSize: 8 },
+        { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8 },
+        ...(company.bankDetails.upiId ? [{ text: `UPI: ${company.bankDetails.upiId}`, fontSize: 8 }] : []),
+      ]
+    });
+  }
+
+  // Terms Column
+  if (showTerms && termsText) {
+    columns.push({
+      width: '*',
+      stack: [
+        { text: 'Terms & Conditions:', fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
+        { text: termsText, fontSize: 8 },
+      ],
+      margin: [10, 0, 0, 0] // Left margin to separate
+    });
+  }
+
+  // Notes Column
+  if (showNotes && notesText) {
+    columns.push({
+      width: '*',
+      stack: [
+        { text: 'Notes:', fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
+        { text: notesText, fontSize: 8 },
+      ],
+      margin: [10, 0, 0, 0]
+    });
+  }
+
+  if (columns.length === 0) return [];
+
+  return {
+    columns: columns,
+    margin: [0, 10, 0, 5]
   };
 };

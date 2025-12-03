@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: str = "*"
     CORS_ALLOW_HEADERS: str = "*"
+
+    # Cookie configuration (for session cookies)
+    # Set COOKIE_SAMESITE to 'None' for cross-site cookies (required when frontend and backend are on different domains)
+    # Make sure to set COOKIE_SECURE=True in production (HTTPS) to allow cookies with SameSite=None
+    COOKIE_SAMESITE: str = "None"
+    COOKIE_SECURE: bool = True
+    COOKIE_DOMAIN: Optional[str] = None
+    COOKIE_PATH: str = "/"
     
     # Security
     SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
@@ -56,6 +64,17 @@ class Settings(BaseSettings):
         if isinstance(self.CORS_ORIGINS, str):
             return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
         return [self.CORS_ORIGINS]
+
+    @property
+    def cookie_settings(self) -> dict:
+        """Return a dict of cookie parameters suitable for Response.set_cookie/delete_cookie."""
+        return {
+            "httponly": True,
+            "secure": bool(self.COOKIE_SECURE),
+            "samesite": self.COOKIE_SAMESITE,
+            "domain": self.COOKIE_DOMAIN,
+            "path": self.COOKIE_PATH,
+        }
 
 
 # Global settings instance

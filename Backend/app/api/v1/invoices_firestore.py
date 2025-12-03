@@ -9,6 +9,60 @@ from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def ensure_user_company_access(db, user: Dict[str, Any], company_id: str):
+    """If the user is an admin and the company belongs to the same organization,
+    add the company to the user's allowedCompanyIds to avoid access-desyncs.
+    Returns True if access granted (already present or newly added), False otherwise."""
+    try:
+        if not company_id:
+            return False
+
+        # Super admins always have access
+        if user.get('role') == 'super_admin':
+            return True
+
+        # Only auto-grant for admins (not generic employees)
+        if user.get('role') != 'admin':
+            return False
+
+        # Check company exists and belongs to same org
+        comp_doc = db.collection('companies').document(company_id).get()
+        if not comp_doc.exists:
+            return False
+        comp_data = comp_doc.to_dict()
+        if comp_data.get('organizationId') != user.get('organizationId'):
+            return False
+
+        allowed = user.get('allowedCompanyIds', []) or []
+        if company_id in allowed:
+            return True
+
+        # Add company to user's allowedCompanyIds
+        try:
+            users_ref = db.collection('users')
+            user_doc_ref = users_ref.document(user.get('id'))
+            # Read current user's allowed list to avoid race
+            cur = user_doc_ref.get()
+            if cur.exists:
+                cur_data = cur.to_dict()
+                cur_allowed = cur_data.get('allowedCompanyIds', []) or []
+                if company_id not in cur_allowed:
+                    new_allowed = cur_allowed + [company_id]
+                    user_doc_ref.update({'allowedCompanyIds': new_allowed, 'updatedAt': datetime.utcnow().isoformat()})
+                    logger.info("ensure_user_company_access: added company %s to user %s allowedCompanyIds", company_id, user.get('id'))
+                    return True
+        except Exception:
+            logger.exception("ensure_user_company_access: failed to add company to user")
+            return False
+
+    except Exception:
+        logger.exception("ensure_user_company_access: unexpected error")
+    return False
 
 router = APIRouter()
 
@@ -146,8 +200,22 @@ async def create_invoice(
         db = get_firestore_db()
         
         # Verify Company Access
-        if user.get("role") != "super_admin" and invoice.company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied to this company")
+        allowed = user.get("allowedCompanyIds", [])
+        if user.get("role") != "super_admin" and invoice.company_id not in allowed:
+            # Attempt to auto-grant for admins when appropriate
+            auto_granted = ensure_user_company_access(db, user, invoice.company_id)
+            if auto_granted:
+                try:
+                    refreshed = db.collection('users').document(user.get('id')).get()
+                    if refreshed.exists:
+                        user = refreshed.to_dict()
+                        user['id'] = refreshed.id
+                        allowed = user.get('allowedCompanyIds', [])
+                except Exception:
+                    logger.exception("create_invoice: failed to reload user after auto-grant")
+            if not auto_granted:
+                logger.warning("create_invoice: access denied. user=%s role=%s allowed=%s requested_company=%s", user.get('id'), user.get('role'), allowed, invoice.company_id)
+                raise HTTPException(status_code=403, detail="Access denied to this company")
 
         invoice_data = invoice.dict(by_alias=True, exclude_unset=True)
         invoice_data["createdAt"] = datetime.utcnow()
@@ -190,12 +258,26 @@ async def get_invoices(
         if target_company_id:
             # Verify access
             if user.get("role") != "super_admin" and target_company_id not in allowed_companies:
-                 raise HTTPException(status_code=403, detail="Access denied to this company")
+                # Attempt to auto-grant access for admins when company belongs to same org
+                auto_granted = ensure_user_company_access(db, user, target_company_id)
+                if auto_granted:
+                    try:
+                        refreshed = db.collection('users').document(user.get('id')).get()
+                        if refreshed.exists:
+                            user = refreshed.to_dict()
+                            user['id'] = refreshed.id
+                            allowed_companies = user.get('allowedCompanyIds', []) or []
+                    except Exception:
+                        logger.exception("get_invoices: failed to reload user after auto-grant")
+                else:
+                    logger.warning("get_invoices: access denied. user=%s role=%s allowed=%s requested_company=%s", user.get('id'), user.get('role'), allowed_companies, target_company_id)
+                    raise HTTPException(status_code=403, detail="Access denied to this company")
             query = query.where("companyId", "==", target_company_id)
         else:
             # If no company specified, filter by allowed companies
             if user.get("role") != "super_admin":
                 if not allowed_companies:
+                    logger.info("get_invoices: user=%s has no allowed companies, returning empty list", user.get('id'))
                     return []
                 if len(allowed_companies) > 0:
                      query = query.where("companyId", "in", allowed_companies[:10]) # Limit to 10 for safety
@@ -205,6 +287,7 @@ async def get_invoices(
             data = doc.to_dict()
             data["id"] = doc.id
             invoices.append(serialize_firestore_doc(data))
+        logger.debug("get_invoices: returning %d invoices for user=%s requested_company=%s", len(invoices), user.get('id'), target_company_id)
             
         return invoices
         
@@ -233,11 +316,21 @@ async def get_invoice(
         # Verify Access
         company_id = invoice_data.get("companyId")
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+            # Try to auto-grant for admins if company belongs to same org
+            auto_granted = ensure_user_company_access(db, user, company_id)
+            if auto_granted:
+                try:
+                    refreshed = db.collection('users').document(user.get('id')).get()
+                    if refreshed.exists:
+                        user = refreshed.to_dict()
+                        user['id'] = refreshed.id
+                except Exception:
+                    logger.exception("get_invoice: failed to reload user after auto-grant")
+            if not auto_granted:
+                raise HTTPException(status_code=403, detail="Access denied")
              
         invoice_data["id"] = doc.id
         return serialize_firestore_doc(invoice_data)
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -264,7 +357,17 @@ async def update_invoice(
         # Verify Access
         company_id = invoice_data.get("companyId")
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+            auto_granted = ensure_user_company_access(db, user, company_id)
+            if auto_granted:
+                try:
+                    refreshed = db.collection('users').document(user.get('id')).get()
+                    if refreshed.exists:
+                        user = refreshed.to_dict()
+                        user['id'] = refreshed.id
+                except Exception:
+                    logger.exception("update_invoice: failed to reload user after auto-grant")
+            if not auto_granted:
+                raise HTTPException(status_code=403, detail="Access denied")
 
         # Restrict Employee from Update
         if user.get("role") == "employee":
@@ -306,7 +409,17 @@ async def patch_invoice(
         # Verify Access
         company_id = invoice_data.get("companyId")
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+            auto_granted = ensure_user_company_access(db, user, company_id)
+            if auto_granted:
+                try:
+                    refreshed = db.collection('users').document(user.get('id')).get()
+                    if refreshed.exists:
+                        user = refreshed.to_dict()
+                        user['id'] = refreshed.id
+                except Exception:
+                    logger.exception("patch_invoice: failed to reload user after auto-grant")
+            if not auto_granted:
+                raise HTTPException(status_code=403, detail="Access denied")
 
         # Restrict Employee from Update
         if user.get("role") == "employee":
@@ -347,7 +460,17 @@ async def delete_invoice(
         # Verify Access
         company_id = invoice_data.get("companyId")
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+            auto_granted = ensure_user_company_access(db, user, company_id)
+            if auto_granted:
+                try:
+                    refreshed = db.collection('users').document(user.get('id')).get()
+                    if refreshed.exists:
+                        user = refreshed.to_dict()
+                        user['id'] = refreshed.id
+                except Exception:
+                    logger.exception("delete_invoice: failed to reload user after auto-grant")
+            if not auto_granted:
+                raise HTTPException(status_code=403, detail="Access denied")
         
         # Restrict Employee from Delete
         if user.get("role") == "employee":

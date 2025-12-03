@@ -174,21 +174,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logoutUser = () => {
-    setUser(null);
-    localStorage.removeItem('userData');
-    localStorage.removeItem('userToken');
-    clearSelectedCompany();
-    router.push('/auth/login');
-    toast.success('Logged out');
+    (async () => {
+      try {
+        // Call backend logout to ensure server cookie is cleared
+        const { authApi } = await import('@/lib/api/auth.api');
+        await authApi.logout();
+      } catch (e) {
+        // ignore network/logout errors but continue clearing client state
+        console.warn('Logout request failed:', e);
+      } finally {
+        setUser(null);
+        localStorage.removeItem('userData');
+        localStorage.removeItem('userToken');
+        clearSelectedCompany();
+        router.push('/auth/login');
+        toast.success('Logged out');
+      }
+    })();
   };
 
   const logoutOrg = () => {
-    logoutUser(); // Clear user first
-    setOrganization(null);
-    localStorage.removeItem('orgData');
-    localStorage.removeItem('orgToken');
-    router.push('/auth/org-login');
-    toast.success('Organization session ended');
+    (async () => {
+      // Ensure user logout clears server cookie as well
+      try {
+        const { authApi } = await import('@/lib/api/auth.api');
+        await authApi.logout();
+      } catch (e) {
+        console.warn('Logout request failed:', e);
+      } finally {
+        logoutUser(); // this will clear client state and redirect
+        setOrganization(null);
+        localStorage.removeItem('orgData');
+        localStorage.removeItem('orgToken');
+        router.push('/auth/org-login');
+        toast.success('Organization session ended');
+      }
+    })();
   };
 
   return (

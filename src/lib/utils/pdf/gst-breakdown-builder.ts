@@ -29,40 +29,40 @@ export const buildGSTBreakdownTable = (
 
   // Build table headers
   const headers = [
-    { text: 'GST Rate', fontSize: 9, bold: true, alignment: 'center' },
-    { text: 'Taxable Amount', fontSize: 9, bold: true, alignment: 'right' },
+    { text: 'GST Rate', fontSize: 8, bold: true, alignment: 'center' },
+    { text: 'Taxable Amount', fontSize: 8, bold: true, alignment: 'right' },
   ];
 
   if (!isInterState) {
     // Intra-state: Show CGST and SGST
-    if (showCGST) headers.push({ text: 'CGST', fontSize: 9, bold: true, alignment: 'right' });
-    if (showSGST) headers.push({ text: 'SGST', fontSize: 9, bold: true, alignment: 'right' });
+    if (showCGST) headers.push({ text: 'CGST', fontSize: 8, bold: true, alignment: 'right' });
+    if (showSGST) headers.push({ text: 'SGST', fontSize: 8, bold: true, alignment: 'right' });
   } else {
     // Inter-state: Show IGST
-    if (showIGST) headers.push({ text: 'IGST', fontSize: 9, bold: true, alignment: 'right' });
+    if (showIGST) headers.push({ text: 'IGST', fontSize: 8, bold: true, alignment: 'right' });
   }
 
-  headers.push({ text: 'Total Tax', fontSize: 9, bold: true, alignment: 'right' });
+  headers.push({ text: 'Total Tax', fontSize: 8, bold: true, alignment: 'right' });
 
   // Build table rows
   const rows = data.taxBreakdown.map((breakdown: TaxBreakdown) => {
     const row = [
-      { text: `${breakdown.rate}%`, fontSize: 9, alignment: 'center' },
-      { text: safeCurrency(breakdown.taxableAmount), fontSize: 9, alignment: 'right' },
+      { text: `${breakdown.rate}%`, fontSize: 8, alignment: 'center' },
+      { text: safeCurrency(breakdown.taxableAmount), fontSize: 8, alignment: 'right' },
     ];
 
     if (!isInterState) {
       if (showCGST) {
         row.push({ 
           text: `${safeCurrency(breakdown.cgst)} (${breakdown.rate / 2}%)`, 
-          fontSize: 9, 
+          fontSize: 8, 
           alignment: 'right' 
         });
       }
       if (showSGST) {
         row.push({ 
           text: `${safeCurrency(breakdown.sgst)} (${breakdown.rate / 2}%)`, 
-          fontSize: 9, 
+          fontSize: 8, 
           alignment: 'right' 
         });
       }
@@ -70,13 +70,13 @@ export const buildGSTBreakdownTable = (
       if (showIGST) {
         row.push({ 
           text: `${safeCurrency(breakdown.igst)} (${breakdown.rate}%)`, 
-          fontSize: 9, 
+          fontSize: 8, 
           alignment: 'right' 
         });
       }
     }
 
-    row.push({ text: safeCurrency(breakdown.totalTax), fontSize: 9, alignment: 'right' } as any);
+    row.push({ text: safeCurrency(breakdown.totalTax), fontSize: 8, alignment: 'right' } as any);
 
     return row;
   });
@@ -94,9 +94,9 @@ export const buildGSTBreakdownTable = (
   return [
     {
       text: 'GST Breakdown',
-      fontSize: 10,
+      fontSize: 9,
       bold: true,
-      margin: [0, 15, 0, 5],
+      margin: [0, 5, 0, 2],
     },
     {
       table: {
@@ -112,12 +112,12 @@ export const buildGSTBreakdownTable = (
         vLineWidth: () => 0.5,
         hLineColor: () => '#e5e7eb',
         vLineColor: () => '#e5e7eb',
-        paddingLeft: () => 8,
-        paddingRight: () => 8,
-        paddingTop: () => 6,
-        paddingBottom: () => 6,
+        paddingLeft: () => 4,
+        paddingRight: () => 4,
+        paddingTop: () => 2,
+        paddingBottom: () => 2,
       },
-      margin: [0, 0, 0, 10],
+      margin: [0, 0, 0, 5],
     },
   ];
 };
@@ -143,15 +143,15 @@ export const buildSummaryTotals = (
               widths: ['*', 80],
               body: [
                 [
-                  { text: 'Grand Total:', fontSize: 11, bold: true },
-                  { text: safeCurrency(data.totalAmount), fontSize: 11, bold: true, alignment: 'right' },
+                  { text: 'Grand Total:', fontSize: 10, bold: true },
+                  { text: safeCurrency(data.totalAmount), fontSize: 10, bold: true, alignment: 'right' },
                 ],
               ],
             },
             layout: 'noBorders',
           },
         ],
-        margin: [0, 5, 0, 10],
+        margin: [0, 2, 0, 5],
       },
     ];
   }

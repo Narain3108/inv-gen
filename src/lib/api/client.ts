@@ -94,6 +94,27 @@ class ApiClient {
         errorMessage = JSON.stringify(errorMessage);
       }
       
+      // If unauthorized, clear client session to avoid repeated failing calls
+      if (response.status === 401 && typeof window !== 'undefined') {
+        try {
+          console.warn('[apiClient] 401 Unauthorized received. Clearing local session and redirecting to login.');
+          localStorage.removeItem('userData');
+          localStorage.removeItem('userToken');
+          localStorage.removeItem('orgData');
+          localStorage.removeItem('orgToken');
+          // Give caller a chance to handle before redirecting in SPA environments
+          setTimeout(() => {
+            try {
+              window.location.href = '/auth/login';
+            } catch (e) {
+              // ignore
+            }
+          }, 200);
+        } catch (e) {
+          // ignore
+        }
+      }
+
       throw new ApiError(
         response.status,
         errorMessage,
