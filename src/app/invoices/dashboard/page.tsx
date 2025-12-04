@@ -74,7 +74,7 @@ interface DashboardStats {
 
 function DashboardContent() {
   const { selectedCompany } = useCompany();
-  const { clients, products } = useAppData();
+  const { clients, products, companies, companiesInitialized } = useAppData();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -83,8 +83,21 @@ function DashboardContent() {
 
   // Load invoices and quotations
   const loadData = async () => {
-    // Ensure company is selected
+    // Ensure company is selected and valid
     if (!selectedCompany) return;
+    
+    // If companies are initialized, verify the selected company exists in the user's company list
+    // This prevents "Failed to load dashboard data" errors when switching users
+    if (companiesInitialized) {
+      const isValidCompany = companies.find(c => c.id === selectedCompany.id);
+      if (!isValidCompany) {
+        console.log('⚠️ Skipping dashboard load - selected company not in user list');
+        return;
+      }
+    } else {
+      // If not initialized yet, wait
+      return;
+    }
 
     try {
       setLoading(true);
@@ -108,9 +121,9 @@ function DashboardContent() {
   };
 
   useEffect(() => {
-    if (!selectedCompany) return;
+    if (!selectedCompany || !companiesInitialized) return;
     loadData();
-  }, [selectedCompany]);
+  }, [selectedCompany, companiesInitialized, companies]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

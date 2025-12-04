@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import { useAppData } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
-import { ROLES } from '@/lib/constants';
 
 interface CheckboxProps {
   id?: string;
@@ -43,7 +42,7 @@ const userFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
-  role: z.enum([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.EMPLOYEE]),
+  role: z.enum(['super_admin', 'admin', 'employee']),
   allowedCompanyIds: z.array(z.string()),
 });
 
@@ -73,7 +72,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       name: user?.name || '',
       email: user?.email || '',
       password: '',
-      role: (user?.role as any) || ROLES.EMPLOYEE,
+      role: (user?.role as any) || 'employee',
       allowedCompanyIds: user?.allowedCompanyIds || [],
     },
   });
@@ -85,7 +84,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         name: user.name,
         email: user.email,
         password: '',
-        role: (user.role as any) || ROLES.EMPLOYEE,
+        role: (user.role as any) || 'employee',
         allowedCompanyIds: user.allowedCompanyIds || [],
       });
     } else {
@@ -93,7 +92,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         name: '',
         email: '',
         password: '',
-        role: ROLES.EMPLOYEE,
+        role: 'employee',
         allowedCompanyIds: [],
       });
     }
@@ -171,15 +170,15 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ROLES.SUPER_ADMIN}>Super Admin</SelectItem>
-              <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
-              <SelectItem value={ROLES.EMPLOYEE}>Employee</SelectItem>
+              <SelectItem value="super_admin">Super Admin</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="employee">Employee</SelectItem>
             </SelectContent>
           </Select>
           {errors.role && <p className="text-sm text-red-500">{errors.role.message}</p>}
         </div>
 
-        {selectedRole !== ROLES.SUPER_ADMIN && (
+        {selectedRole !== 'super_admin' && (
           <div className="grid gap-2">
             <Label>Allowed Companies</Label>
             <div className="border rounded-md p-4 space-y-3 max-h-60 overflow-y-auto">
