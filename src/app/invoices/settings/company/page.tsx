@@ -60,16 +60,16 @@ export default function CompanySettingsPage() {
     loadCompanies();
   }, []);
 
-  if (authLoading || (user && user.role !== 'super_admin')) {
-    return null; // Or a loading spinner
-  }
-
   // Auto-open form if no companies exist
   useEffect(() => {
     if (!isLoading && companies.length === 0) {
       setIsFormOpen(true);
     }
   }, [isLoading, companies]);
+
+  if (authLoading || (user && user.role !== 'super_admin')) {
+    return null; // Or a loading spinner
+  }
 
   const handleCreateCompany = () => {
     setEditingCompany(undefined);

@@ -140,7 +140,15 @@ function QuotationsContent() {
 
     setLoading(true);
     try {
-      setCompany(selectedCompany);
+      // Fetch fresh company data to ensure we have latest details (address, etc)
+      const freshCompany = await companiesApi.getById(selectedCompany.id);
+      setCompany(freshCompany);
+      
+      // Update global store if stale
+      if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
+        console.log('🔄 Updating stale selected company in store');
+        setSelectedCompany(freshCompany);
+      }
 
       // Load quotations using API
       const quotationsData = await quotationsApi.getAll({ company_id: selectedCompany.id });
@@ -354,13 +362,21 @@ function QuotationsContent() {
     if (!selectedCompany) return;
 
     // Reload fresh company data to ensure we use latest numbering config
-    await reloadCompanyData();
+    // We fetch directly from API to bypass any stale state
+    let currentCompany = company;
+    try {
+      currentCompany = await companiesApi.getById(selectedCompany.id);
+      setCompany(currentCompany);
+      setSelectedCompany(currentCompany);
+    } catch (e) {
+      console.error("Failed to reload company data", e);
+    }
 
     // Count existing invoices for this company
     const invoices = await invoicesApi.getAll({ company_id: selectedCompany?.id || '' });
 
     // Use company's invoice numbering settings when available
-    const suggestedNumber = generateInvoiceNumber(company || selectedCompany, invoices.length);
+    const suggestedNumber = generateInvoiceNumber(currentCompany || selectedCompany, invoices.length);
 
     setInvoiceNumber(suggestedNumber);
     setConvertingQuotation(quotation);

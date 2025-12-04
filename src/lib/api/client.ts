@@ -175,6 +175,7 @@ class ApiClient {
       method: 'GET',
       headers: this.getHeaders(),
       credentials: 'include', // Send cookies
+      cache: 'no-store', // Prevent caching of API responses
     });
 
     const result = await this.handleResponse<T>(response);

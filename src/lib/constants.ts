@@ -197,3 +197,14 @@ export const DUMMY_COMPANY = {
   },
   pan: 'ABCDE1234F',
 } as const;
+
+// ==================== User Roles ====================
+
+export const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
+  EMPLOYEE: 'employee',
+} as const;
+
+export type Role = typeof ROLES[keyof typeof ROLES];
+

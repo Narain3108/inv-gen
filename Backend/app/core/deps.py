@@ -8,7 +8,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 async def get_current_user_id(
-    x_user_id: Optional[str] = Header(None),
     access_token: Optional[str] = Cookie(None),
     authorization: Optional[str] = Header(None)
 ) -> str:
@@ -16,7 +15,6 @@ async def get_current_user_id(
     Identify the current user.
     Prioritizes the HTTP-only cookie (secure).
     Falls back to Authorization header (Bearer token).
-    Falls back to x-user-id header for legacy/testing support.
     """
     # 1. Try Cookie (Secure JWT)
     if access_token:
@@ -34,11 +32,6 @@ async def get_current_user_id(
                 logger.debug("Auth resolved from Authorization header. subject=%s", user_id)
                 return user_id
     
-    # 3. Fallback to Header (Simple ID)
-    if x_user_id:
-        logger.debug("Auth resolved from x-user-id header. user_id=%s", x_user_id)
-        return x_user_id
-        
     raise HTTPException(status_code=401, detail="Not authenticated")
 
 async def get_current_user(user_id: str = Depends(get_current_user_id)):

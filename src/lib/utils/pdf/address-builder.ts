@@ -27,7 +27,7 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
 
   if (showBilling) {
     columns.push({
-      width: 'auto',
+      width: '45%',
       stack: [
         // Title highlighted with light background
         {
@@ -56,7 +56,7 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
 
   if (showShipping) {
     columns.push({
-      width: 'auto',
+      width: '45%',
       stack: [
         // Title highlighted with light background and right aligned
         {

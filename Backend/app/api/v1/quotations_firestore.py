@@ -8,9 +8,43 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
+from app.core.constants import Roles
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def verify_company_access(db, user: Dict[str, Any], company_id: str) -> bool:
+    """
+    Verify if the user has access to the given company.
+    - Super Admins: Always True
+    - Employees/Admins: True if company_id in allowedCompanyIds
+    - Admins: True if company belongs to same organization (Implicit Access)
+    """
+    if not company_id:
+        return False
+        
+    if user.get('role') == Roles.SUPER_ADMIN:
+        return True
+        
+    # Check explicit assignment (Fastest)
+    allowed = user.get('allowedCompanyIds', []) or []
+    if company_id in allowed:
+        return True
+        
+    # Check Admin implicit access (Slower, requires DB fetch)
+    if user.get('role') == Roles.ADMIN:
+        try:
+            comp_doc = db.collection('companies').document(company_id).get()
+            if comp_doc.exists and comp_doc.to_dict().get('organizationId') == user.get('organizationId'):
+                return True
+        except Exception:
+            logger.exception("verify_company_access: error checking admin implicit access")
+            
+    return False
 
 
 def serialize_firestore_doc(doc_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -137,7 +171,7 @@ async def create_quotation(
         if not company_id:
              raise HTTPException(status_code=400, detail="companyId is required")
              
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        if not verify_company_access(db, user, company_id):
              raise HTTPException(status_code=403, detail="Access denied to this company")
 
         quotation_data["createdAt"] = datetime.utcnow()
@@ -181,12 +215,12 @@ async def get_quotations(
         
         if target_company_id:
             # Verify access
-            if user.get("role") != "super_admin" and target_company_id not in allowed_companies:
+            if not verify_company_access(db, user, target_company_id):
                  raise HTTPException(status_code=403, detail="Access denied to this company")
             query = query.where("companyId", "==", target_company_id)
         else:
             # If no company specified, filter by allowed companies
-            if user.get("role") != "super_admin":
+            if user.get("role") != Roles.SUPER_ADMIN:
                 if not allowed_companies:
                     return []
                 if len(allowed_companies) > 0:
@@ -224,7 +258,7 @@ async def get_quotation(
         
         # Verify Access
         company_id = quotation_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        if not verify_company_access(db, user, company_id):
              raise HTTPException(status_code=403, detail="Access denied")
              
         quotation_data["id"] = doc.id
@@ -255,16 +289,20 @@ async def update_quotation(
         
         # Verify Access
         company_id = quotation_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        if not verify_company_access(db, user, company_id):
              raise HTTPException(status_code=403, detail="Access denied")
 
-        # Restrict Employee from Update
-        if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot update records")
-
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
+
+        # Allow employees to only update conversion/status-related fields (convertedToInvoiceId, status)
+        if user.get("role") == Roles.EMPLOYEE:
+            allowed_fields = {"status", "convertedToInvoiceId", "converted_to_invoice_id", "updatedAt", "updated_at"}
+            incoming = set(update_data.keys())
+            if not incoming.issubset(allowed_fields):
+                raise HTTPException(status_code=403, detail="Employees can only update quotation status/converted fields")
+
         update_data["updatedAt"] = datetime.utcnow()
-        
+
         doc_ref.update(update_data)
         
         updated_doc = doc_ref.get()
@@ -297,16 +335,20 @@ async def patch_quotation(
         
         # Verify Access
         company_id = quotation_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        if not verify_company_access(db, user, company_id):
              raise HTTPException(status_code=403, detail="Access denied")
 
-        # Restrict Employee from Update
-        if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot update records")
-
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
+
+        # Allow employees to only patch conversion/status-related fields
+        if user.get("role") == Roles.EMPLOYEE:
+            allowed_fields = {"status", "convertedToInvoiceId", "converted_to_invoice_id", "updatedAt", "updated_at"}
+            incoming = set(update_data.keys())
+            if not incoming.issubset(allowed_fields):
+                raise HTTPException(status_code=403, detail="Employees can only patch quotation status/converted fields")
+
         update_data["updatedAt"] = datetime.utcnow()
-        
+
         doc_ref.update(update_data)
         
         updated_doc = doc_ref.get()
@@ -338,11 +380,11 @@ async def delete_quotation(
         
         # Verify Access
         company_id = quotation_data.get("companyId")
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
+        if not verify_company_access(db, user, company_id):
              raise HTTPException(status_code=403, detail="Access denied")
         
         # Restrict Employee from Delete
-        if user.get("role") == "employee":
+        if user.get("role") == Roles.EMPLOYEE:
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
 
         doc_ref.delete()

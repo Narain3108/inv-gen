@@ -21,21 +21,24 @@ export const buildBankDetails = (company: Company, customization?: InvoiceCustom
       fontSize: 9,
       bold: true,
       margin: [0, 5, 0, 2],
+      alignment: 'center'
     },
     {
       columns: [
         {
-          width: '50%',
+          width: '100%',
           stack: [
-            { text: 'Our Bank Details:', fontSize: 8, bold: true, margin: [0, 0, 0, 2] },
-            { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8 },
-            { text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 8 },
-            { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8 },
+            { text: 'Our Bank Details:', fontSize: 8, bold: true, margin: [0, 0, 0, 2], alignment: 'center' },
+            { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'center' },
+            { text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'center' },
+            { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'center' },
             {
               text: company.bankDetails.upiId ? `UPI: ${company.bankDetails.upiId}` : '',
               fontSize: 8,
+              alignment: 'center'
             },
           ],
+          alignment: 'center'
         },
       ],
       margin: [0, 0, 0, 10],

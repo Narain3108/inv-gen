@@ -5,7 +5,9 @@
 
 // ==================== User Types ====================
 
-export type UserRole = 'super_admin' | 'admin' | 'employee';
+import { ROLES } from '@/lib/constants';
+
+export type UserRole = typeof ROLES[keyof typeof ROLES];
 
 export interface Organization {
   id: string;

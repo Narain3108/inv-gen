@@ -30,25 +30,25 @@ export const buildGSTBreakdownTable = (
   // Build table headers
   const headers = [
     { text: 'GST Rate', fontSize: 8, bold: true, alignment: 'center' },
-    { text: 'Taxable Amount', fontSize: 8, bold: true, alignment: 'right' },
+    { text: 'Taxable Amount', fontSize: 8, bold: true, alignment: 'center' },
   ];
 
   if (!isInterState) {
     // Intra-state: Show CGST and SGST
-    if (showCGST) headers.push({ text: 'CGST', fontSize: 8, bold: true, alignment: 'right' });
-    if (showSGST) headers.push({ text: 'SGST', fontSize: 8, bold: true, alignment: 'right' });
+    if (showCGST) headers.push({ text: 'CGST', fontSize: 8, bold: true, alignment: 'center' });
+    if (showSGST) headers.push({ text: 'SGST', fontSize: 8, bold: true, alignment: 'center' });
   } else {
     // Inter-state: Show IGST
-    if (showIGST) headers.push({ text: 'IGST', fontSize: 8, bold: true, alignment: 'right' });
+    if (showIGST) headers.push({ text: 'IGST', fontSize: 8, bold: true, alignment: 'center' });
   }
 
-  headers.push({ text: 'Total Tax', fontSize: 8, bold: true, alignment: 'right' });
+  headers.push({ text: 'Total Tax', fontSize: 8, bold: true, alignment: 'center' });
 
   // Build table rows
   const rows = data.taxBreakdown.map((breakdown: TaxBreakdown) => {
     const row = [
       { text: `${breakdown.rate}%`, fontSize: 8, alignment: 'center' },
-      { text: safeCurrency(breakdown.taxableAmount), fontSize: 8, alignment: 'right' },
+      { text: safeCurrency(breakdown.taxableAmount), fontSize: 8, alignment: 'center' },
     ];
 
     if (!isInterState) {
@@ -56,14 +56,14 @@ export const buildGSTBreakdownTable = (
         row.push({ 
           text: `${safeCurrency(breakdown.cgst)} (${breakdown.rate / 2}%)`, 
           fontSize: 8, 
-          alignment: 'right' 
+          alignment: 'center' 
         });
       }
       if (showSGST) {
         row.push({ 
           text: `${safeCurrency(breakdown.sgst)} (${breakdown.rate / 2}%)`, 
           fontSize: 8, 
-          alignment: 'right' 
+          alignment: 'center' 
         });
       }
     } else {
@@ -71,12 +71,12 @@ export const buildGSTBreakdownTable = (
         row.push({ 
           text: `${safeCurrency(breakdown.igst)} (${breakdown.rate}%)`, 
           fontSize: 8, 
-          alignment: 'right' 
+          alignment: 'center' 
         });
       }
     }
 
-    row.push({ text: safeCurrency(breakdown.totalTax), fontSize: 8, alignment: 'right' } as any);
+    row.push({ text: safeCurrency(breakdown.totalTax), fontSize: 8, alignment: 'center' } as any);
 
     return row;
   });

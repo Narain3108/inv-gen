@@ -25,7 +25,7 @@ export const buildHeader = (
     columns: [
       // Left Column: Logo
       {
-        width: '30%',
+        width: '20%',
         stack: [
           showLogo && company.logoUrl
             ? {
@@ -35,37 +35,43 @@ export const buildHeader = (
                 alignment: 'left',
               }
             : {
-                text: company.name.substring(0, 2).toUpperCase(),
+                text: (company.name || '').substring(0, 2).toUpperCase(),
                 fontSize: 32,
                 bold: true,
                 color: customization?.colorScheme?.primary || '#3b82f6',
-                alignment: 'center',
+                alignment: 'left',
                 width: 80,
               }
-        ]
+        ],
+        alignment: 'left'
       },
-      // Center Column: Title and Document Details
+
+      // Middle Column: Company name, address, GSTIN, contact
       {
-        width: '40%',
+        width: '45%',
         stack: [
-          { text: title, fontSize: 16, bold: true, alignment: 'center', margin: [0, 5, 0, 2] },
-          { text: `${type === 'invoice' ? 'Invoice' : 'Quotation'} #: ${documentNumber}`, fontSize: 9, bold: true, alignment: 'center' },
-          { text: `${dateLabel}: ${formatDate(document.date)}`, fontSize: 9, alignment: 'center' },
+          { text: company.name || '', fontSize: 12, bold: true, alignment: 'center' },
+          company.address?.street ? { text: company.address.street, fontSize: 9, alignment: 'left' } : {},
+          (company.address?.city || company.address?.state || company.address?.pincode)
+            ? { text: `${company.address?.city || ''}${company.address?.city ? ', ' : ''}${company.address?.state || ''}${company.address?.pincode ? ' - ' + company.address?.pincode : ''}`, fontSize: 9, alignment: 'left' }
+            : {},
+          company.gstin ? { text: `GSTIN: ${company.gstin}`, fontSize: 9, alignment: 'left' } : {},
+          company.contact?.email ? { text: `Email: ${company.contact.email}`, fontSize: 9, alignment: 'left' } : {},
+          company.contact?.phone ? { text: `Phone: ${company.contact.phone}`, fontSize: 9, alignment: 'left' } : {},
         ],
         alignment: 'center'
       },
-      // Right Column: Company Details
+
+      // Right Column: Title and Document Details (Invoice/Quotation info)
       {
-        width: '30%',
+        width: '35%',
         stack: [
-          { text: company.name, fontSize: 10, bold: true, alignment: 'right' },
-          { text: company.address.street, fontSize: 8, alignment: 'right' },
-          { text: `${company.address.city}, ${company.address.state} - ${company.address.pincode}`, fontSize: 8, alignment: 'right' },
-          company.gstin ? { text: `GSTIN: ${company.gstin}`, fontSize: 8, alignment: 'right' } : {},
-          company.contact.email ? { text: `Email: ${company.contact.email}`, fontSize: 8, alignment: 'right' } : {},
-          company.contact.phone ? { text: `Phone: ${company.contact.phone}`, fontSize: 8, alignment: 'right' } : {},
+          { text: title, fontSize: 16, bold: true, alignment: 'center', margin: [0, 5, 0, 2] },
+          { text: `${type === 'invoice' ? 'Invoice No' : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'center' },
+          (document as any).referenceNumber ? { text: `Ref: ${(document as any).referenceNumber}`, fontSize: 9, alignment: 'center' } : {},
+          { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'center' },
         ],
-        alignment: 'right'
+        alignment: 'center'
       }
     ],
     margin: [0, 0, 0, 10]

@@ -21,6 +21,7 @@ import {
 import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, ArrowRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
+import { ROLES } from '@/lib/constants';
 
 interface QuotationListProps {
   quotations: Quotation[];
@@ -226,7 +227,7 @@ export function QuotationList({
                               </DropdownMenuItem>
                             </>
                           )}
-                          {user?.role !== 'employee' && (
+                          {user?.role !== ROLES.EMPLOYEE && (
                           <>
                           {quotation.status === 'pending' && !isExpired && (
                             <>

@@ -152,8 +152,8 @@ async def get_customization(
              raise HTTPException(status_code=403, detail="Access denied to this company")
             
         query = db.collection("customizations")\
-            .where("companyId", "==", company_id)\
-            .where("type", "==", type)\
+            .where(field_path="companyId", op_string="==", value=company_id)\
+            .where(field_path="type", op_string="==", value=type)\
             .limit(1)
             
         docs = list(query.stream())

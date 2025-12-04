@@ -11,22 +11,28 @@ import { safeCurrency } from './helpers';
 export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any => {
   const headers = [
     { text: 'S.No', style: 'tableHeader', alignment: 'center' },
-    { text: 'Description', style: 'tableHeader', alignment: 'left' },
+    { text: 'Description', style: 'tableHeader', alignment: 'center' },
     { text: 'HSN/SAC', style: 'tableHeader', alignment: 'center' },
     { text: 'Qty/Unit', style: 'tableHeader', alignment: 'center' },
-    { text: 'Rate', style: 'tableHeader', alignment: 'right' },
-    { text: 'GST Amt', style: 'tableHeader', alignment: 'right' },
-    { text: 'Amount', style: 'tableHeader', alignment: 'right' },
+    { text: 'Rate', style: 'tableHeader', alignment: 'center' },
+    { text: 'GST %', style: 'tableHeader', alignment: 'center' },
+    { text: 'Taxable Amt', style: 'tableHeader', alignment: 'center' },
+    { text: 'GST Amt', style: 'tableHeader', alignment: 'center' },
+    { text: 'Amount', style: 'tableHeader', alignment: 'center' },
   ];
 
-  const widths = [25, '*', 50, 50, 55, 55, 60];
+  const widths = [25, '*', 45, 45, 50, 35, 55, 50, 55];
 
   const body = [
     headers,
     ...items.map((item, index) => {
       // Calculate total GST for this item
       const gstAmount = (item.cgst || 0) + (item.sgst || 0) + (item.igst || 0);
-      
+      // Taxable amount per item (assume lineTotal includes taxes)
+      const taxable = (typeof item.lineTotal === 'number') ? (item.lineTotal - gstAmount) : null;
+      // GST percentage (if available on item)
+      const gstPercent = item.gstRate ?? item.gst_rate ?? null;
+
       return [
         { text: (startIndex + index + 1).toString(), fontSize: 8, alignment: 'center' },
         { 
@@ -38,9 +44,11 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
         },
         { text: item.hsn || '-', fontSize: 8, alignment: 'center' },
         { text: `${item.quantity || 0} ${item.unit || ''}`, fontSize: 8, alignment: 'center' },
-        { text: safeCurrency(item.unitPrice), fontSize: 8, alignment: 'right' },
-        { text: safeCurrency(gstAmount), fontSize: 8, alignment: 'right' },
-        { text: safeCurrency(item.lineTotal), fontSize: 8, alignment: 'right' },
+        { text: safeCurrency(item.unitPrice), fontSize: 8, alignment: 'center' },
+        { text: gstPercent ? `${gstPercent}%` : '-', fontSize: 8, alignment: 'center' },
+        { text: safeCurrency(taxable), fontSize: 8, alignment: 'center' },
+        { text: safeCurrency(gstAmount), fontSize: 8, alignment: 'center' },
+        { text: safeCurrency(item.lineTotal), fontSize: 8, alignment: 'center' },
       ];
     })
   ];
@@ -51,6 +59,8 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
   if (remainingRows > 0) {
     for (let i = 0; i < remainingRows; i++) {
       body.push([
+        { text: '', fontSize: 8 },
+        { text: '', fontSize: 8 },
         { text: '', fontSize: 8 },
         { text: '', fontSize: 8 },
         { text: '', fontSize: 8 },

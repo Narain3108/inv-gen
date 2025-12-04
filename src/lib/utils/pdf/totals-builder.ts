@@ -53,24 +53,24 @@ export const buildTotalsSection = (
             widths: ['*', 80],
             body: [
               ...(showTaxable ? [[
-                { text: 'Taxable Amount:', fontSize: 8 },
-                { text: safeCurrency(data.taxableAmount), fontSize: 8, alignment: 'right' },
+                { text: 'Taxable Amount:', fontSize: 8, alignment: 'center' },
+                { text: safeCurrency(data.taxableAmount), fontSize: 8, alignment: 'center' },
               ]] : []),
               ...(showCGST && data.cgst > 0 ? [[
-                { text: 'CGST:', fontSize: 8 },
-                { text: safeCurrency(data.cgst), fontSize: 8, alignment: 'right' },
+                { text: 'CGST:', fontSize: 8, alignment: 'center' },
+                { text: safeCurrency(data.cgst), fontSize: 8, alignment: 'center' },
               ]] : []),
               ...(showSGST && data.sgst > 0 ? [[
-                { text: 'SGST:', fontSize: 8 },
-                { text: safeCurrency(data.sgst), fontSize: 8, alignment: 'right' },
+                { text: 'SGST:', fontSize: 8, alignment: 'center' },
+                { text: safeCurrency(data.sgst), fontSize: 8, alignment: 'center' },
               ]] : []),
               ...(showIGST && data.igst > 0 ? [[
-                { text: 'IGST:', fontSize: 8 },
-                { text: safeCurrency(data.igst), fontSize: 8, alignment: 'right' },
+                { text: 'IGST:', fontSize: 8, alignment: 'center' },
+                { text: safeCurrency(data.igst), fontSize: 8, alignment: 'center' },
               ]] : []),
               [
-                { text: 'Total:', fontSize: 10, bold: true, fillColor: '#f3f4f6' },
-                { text: safeCurrency(data.totalAmount), fontSize: 10, bold: true, alignment: 'right', fillColor: '#f3f4f6' },
+                { text: 'Total:', fontSize: 10, bold: true, fillColor: '#f3f4f6', alignment: 'center' },
+                { text: safeCurrency(data.totalAmount), fontSize: 10, bold: true, alignment: 'center', fillColor: '#f3f4f6' },
               ],
             ],
           },

@@ -35,6 +35,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Company } from '@/types';
+import { ROLES } from '@/lib/constants';
 
 interface NavItem {
   title: string;
@@ -225,7 +226,7 @@ export function Sidebar({ className }: SidebarProps) {
         })}
 
         {/* Super Admin Items */}
-        {user?.role === 'super_admin' && superAdminNavItems.map((item) => {
+        {user?.role === ROLES.SUPER_ADMIN && superAdminNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 

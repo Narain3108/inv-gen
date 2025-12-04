@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 import { invoicesApi } from '@/lib/api/invoices.api';
 import { productsApi } from '@/lib/api/products.api';
 import { clientsApi } from '@/lib/api/clients.api';
+import { companiesApi } from '@/lib/api/companies.api';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -80,8 +81,16 @@ function InvoicesContent() {
 
     setLoading(true);
     try {
-      // Set company
-      setCompany(selectedCompany);
+      // Set company - Fetch fresh data to ensure we have latest details (address, etc)
+      // This fixes the issue where updated company details weren't reflected in invoices
+      const freshCompany = await companiesApi.getById(selectedCompany.id);
+      setCompany(freshCompany);
+      
+      // Update global store if stale
+      if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
+        console.log('🔄 Updating stale selected company in store');
+        setSelectedCompany(freshCompany);
+      }
 
       // Load invoices
       const invoicesData = await invoicesApi.getAll({ company_id: selectedCompany.id });

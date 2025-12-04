@@ -5,10 +5,12 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Organization } from '@/types';
 import { organizationApi } from '@/lib/api/organization.api';
 import { companiesApi } from '@/lib/api/companies.api';
+import { usersApi } from '@/lib/api/users.api';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
 import { OrgLoginValues, OrgSignupValues } from '@/lib/validations';
+import { ROLES } from '@/lib/constants';
 
 interface AuthContextType {
   user: User | null;
@@ -22,7 +24,7 @@ interface AuthContextType {
   
   // User Actions
   loginUser: (email: string, password: string) => Promise<void>;
-  logoutUser: () => void;
+  logoutUser: (shouldRedirect?: boolean) => void;
   logout: () => void;
 }
 
@@ -65,9 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          // We could also verify user here, but if Org is invalid, User is likely invalid too
-          // For now, let's just trust it if Org is valid, or we can add user verification later
-          setUser(parsedUser);
+          
+          // Verify user session with backend
+          try {
+            const freshUser = await usersApi.getMe();
+            setUser(freshUser);
+            // Update local storage with fresh data
+            localStorage.setItem('userData', JSON.stringify(freshUser));
+          } catch (verifyError) {
+            console.warn('User session invalid:', verifyError);
+            localStorage.removeItem('userData');
+            localStorage.removeItem('userToken');
+            setUser(null);
+          }
         } catch (e) {
           localStorage.removeItem('userData');
           localStorage.removeItem('userToken');
@@ -87,9 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAuthPage = pathname?.startsWith('/auth');
     const isPublicPage = pathname === '/';
 
-    if (!organization && !isAuthPage && !isPublicPage) {
-      // No Org -> Go to Org Login
-      router.push('/auth/org-login');
+    if (!organization) {
+      if (!isAuthPage && !isPublicPage) {
+        // No Org -> Go to Org Login
+        router.push('/auth/org-login');
+      } else if (pathname === '/auth/login') {
+        // If on user login but no org, redirect to org login
+        router.push('/auth/org-login');
+      }
     } else if (organization && !user && !pathname?.includes('/auth/login')) {
       // Org but No User -> Go to User Login
       router.push('/auth/login');
@@ -148,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success(`Welcome back, ${response.user.name}`);
       
       // Role-based Redirect
-      if (response.user.role === 'super_admin') {
+      if (response.user.role === ROLES.SUPER_ADMIN) {
         // Check if user has any companies
         try {
           const companies = await companiesApi.getAll();
@@ -173,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logoutUser = () => {
+  const logoutUser = (shouldRedirect: boolean = true) => {
     (async () => {
       try {
         // Call backend logout to ensure server cookie is cleared
@@ -187,7 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('userData');
         localStorage.removeItem('userToken');
         clearSelectedCompany();
-        router.push('/auth/login');
+        if (shouldRedirect) {
+          router.push('/auth/login');
+        }
         toast.success('Logged out');
       }
     })();
@@ -202,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.warn('Logout request failed:', e);
       } finally {
-        logoutUser(); // this will clear client state and redirect
+        logoutUser(false); // this will clear client state without redirecting
         setOrganization(null);
         localStorage.removeItem('orgData');
         localStorage.removeItem('orgToken');

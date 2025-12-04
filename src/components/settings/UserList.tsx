@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Users } from 'lucide-react';
+import { ROLES } from '@/lib/constants';
 
 interface UserListProps {
   users: User[];
@@ -51,7 +52,7 @@ export function UserList({ users, onEdit }: UserListProps) {
                   <td className="p-4 font-medium">{user.name}</td>
                   <td className="p-4 text-sm">{user.email}</td>
                   <td className="p-4">
-                    <Badge variant={user.role === 'super_admin' ? 'default' : user.role === 'admin' ? 'secondary' : 'outline'}>
+                    <Badge variant={user.role === ROLES.SUPER_ADMIN ? 'default' : user.role === ROLES.ADMIN ? 'secondary' : 'outline'}>
                       {user.role.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </td>
@@ -86,7 +87,7 @@ export function UserList({ users, onEdit }: UserListProps) {
                 <div className="font-semibold text-base">{user.name}</div>
                 <div className="text-sm text-muted-foreground break-all">{user.email}</div>
               </div>
-              <Badge variant={user.role === 'super_admin' ? 'default' : user.role === 'admin' ? 'secondary' : 'outline'}>
+              <Badge variant={user.role === ROLES.SUPER_ADMIN ? 'default' : user.role === ROLES.ADMIN ? 'secondary' : 'outline'}>
                 {user.role.replace('_', ' ').toUpperCase()}
               </Badge>
             </div>

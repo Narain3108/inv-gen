@@ -71,19 +71,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Track user ID to detect user switches
   const [prevUserId, setPrevUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user?.id && user.id !== prevUserId) {
-      // User changed (e.g. login as different user, or profile update)
-      // Reset initialization flags to force reload
-      setCompaniesInitialized(false);
-      setClientsInitialized(false);
-      setProductsInitialized(false);
-      setPrevUserId(user.id);
-    } else if (!user && prevUserId) {
-      // Logout
-      setPrevUserId(null);
-    }
-  }, [user, prevUserId]);
+  // Merged user change detection into the main data loading effect below
+
 
   // Load companies once on mount
   const loadCompanies = useCallback(async (force = false) => {
@@ -160,7 +149,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedCompany, companies, companiesInitialized]);
 
-  // Initial load on mount
+  // Initial load on mount and user change handling
   useEffect(() => {
     if (authLoading) return;
     
@@ -168,17 +157,30 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     if (isPublicPage) return;
 
     if (user) {
+      const hasUserChanged = user.id !== prevUserId;
+      
+      if (hasUserChanged) {
+        console.log('👤 User changed, forcing data reload');
+        setPrevUserId(user.id);
+        // Reset flags immediately to reflect loading state if needed
+        setCompaniesInitialized(false);
+        setClientsInitialized(false);
+        setProductsInitialized(false);
+      }
+
       const initializeData = async () => {
         // Load companies and clients in parallel
+        // Force reload if user changed
         await Promise.all([
-          loadCompanies(),
-          loadClients(),
+          loadCompanies(hasUserChanged),
+          loadClients(hasUserChanged),
         ]);
       };
       
       initializeData();
     } else {
       // Clear data on logout
+      if (prevUserId) setPrevUserId(null);
       setCompanies([]);
       setClients([]);
       setProducts([]);
@@ -186,7 +188,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setClientsInitialized(false);
       setProductsInitialized(false);
     }
-  }, [user, authLoading, loadCompanies, loadClients, isPublicPage]);
+  }, [user, authLoading, loadCompanies, loadClients, isPublicPage, prevUserId]);
 
   // Validate selected company against loaded companies
   useEffect(() => {
