@@ -89,6 +89,19 @@ export const companyFormSchema = z.object({
   additionalNotes: z.string().max(500, 'Notes must be less than 500 characters').optional().or(z.literal('')).nullish(),
 });
 
+// ==================== Category Schema ====================
+
+export const categoryFormSchema = z.object({
+  categoryName: z.string().min(2, 'Category name is required').max(200),
+  description: z.string().max(500).optional().or(z.literal('')).nullish(),
+  products: z.array(z.object({
+    name: z.string().min(1, 'Product name is required'),
+    hsn: z.string().min(1, 'HSN/SAC is required'),
+    itemCode: z.string().optional().or(z.literal('')).nullish(),
+  })).min(1, 'At least one product is required'),
+  defaultGstRate: z.number().min(0).max(100),
+});
+
 // ==================== Product Schema ====================
 
 export const productFormSchema = z.object({

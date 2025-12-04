@@ -4,7 +4,6 @@
  */
 
 'use client';
-
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -181,80 +180,126 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3 sm:p-4 overflow-y-auto hide-scrollbar">
-        {navItems.filter(item => {
-          if (user?.role === 'employee') {
-            return item.title !== 'Settings';
-          }
-          return true;
-        }).map((item) => {
-          const Icon = item.icon;
-          const matchesBasePath = pathname === item.href || pathname.startsWith(item.href + '/');
-          const isExcluded = item.excludeActivePaths?.some((path) =>
-            pathname === path || pathname.startsWith(path + '/')
-          );
-          const isActive = matchesBasePath && !isExcluded;
+        {(() => {
+          const isSuper = user?.role === ROLES.SUPER_ADMIN;
+          // For super admins, exclude Settings from the main list so we can render it after User Management
+          const mainNav = navItems.filter((item) => {
+            if (item.title === 'Settings' && isSuper) return false;
+            if (user?.role === 'employee' && item.title === 'Settings') return false;
+            return true;
+          });
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
-                'transition-all duration-200 group relative overflow-hidden',
-                'active:scale-[0.97]',
-                isActive
-                  ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
-              )}
-            >
-              <div className={cn(
-                "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
-                isActive 
-                  ? "bg-white/20 backdrop-blur-sm" 
-                  : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
-              )}>
-                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <span className="font-semibold relative z-10 truncate">{item.title}</span>
-              {item.badge && (
-                <span className="ml-auto rounded-full bg-white/30 backdrop-blur-sm px-2 py-0.5 text-xs text-white font-bold shadow-sm relative z-10 shrink-0">
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+            <>
+              {mainNav.map((item) => {
+                const Icon = item.icon;
+                const matchesBasePath = pathname === item.href || pathname.startsWith(item.href + '/');
+                const isExcluded = item.excludeActivePaths?.some((path) =>
+                  pathname === path || pathname.startsWith(path + '/')
+                );
+                const isActive = matchesBasePath && !isExcluded;
 
-        {/* Super Admin Items */}
-        {user?.role === ROLES.SUPER_ADMIN && superAdminNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                      'transition-all duration-200 group relative overflow-hidden',
+                      'active:scale-[0.97]',
+                      isActive
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+                    )}
+                  >
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                      isActive 
+                        ? "bg-white/20 backdrop-blur-sm" 
+                        : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+                    )}>
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <span className="font-semibold relative z-10 truncate">{item.title}</span>
+                    {item.badge && (
+                      <span className="ml-auto rounded-full bg-white/30 backdrop-blur-sm px-2 py-0.5 text-xs text-white font-bold shadow-sm relative z-10 shrink-0">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
-                'transition-all duration-200 group relative overflow-hidden',
-                'active:scale-[0.97]',
-                isActive
-                  ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
-              )}
-            >
-              <div className={cn(
-                "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
-                isActive 
-                  ? "bg-white/20 backdrop-blur-sm" 
-                  : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
-              )}>
-                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <span className="font-semibold relative z-10 truncate">{item.title}</span>
-            </Link>
+              {/* Super Admin Items */}
+              {isSuper && superAdminNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                      'transition-all duration-200 group relative overflow-hidden',
+                      'active:scale-[0.97]',
+                      isActive
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+                    )}
+                  >
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                      isActive 
+                        ? "bg-white/20 backdrop-blur-sm" 
+                        : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+                    )}>
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <span className="font-semibold relative z-10 truncate">{item.title}</span>
+                  </Link>
+                );
+              })}
+
+              {/* Render Settings for super admin below User Management */}
+              {isSuper && (() => {
+                const settingsItem = navItems.find(i => i.title === 'Settings');
+                if (!settingsItem) return null;
+                const Icon = settingsItem.icon;
+                const matchesBasePath = pathname === settingsItem.href || pathname.startsWith(settingsItem.href + '/');
+                const isExcluded = settingsItem.excludeActivePaths?.some((path) =>
+                  pathname === path || pathname.startsWith(path + '/')
+                );
+                const isActive = matchesBasePath && !isExcluded;
+
+                return (
+                  <Link
+                    key={settingsItem.href}
+                    href={settingsItem.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                      'transition-all duration-200 group relative overflow-hidden',
+                      'active:scale-[0.97]',
+                      isActive
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+                    )}
+                  >
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                      isActive 
+                        ? "bg-white/20 backdrop-blur-sm" 
+                        : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+                    )}>
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <span className="font-semibold relative z-10 truncate">{settingsItem.title}</span>
+                  </Link>
+                );
+              })()}
+            </>
           );
-        })}
+        })()}
       </nav>
 
       {/* Footer */}

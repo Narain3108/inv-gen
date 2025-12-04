@@ -7,7 +7,10 @@
 
 import React, { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { ProductCategory, CategoryProduct } from '@/types';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { categoryFormSchema } from '@/lib/validations';
+import { ProductCategory } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,12 +21,7 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { GST_RATES } from '@/lib/constants';
 
-interface CategoryFormData {
-  categoryName: string;
-  description?: string;
-  products: CategoryProduct[];
-  defaultGstRate: number;
-}
+type CategoryFormData = z.infer<typeof categoryFormSchema>;
 
 interface CategoryFormProps {
   category?: ProductCategory;
@@ -42,6 +40,7 @@ export function CategoryForm({ category, onSubmit, onCancel }: CategoryFormProps
     watch,
     formState: { errors },
   } = useForm<CategoryFormData>({
+    resolver: zodResolver(categoryFormSchema) as any,
     defaultValues: category
       ? {
           categoryName: category.categoryName,
@@ -67,21 +66,6 @@ export function CategoryForm({ category, onSubmit, onCancel }: CategoryFormProps
   };
 
   const handleFormSubmit = async (data: CategoryFormData) => {
-    // Validate at least one product
-    if (!data.products || data.products.length === 0) {
-      toast.error('Please add at least one product to the category');
-      return;
-    }
-
-    // Validate all products have name and HSN
-    const invalidProducts = data.products.filter(
-      (p) => !p.name.trim() || !p.hsn.trim()
-    );
-    if (invalidProducts.length > 0) {
-      toast.error('All products must have a name and HSN code');
-      return;
-    }
-
     setIsLoading(true);
     try {
       await onSubmit(data);
@@ -185,6 +169,9 @@ export function CategoryForm({ category, onSubmit, onCancel }: CategoryFormProps
                       })}
                       placeholder="e.g., Laptop, Cotton Shirt"
                     />
+                    {errors.products?.[index]?.name && (
+                      <p className="text-sm text-red-500">{errors.products?.[index]?.name?.message as any}</p>
+                    )}
                   </div>
 
                   {/* HSN Code */}
@@ -199,6 +186,9 @@ export function CategoryForm({ category, onSubmit, onCancel }: CategoryFormProps
                       })}
                       placeholder="e.g., 8471"
                     />
+                    {errors.products?.[index]?.hsn && (
+                      <p className="text-sm text-red-500">{errors.products?.[index]?.hsn?.message as any}</p>
+                    )}
                   </div>
 
                   {/* Item Code (Optional) */}

@@ -43,7 +43,12 @@ function snakeToCamel(obj: any): any {
   return camelObj;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/+$/,'');
+
+function buildUrl(base: string, endpoint: string) {
+  const e = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${base}${e}`;
+}
 
 export interface ApiResponse<T> {
   data: T;
@@ -76,7 +81,7 @@ class ApiClient {
   private baseURL: string;
 
   constructor(baseURL: string) {
-    this.baseURL = baseURL;
+    this.baseURL = (baseURL || '').replace(/\/+$/,'');
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -156,7 +161,7 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string, params?: Record<string, any>, transformCase = false): Promise<T> {
-    const url = new URL(`${this.baseURL}${endpoint}`);
+    const url = new URL(buildUrl(this.baseURL, endpoint));
     
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -188,7 +193,7 @@ class ApiClient {
 
   async post<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const url = `${this.baseURL}${endpoint}`;
+    const url = buildUrl(this.baseURL, endpoint);
 
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] POST', url, bodyData);
@@ -211,7 +216,7 @@ class ApiClient {
 
   async put<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const url = `${this.baseURL}${endpoint}`;
+    const url = buildUrl(this.baseURL, endpoint);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] PUT', url, bodyData);
     }
@@ -233,7 +238,7 @@ class ApiClient {
 
   async patch<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const url = `${this.baseURL}${endpoint}`;
+    const url = buildUrl(this.baseURL, endpoint);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] PATCH', url, bodyData);
     }
@@ -254,7 +259,7 @@ class ApiClient {
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
+    const url = buildUrl(this.baseURL, endpoint);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] DELETE', url);
     }
@@ -283,7 +288,7 @@ class ApiClient {
       });
     }
 
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    const response = await fetch(buildUrl(this.baseURL, endpoint), {
       method: 'POST',
       body: formData,
       credentials: 'include', // Send cookies
@@ -295,3 +300,14 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
+
+// Runtime debug: log resolved API base URL in browser devtools
+if (typeof window !== 'undefined') {
+  try {
+    // Expose for quick inspection and optional DEBUG toggle
+    (window as any).API_BASE_URL = API_BASE_URL;
+    console.debug('[apiClient] Resolved API_BASE_URL ->', API_BASE_URL);
+  } catch (e) {
+    // ignore
+  }
+}

@@ -216,7 +216,11 @@ function DashboardContent() {
     
     // Paid and pending amounts
     const paidAmount = filteredInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
-    const pendingAmount = filteredInvoices.reduce((sum, inv) => sum + (inv.amountPending || 0), 0);
+    const pendingAmount = filteredInvoices.reduce((sum, inv) => {
+      const total = inv.totalAmount || 0;
+      const paid = inv.amountPaid || 0;
+      return sum + Math.max(0, total - paid);
+    }, 0);
 
     // Average invoice value
     const averageInvoiceValue = filteredInvoices.length > 0 

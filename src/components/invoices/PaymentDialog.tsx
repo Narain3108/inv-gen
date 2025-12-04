@@ -74,6 +74,7 @@ export function PaymentDialog({
     handleSubmit,
     setValue,
     watch,
+    setError,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<PaymentFormData>({
@@ -102,6 +103,17 @@ export function PaymentDialog({
   }, [invoice, open, setValue]);
 
   const handleFormSubmit = async (data: PaymentFormData) => {
+    // Prevent submitting an amount greater than the pending balance
+    const roundTo2 = (num: number) => Math.round((num || 0) * 100) / 100;
+    const pending = roundTo2(invoice?.amountPending ?? invoice?.totalAmount ?? 0);
+    const entered = roundTo2(data.amount || 0);
+    if (entered > pending + 0.001) {
+      const msg = `Amount exceeds pending balance (${formatCurrency(pending)})`;
+      setError('amount', { type: 'manual', message: msg });
+      toast.error(msg);
+      return;
+    }
+
     await onSubmit(data);
     reset();
   };
