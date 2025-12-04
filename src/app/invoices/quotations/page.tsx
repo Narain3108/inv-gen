@@ -39,7 +39,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
 import { amountToWords } from '@/lib/utils/number-to-words';
-import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
+import { generateQuotationNumber, generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
 import { quotationsApi } from '@/lib/api/quotations.api';
@@ -351,12 +351,17 @@ function QuotationsContent() {
   };
 
   const handleConvertToInvoice = async (quotation: Quotation) => {
-    // Generate suggested invoice number using API
+    if (!selectedCompany) return;
+
+    // Reload fresh company data to ensure we use latest numbering config
+    await reloadCompanyData();
+
+    // Count existing invoices for this company
     const invoices = await invoicesApi.getAll({ company_id: selectedCompany?.id || '' });
-    const number = invoices.length + 1;
-    const year = new Date().getFullYear();
-    const suggestedNumber = `INV-${year}-${String(number).padStart(4, '0')}`;
-    
+
+    // Use company's invoice numbering settings when available
+    const suggestedNumber = generateInvoiceNumber(company || selectedCompany, invoices.length);
+
     setInvoiceNumber(suggestedNumber);
     setConvertingQuotation(quotation);
   };
