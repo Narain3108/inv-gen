@@ -408,7 +408,7 @@ export function InvoiceForm({
           <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Invoice Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pb-4 pt-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Invoice Number */}
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number</Label>
@@ -445,10 +445,10 @@ export function InvoiceForm({
                 value={watch('clientId') || ''}
                 onValueChange={(value) => setValue('clientId', value)}
               >
-                <SelectTrigger className="min-w-[260px] sm:min-w-[320px] md:min-w-[360px]">
+                <SelectTrigger className="w-full sm:min-w-[260px]">
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
-                <SelectContent className="w-[320px] sm:w-[380px]">
+                <SelectContent className="w-full sm:w-[380px]">
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id} className="text-sm">
                       <span className="block max-w-[300px] truncate">
@@ -520,7 +520,7 @@ export function InvoiceForm({
                 )}
 
                 {shippingAddressMode === 'new' && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input 
                       placeholder="Street" 
                       value={newShippingAddress.street}
@@ -802,7 +802,7 @@ export function InvoiceForm({
                     </div>
 
                     {/* Quantity and Unit Price Row */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Quantity</Label>
                         <Input
@@ -841,7 +841,7 @@ export function InvoiceForm({
                     </div>
 
                     {/* Discount and Amount Row */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Discount %</Label>
                         <Input

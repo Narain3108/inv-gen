@@ -38,21 +38,7 @@ export default function LandingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if splash has been shown in this session
-    const splashShown = sessionStorage.getItem('splashShown');
-    
-    if (splashShown === 'true') {
-      setShowSplash(false);
-      setIsLoading(false);
-    } else {
-      // Mark splash as shown for this session
-      sessionStorage.setItem('splashShown', 'true');
-      setIsLoading(false);
-    }
-  }, []);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -63,16 +49,18 @@ export default function LandingPage() {
   }, []);
 
   const handleSplashFinish = () => {
-    setShowSplash(false);
+    // After splash, navigate directly to login page
+    try {
+      router.push('/auth/login');
+    } catch (e) {
+      // fallback
+      if (typeof window !== 'undefined') window.location.href = '/auth/login';
+    }
   };
 
-  // Show splash screen if needed
-  if (isLoading) {
-    return null; // Prevent flash of content while checking session storage
-  }
-
+  // Always show splash for 3 seconds then redirect to login
   if (showSplash) {
-    return <Splash durationMs={4000} logoSrc="/loo.jpg" onFinish={handleSplashFinish} />;
+    return <Splash durationMs={3000} logoSrc="/loo.jpg" onFinish={handleSplashFinish} />;
   }
 
   return (

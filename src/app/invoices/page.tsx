@@ -263,7 +263,7 @@ function InvoicesContent() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-full sm:max-w-4xl h-full sm:h-auto max-h-[90vh] overflow-y-auto sm:rounded-lg rounded-none">
           <DialogHeader>
             <DialogTitle>
               {editingInvoice ? 'Edit Invoice' : 'New Invoice'}

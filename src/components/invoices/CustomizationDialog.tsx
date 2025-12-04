@@ -221,7 +221,7 @@ export function CustomizationDialog({
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="invoiceNumberLabel">Invoice Number Label</Label>
                       <Input
@@ -239,7 +239,7 @@ export function CustomizationDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="dateLabel">Date Label</Label>
                       <Input
@@ -258,7 +258,7 @@ export function CustomizationDialog({
                   </div>
 
                   {type === 'quotation' && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="dueDateLabel">Valid Until Label</Label>
                         <Input
@@ -315,7 +315,7 @@ export function CustomizationDialog({
                   <CardDescription>Customize how addresses are displayed</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="billingLabel">Billing Address Label</Label>
                       <Input
@@ -333,7 +333,7 @@ export function CustomizationDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="shippingLabel">Shipping Address Label</Label>
                       <Input
@@ -542,7 +542,7 @@ export function CustomizationDialog({
                   <CardDescription>Configure page size and margins</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="pageSize">Page Size</Label>
                       <Select
@@ -578,7 +578,7 @@ export function CustomizationDialog({
 
                   <div className="space-y-4 pt-4 border-t">
                     <Label className="text-base font-semibold">Margins (in pixels)</Label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="marginTop">Top</Label>
                         <Input
