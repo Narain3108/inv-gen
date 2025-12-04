@@ -70,26 +70,39 @@ function ProductsContent() {
     if (!selectedCompany) return;
 
     try {
-      // Filter out undefined values
-      // Remove itemCode if it's empty or undefined
-      const cleanData = { ...data };
-      if (!cleanData.itemCode || cleanData.itemCode.trim() === '') {
+      // Filter out undefined/null/empty-string values so payloads match API types
+      const cleanData = { ...data } as Record<string, any>;
+      // Remove itemCode if it's empty or whitespace
+      if (!cleanData.itemCode || (typeof cleanData.itemCode === 'string' && cleanData.itemCode.trim() === '')) {
         delete cleanData.itemCode;
       }
 
+      // Sanitize: convert explicit nulls or empty strings to undefined (so types like string | undefined match)
+      const sanitizedCleanData: Record<string, any> = {};
+      Object.entries(cleanData).forEach(([key, value]) => {
+        if (value === null || value === undefined) return; // omit key -> becomes undefined when not present
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed === '') return; // omit empty strings
+          sanitizedCleanData[key] = trimmed;
+          return;
+        }
+        sanitizedCleanData[key] = value;
+      });
+
       if (editingProduct) {
         // Update existing product using API - don't send companyId
-        console.log('Updating product:', editingProduct.id, cleanData);
-        await productsApi.update(editingProduct.id, cleanData);
+        console.log('Updating product:', editingProduct.id, sanitizedCleanData);
+        await productsApi.update(editingProduct.id, sanitizedCleanData as any);
         toast.success('Product updated successfully');
       } else {
         // Create new product using API - include companyId
         const productData = {
-          ...cleanData,
+          ...sanitizedCleanData,
           companyId: selectedCompany.id,
         };
         console.log('Creating new product:', productData);
-        const newProduct = await productsApi.create(productData);
+        const newProduct = await productsApi.create(productData as any);
         console.log('Created product with ID:', newProduct.id);
         toast.success('Product created successfully');
       }

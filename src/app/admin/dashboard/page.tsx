@@ -29,7 +29,6 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   // Load users and companies
   useEffect(() => {
@@ -165,6 +164,8 @@ function UserDialog({ open, onOpenChange, companies, orgId, onSuccess }: {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit: SubmitHandler<SubUserFormValues> = async (data) => {
     try {

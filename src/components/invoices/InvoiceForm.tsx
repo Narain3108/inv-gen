@@ -382,7 +382,8 @@ export function InvoiceForm({
         totalAmountInWords: totals.totalAmountInWords,
         taxBreakdown: totals.taxBreakdown,
         status: 'draft',
-        paymentStatus: 'unpaid',
+        // Default paymentStatus must align with InvoicePaymentStatus ('pending'|'partially_paid'|'paid')
+        paymentStatus: 'pending',
       };
 
       await onSubmit(invoiceData as any);

@@ -415,7 +415,8 @@ function QuotationsContent() {
         cgst: convertingQuotation.cgst,
         sgst: convertingQuotation.sgst,
         igst: convertingQuotation.igst,
-        paymentStatus: 'unpaid' as const,
+        // Use InvoicePaymentStatus values defined in types (pending|partially_paid|paid)
+        paymentStatus: 'pending' as const,
       };
 
       const newInvoice = await invoicesApi.create(invoiceData);
@@ -441,7 +442,14 @@ function QuotationsContent() {
 
   const handleUpdateStatus = async (quotation: Quotation, status: QuotationStatus) => {
     try {
-      await quotationsApi.updateStatus(quotation.id, status, quotation.companyId);
+      // Map local QuotationStatus to API-expected status values
+      // API expects: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+      let apiStatus: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+      if (status === 'pending') apiStatus = 'draft';
+      else if (status === 'converted') apiStatus = 'sent';
+      else apiStatus = status as any;
+
+      await quotationsApi.updateStatus(quotation.id, apiStatus, quotation.companyId);
       toast.success(`Quotation marked as ${status}`);
       await loadData();
     } catch (error) {
@@ -544,7 +552,7 @@ function QuotationsContent() {
           <QuotationForm
             quotation={editingQuotation}
             companyId={selectedCompany?.id || ''}
-            company={company}
+            company={company || undefined}
             products={products}
             clients={clients}
             companyState={selectedCompany?.address?.state || ''}

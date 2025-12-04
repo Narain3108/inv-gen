@@ -30,6 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PaymentMode, Invoice } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { toast } from 'sonner';
 import { DollarSign, Calendar, CreditCard, FileText, Clock, Hash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -208,9 +209,10 @@ export function PaymentDialog({
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               <span>
-                                {payment.paymentDate?.toDate 
-                                  ? formatDate(payment.paymentDate.toDate()) 
-                                  : 'N/A'}
+                                {(() => {
+                                  const d = formatDate(payment.paymentDate as any);
+                                  return d === '-' ? 'N/A' : d;
+                                })()}
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -231,8 +233,14 @@ export function PaymentDialog({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground text-right">
-                          {payment.recordedAt?.toDate 
-                            ? formatDate(payment.recordedAt.toDate()) 
+                          {payment.recordedAt
+                            ? formatDate(
+                                typeof payment.recordedAt === 'string'
+                                  ? payment.recordedAt
+                                  : payment.recordedAt instanceof Date
+                                  ? payment.recordedAt
+                                  : (payment.recordedAt as any).toDate?.() || new Date()
+                              )
                             : 'N/A'}
                         </div>
                       </div>

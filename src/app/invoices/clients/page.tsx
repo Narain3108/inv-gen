@@ -63,15 +63,16 @@ function ClientsContent() {
 
     try {
       // Clients are global in backend
-      // Sanitize data to match backend expectations
-      const clientData = {
+      // Sanitize data to match backend expectations - avoid explicit `null`
+      // Use a loose `any` here to allow partial nested objects (bankDetails/address)
+      const clientData: any = {
         ...data,
         companyId: selectedCompany.id, // Add companyId from context
-        billingAddress: data.billingAddress || null,
-        shippingAddress: data.shippingAddress || null,
-        bankDetails: data.bankDetails || null,
-        gstin: data.gstin || null,
-        pan: data.pan || null,
+        billingAddress: data.billingAddress ?? undefined,
+        shippingAddress: data.shippingAddress ?? undefined,
+        bankDetails: data.bankDetails ?? undefined,
+        gstin: data.gstin ?? undefined,
+        pan: data.pan ?? undefined,
       };
 
       if (editingClient) {

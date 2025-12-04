@@ -71,14 +71,33 @@ function CategoriesContent() {
     setEditingCategory(undefined);
   };
 
-  const handleSubmit = async (data: ProductCategoryFormData) => {
+  const handleSubmit = async (data: any) => {
     if (!selectedCompany) return;
-    
+
     try {
+      // Sanitize incoming data which may contain null or empty strings (from forms)
+      const sanitized: ProductCategoryFormData = {
+        categoryName: (data.categoryName || '').trim(),
+        description: typeof data.description === 'string' ? data.description.trim() : undefined,
+        defaultGstRate: data.defaultGstRate,
+        products: Array.isArray(data.products)
+          ? data.products.map((p: any) => {
+              const prod: any = {
+                name: (p.name || '').trim(),
+                hsn: (p.hsn || '').trim(),
+              };
+              if (p.itemCode && typeof p.itemCode === 'string' && p.itemCode.trim() !== '') {
+                prod.itemCode = p.itemCode.trim();
+              }
+              return prod;
+            })
+          : [],
+      };
+
       if (editingCategory) {
-        await updateProductCategory(selectedCompany.id, editingCategory.id, data);
+        await updateProductCategory(selectedCompany.id, editingCategory.id, sanitized);
       } else {
-        await createProductCategory(selectedCompany.id, data);
+        await createProductCategory(selectedCompany.id, sanitized);
       }
 
       handleCloseForm();

@@ -6,6 +6,9 @@ import { User, Organization } from '@/types';
 import { organizationApi } from '@/lib/api/organization.api';
 import { companiesApi } from '@/lib/api/companies.api';
 import { usersApi } from '@/lib/api/users.api';
+import { authApi } from '@/lib/api/auth.api';
+import { auth, googleProvider } from '@/lib/firebase/config';
+import { signInWithPopup } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
@@ -26,6 +29,8 @@ interface AuthContextType {
   loginUser: (email: string, password: string) => Promise<void>;
   logoutUser: (shouldRedirect?: boolean) => void;
   logout: () => void;
+  // Social Auth
+  signInWithGoogle: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -231,6 +236,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   };
 
+  const signInWithGoogle = async () => {
+    if (!organization) {
+      toast.error('Organization session expired');
+      router.push('/auth/org-login');
+      return;
+    }
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+
+      // Exchange Firebase token with backend to obtain app session token
+      const response = await authApi.googleLogin(idToken);
+
+      // Save token and fetch user info
+      localStorage.setItem('userToken', response.token);
+      try {
+        const freshUser = await usersApi.getMe();
+        setUser(freshUser);
+        localStorage.setItem('userData', JSON.stringify(freshUser));
+      } catch (err) {
+        console.warn('Failed to fetch user after Google login', err);
+      }
+
+      toast.success('Signed in with Google');
+      router.push('/invoices/dashboard');
+    } catch (error: any) {
+      console.error('Google sign-in failed:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -242,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginUser, 
       logoutUser,
       logout: logoutUser,
+      signInWithGoogle,
     }}>
       {children}
     </AuthContext.Provider>
