@@ -19,8 +19,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     const stored = localStorage.getItem('theme') as Theme;
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const initialTheme = stored || systemTheme;
+    // Default to light if no stored preference. Previously we used the system preference
+    // which caused the app to start in dark mode for users with dark system settings.
+    const initialTheme = stored || 'light';
     setThemeState(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
   }, []);
