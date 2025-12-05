@@ -32,7 +32,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden shrink-0 hover:bg-primary/10 transition-colors mr-2"
+        className="lg:hidden shrink-0 hover:bg-primary/10 transition-colors mr-2"
         onClick={onMenuClick}
         aria-label="Toggle menu"
       >
