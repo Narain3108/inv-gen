@@ -479,7 +479,7 @@ function QuotationsContent() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Quotations
@@ -488,21 +488,24 @@ function QuotationsContent() {
             Create and manage price estimates for clients
           </p>
         </div>
-        <div className="flex gap-2">
-          <ExportButton
-            onExportExcel={handleExportExcel}
-            onExportCSV={handleExportCSV}
-          />
+        <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+          <div className="w-full md:w-auto">
+            <ExportButton
+              onExportExcel={handleExportExcel}
+              onExportCSV={handleExportCSV}
+            />
+          </div>
           <Button 
             variant="outline"
             onClick={() => setIsCustomizationDialogOpen(true)}
+            className="w-full md:w-auto"
           >
             <Settings className="mr-2 h-4 w-4" />
             Customize Bill
           </Button>
           <Button 
             onClick={handleAddQuotation} 
-            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all"
+            className="w-full md:w-auto bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all"
           >
             <Plus className="mr-2 h-4 w-4" />
             New Quotation

@@ -23,7 +23,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
 
   return (
     <header className={cn(
-      'sticky top-0 z-40 flex h-14 sm:h-16 items-center gap-2 sm:gap-4',
+      'sticky top-0 z-50 flex h-14 sm:h-16 items-center gap-2 sm:gap-4',
       'border-b bg-background/80 backdrop-blur-xl px-3 sm:px-6',
       'transition-all duration-300 mobile-safe-top',
       className
@@ -32,7 +32,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden shrink-0 hover:bg-primary/10 transition-colors"
+        className="md:hidden shrink-0 hover:bg-primary/10 transition-colors mr-2"
         onClick={onMenuClick}
         aria-label="Toggle menu"
       >
