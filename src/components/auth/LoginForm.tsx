@@ -23,7 +23,7 @@ interface LoginFormProps {
 export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { loginUser, organization, logoutOrg } = useAuth();
+  const { loginUser } = useAuth();
 
   const {
     register,
@@ -47,24 +47,11 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
     }
   };
 
-  if (!organization) {
-    return (
-      <div className="text-center space-y-4">
-        <p className="text-muted-foreground">No Organization session found.</p>
-        <Button onClick={logoutOrg} variant="outline">Go to Organization Login</Button>
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="bg-muted/50 p-3 rounded-lg text-sm text-center mb-4">
-        Logging in to <strong>{organization.name}</strong>
-        <button type="button" onClick={logoutOrg} className="block w-full text-xs text-primary hover:underline mt-1">
-          (Change Organization)
-        </button>
+        Sign in to your account
       </div>
-
       <div className="space-y-2">
         <Label htmlFor="email">Your Email</Label>
         <Input

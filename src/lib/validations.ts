@@ -44,6 +44,20 @@ export type UserLoginValues = z.infer<typeof userLoginSchema>;
 export type OrgSignupValues = z.infer<typeof orgSignupSchema>;
 export type SubUserFormValues = z.infer<typeof subUserFormSchema>;
 
+// ==================== Signup Schema (User) ====================
+export const signupSchema = z.object({
+  username: z.string().min(3, 'Username is required').regex(/^[a-zA-Z0-9_\-]+$/, 'Only letters, numbers, hyphens and underscores allowed'),
+  name: z.string().min(2, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(6, 'Confirm password is required'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
+export type SignupValues = z.infer<typeof signupSchema>;
+
 // ==================== Address Schema ====================
 
 export const addressSchema = z.object({

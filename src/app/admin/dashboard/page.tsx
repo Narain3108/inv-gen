@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Users, Plus, Shield, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies } from '@/hooks/useCompanies';
-import { organizationApi } from '@/lib/api/organization.api';
+import { usersApi } from '@/lib/api/users.api';
 import { User } from '@/types';
 import { toast } from 'sonner';
 import { useForm, SubmitHandler } from 'react-hook-form';
@@ -23,7 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { subUserFormSchema, SubUserFormValues } from '@/lib/validations';
 
 export default function UserManagementPage() {
-  const { user, organization } = useAuth();
+  const { user } = useAuth();
   const { companies, loadCompanies } = useCompanies();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,10 +34,11 @@ export default function UserManagementPage() {
   // Load users and companies
   useEffect(() => {
     const loadData = async () => {
-      if (!organization) return;
+      // require user to be present
+      if (!user) return;
       try {
         await loadCompanies();
-        const usersData = await organizationApi.getUsers(organization.id);
+        const usersData = await usersApi.getAll();
         setUsers(usersData);
       } catch (error) {
         console.error('Error loading users:', error);
@@ -52,7 +53,7 @@ export default function UserManagementPage() {
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      await organizationApi.deleteUser(userId);
+      await usersApi.delete(userId);
       setUsers(users.filter(u => u.id !== userId));
       toast.success('User deleted successfully');
     } catch (error) {
@@ -76,9 +77,9 @@ export default function UserManagementPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Organization Users</CardTitle>
+            <CardTitle>Users</CardTitle>
             <CardDescription>
-              List of all users in {organization?.name}
+              Manage users, roles and company access
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -134,11 +135,10 @@ export default function UserManagementPage() {
           </CardContent>
         </Card>
 
-        <UserDialog 
-          open={isDialogOpen} 
+        <UserDialog
+          open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
           companies={companies}
-          orgId={organization?.id || ''}
           onSuccess={(newUser: User) => {
             setUsers([...users, newUser]);
             setIsDialogOpen(false);
@@ -149,12 +149,11 @@ export default function UserManagementPage() {
   );
 }
 
-function UserDialog({ open, onOpenChange, companies, orgId, onSuccess }: { 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void; 
-  companies: any[]; 
-  orgId: string; 
-  onSuccess: (user: User) => void; 
+function UserDialog({ open, onOpenChange, companies, onSuccess }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  companies: any[];
+  onSuccess: (user: User) => void;
 }) {
   const { register, handleSubmit, formState: { errors }, reset } = useForm<SubUserFormValues>({
     resolver: zodResolver(subUserFormSchema),
@@ -169,7 +168,7 @@ function UserDialog({ open, onOpenChange, companies, orgId, onSuccess }: {
   const onSubmit: SubmitHandler<SubUserFormValues> = async (data) => {
     try {
       setIsLoading(true);
-      const newUser = await organizationApi.createSubUser({ ...data, orgId });
+      const newUser = await usersApi.create(data);
       toast.success('User created successfully');
       reset();
       onSuccess(newUser);

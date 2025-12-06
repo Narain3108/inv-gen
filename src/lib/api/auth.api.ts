@@ -20,8 +20,8 @@ export const authApi = {
     return apiClient.post<LoginResponse>('/auth/login', { email, password });
   },
 
-  signup: async (email: string, password: string, name: string): Promise<SignupResponse> => {
-    return apiClient.post<SignupResponse>('/auth/signup', { email, password, name });
+  signup: async (email: string, password: string, name: string, username: string): Promise<SignupResponse> => {
+    return apiClient.post<SignupResponse>('/auth/signup', { email, password, name, username });
   },
 
   googleLogin: async (token: string): Promise<LoginResponse> => {

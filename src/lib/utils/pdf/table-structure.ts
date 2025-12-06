@@ -1,17 +1,14 @@
 /**
  * PDF Table Structure Builder
  */
-
 import { InvoiceCustomization, DEFAULT_INVOICE_CUSTOMIZATION } from '@/types/customization';
 import { TableStructure } from './types';
 import { parseWidth } from './helpers';
-
 /**
  * Get table structure for invoice items based on customization
  */
 export const getTableStructure = (customization?: InvoiceCustomization): TableStructure => {
   console.log('📊 getTableStructure called');
-
   // Default structure - fallback
   const defaultStructure: TableStructure = {
     widths: ['*', 45, 40, 30, 50, 40, 40, 40, 60] as any[],
@@ -32,7 +29,6 @@ export const getTableStructure = (customization?: InvoiceCustomization): TableSt
     console.log('⚠️ No valid customization, using defaults');
     return defaultStructure;
   }
-
   try {
     const widths: any[] = [];
     const headers: any[] = [];

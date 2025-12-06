@@ -2,27 +2,21 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Organization } from '@/types';
-import { organizationApi } from '@/lib/api/organization.api';
-import { companiesApi } from '@/lib/api/companies.api';
+import { User } from '@/types';
+import { authApi } from '@/lib/api/auth.api';
 import { usersApi } from '@/lib/api/users.api';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
-import { OrgLoginValues, OrgSignupValues } from '@/lib/validations';
 import { ROLES } from '@/lib/constants';
 
 interface AuthContextType {
   user: User | null;
-  organization: Organization | null;
+  organization?: never;
   loading: boolean;
   
-  // Org Actions
-  loginOrg: (data: OrgLoginValues) => Promise<void>;
-  signupOrg: (data: OrgSignupValues) => Promise<void>;
-  logoutOrg: () => void;
-  
   // User Actions
+  signupUser: (data: any) => Promise<void>;
   loginUser: (email: string, password: string) => Promise<void>;
   logoutUser: (shouldRedirect?: boolean) => void;
   logout: () => void;
@@ -32,7 +26,6 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -41,33 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize Auth State
   useEffect(() => {
     const initAuth = async () => {
-      // 1. Check for Organization Session
-      const storedOrg = localStorage.getItem('orgData');
-      if (storedOrg) {
-        try {
-          const parsedOrg = JSON.parse(storedOrg);
-          // Verify if organization still exists in backend
-          try {
-            await organizationApi.getOrganization(parsedOrg.id);
-            setOrganization(parsedOrg);
-          } catch (verifyError) {
-            console.warn('Organization session invalid:', verifyError);
-            localStorage.removeItem('orgData');
-            localStorage.removeItem('orgToken');
-            setOrganization(null);
-          }
-        } catch (e) {
-          localStorage.removeItem('orgData');
-          localStorage.removeItem('orgToken');
-        }
-      }
-
-      // 2. Check for User Session
+      // Check for User Session only
       const storedUser = localStorage.getItem('userData');
       if (storedUser) {
         try {
-          const parsedUser = JSON.parse(storedUser);
-          
           // Verify user session with backend
           try {
             const freshUser = await usersApi.getMe();
@@ -85,10 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('userToken');
         }
       }
-      
+
       setLoading(false);
     };
-    
+
     initAuth();
   }, []);
 
@@ -99,91 +69,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAuthPage = pathname?.startsWith('/auth');
     const isPublicPage = pathname === '/';
 
-    if (!organization) {
-      if (!isAuthPage && !isPublicPage) {
-        // No Org -> Go to Org Login
-        router.push('/auth/org-login');
-      } else if (pathname === '/auth/login') {
-        // If on user login but no org, redirect to org login
-        router.push('/auth/org-login');
+    if (!user && !isAuthPage && !isPublicPage) {
+      router.push('/auth/login');
+    }
+  }, [user, loading, pathname, router]);
+
+  const signupUser = async (data: any) => {
+    try {
+      const { username, name, email, password } = data;
+      await authApi.signup(email, password, name, username);
+
+      // After signup, fetch current user
+      const freshUser = await usersApi.getMe();
+      setUser(freshUser);
+      localStorage.setItem('userData', JSON.stringify(freshUser));
+      toast.success('Account created successfully');
+
+      // If user has no companies, send to onboarding
+      try {
+        const companies = await (await import('@/lib/api/companies.api')).companiesApi.getAll();
+        if (companies.length === 0) {
+          router.push('/onboarding');
+          return;
+        }
+      } catch (e) {
+        // ignore and fallback
       }
-    } else if (organization && !user && !pathname?.includes('/auth/login')) {
-      // Org but No User -> Go to User Login
-      router.push('/auth/login');
-    }
-  }, [organization, user, loading, pathname, router]);
-
-  const loginOrg = async (data: OrgLoginValues) => {
-    try {
-      const response = await organizationApi.login(data);
-      setOrganization(response.organization);
-      localStorage.setItem('orgData', JSON.stringify(response.organization));
-      localStorage.setItem('orgToken', response.token);
-      toast.success(`Welcome to ${response.organization.name}`);
-      router.push('/auth/login');
+      router.push('/invoices/dashboard');
     } catch (error: any) {
-      console.error('Org Login Error:', error);
-      throw error;
-    }
-  };
-
-  const signupOrg = async (data: OrgSignupValues) => {
-    try {
-      const response = await organizationApi.create(data);
-      setOrganization(response.organization);
-      localStorage.setItem('orgData', JSON.stringify(response.organization));
-      localStorage.setItem('orgToken', response.token);
-      toast.success('Organization created successfully');
-      
-      // Auto-login as Super Admin (User) is handled by backend returning user token too? 
-      // For now, let's redirect to user login to be safe/explicit
-      router.push('/auth/login');
-    } catch (error: any) {
-      console.error('Org Signup Error:', error);
+      console.error('Signup Error:', error);
       throw error;
     }
   };
 
   const loginUser = async (email: string, password: string) => {
-    if (!organization) {
-      toast.error('Organization session expired');
-      router.push('/auth/org-login');
-      return;
-    }
-
     try {
-      const response = await organizationApi.loginUser({
-        email,
-        password,
-        orgId: organization.id
-      });
-      
-      setUser(response.user);
-      localStorage.setItem('userData', JSON.stringify(response.user));
-      localStorage.setItem('userToken', response.token);
-      
-      toast.success(`Welcome back, ${response.user.name}`);
-      
+      await authApi.login(email, password);
+
+      // Fetch user profile
+      const freshUser = await usersApi.getMe();
+      setUser(freshUser);
+      localStorage.setItem('userData', JSON.stringify(freshUser));
+
+      toast.success(`Welcome back, ${freshUser.name}`);
+
       // Role-based Redirect
-      if (response.user.role === ROLES.SUPER_ADMIN) {
-        // Check if user has any companies
+      if (freshUser.role === ROLES.SUPER_ADMIN) {
         try {
-          const companies = await companiesApi.getAll();
+          const companies = await (await import('@/lib/api/companies.api')).companiesApi.getAll();
           if (companies.length === 0) {
-            // No companies -> Onboarding
             router.push('/onboarding');
-          } else {
-            // Has companies -> Main Dashboard
-            router.push('/invoices/dashboard');
+            return;
           }
         } catch (error) {
           console.error('Error checking companies:', error);
-          // Fallback to dashboard if check fails
-          router.push('/invoices/dashboard');
         }
-      } else {
-        router.push('/invoices/dashboard');
       }
+      router.push('/invoices/dashboard');
     } catch (error: any) {
       console.error('User Login Error:', error);
       throw error;
@@ -212,33 +154,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   };
 
-  const logoutOrg = () => {
-    (async () => {
-      // Ensure user logout clears server cookie as well
-      try {
-        const { authApi } = await import('@/lib/api/auth.api');
-        await authApi.logout();
-      } catch (e) {
-        console.warn('Logout request failed:', e);
-      } finally {
-        logoutUser(false); // this will clear client state without redirecting
-        setOrganization(null);
-        localStorage.removeItem('orgData');
-        localStorage.removeItem('orgToken');
-        router.push('/auth/org-login');
-        toast.success('Organization session ended');
-      }
-    })();
-  };
+  // No organization logout - single user session handled via logoutUser
 
   return (
     <AuthContext.Provider value={{ 
       user, 
-      organization, 
       loading, 
-      loginOrg, 
-      signupOrg, 
-      logoutOrg, 
+      signupUser,
       loginUser, 
       logoutUser,
       logout: logoutUser,

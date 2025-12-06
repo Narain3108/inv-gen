@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 import logging
 from fastapi import APIRouter, HTTPException, Response, Depends
 from firebase_admin import auth
@@ -14,6 +14,7 @@ from app.schemas.user import UserRole, UserCreate, UserUpdate, UserOut
 from app.core.security import create_access_token, get_password_hash, verify_password
 from datetime import datetime
 import uuid
+from app.core.deps import get_current_user as get_current_user_dep
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -201,70 +202,93 @@ async def get_org_users(org_id: str):
     return users
 
 @router.post("/users", response_model=UserOut)
-async def create_sub_user(user_in: UserCreate):
-    # TODO: Add permission check
+async def create_sub_user(user_in: UserCreate, current_user: Dict = Depends(get_current_user_dep)):
+    """Create a sub-user owned by the current super_admin.
+    - Only users with role SUPER_ADMIN can create sub-users.
+    - Cannot create another SUPER_ADMIN.
+    - Email must be unique globally.
+    """
     db = get_firestore_db()
     users_ref = db.collection("users")
-    
-    # Check if email exists in this org
-    # Using manual filtering to avoid composite index requirement
-    query = users_ref.where(filter=FieldFilter("email", "==", user_in.email)).stream()
-    for doc in query:
-        data = doc.to_dict()
-        if data.get("organizationId") == user_in.organizationId:
-            raise HTTPException(status_code=400, detail="Email already registered in this organization")
-        
+
+    # Permission check: only super_admin can create sub-users
+    if current_user.get("role") != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Insufficient permissions to create users")
+
+    # Prevent creating another super_admin
+    if user_in.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot create users with role super_admin")
+
+    # Global uniqueness check for email
+    existing = users_ref.where("email", "==", user_in.email).limit(1).stream()
+    for _ in existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     user_id = str(uuid.uuid4())
     user_data = user_in.dict()
     user_data["id"] = user_id
     user_data["password"] = get_password_hash(user_in.password)
     user_data["createdAt"] = datetime.utcnow().isoformat()
     user_data["updatedAt"] = datetime.utcnow().isoformat()
-    # If allowedCompanyIds not provided, default to all companies within the organization
-    if not user_data.get("allowedCompanyIds") and user_data.get("organizationId"):
-        try:
-            companies_ref = db.collection("companies")
-            query = companies_ref.where("organizationId", "==", user_data.get("organizationId")).stream()
-            company_ids = []
-            for doc in query:
-                company_ids.append(doc.id)
-            user_data["allowedCompanyIds"] = company_ids
-        except Exception:
-            # If company lookup fails, leave allowedCompanyIds as empty list
-            pass
+    # Set creator/owner reference for isolation
+    user_data["createdBy"] = current_user.get("id")
+
+    # Ensure allowedCompanyIds defaults to empty list if not provided
+    if not user_data.get("allowedCompanyIds"):
+        user_data["allowedCompanyIds"] = []
 
     users_ref.document(user_id).set(user_data)
-    
+
     return user_data
 
 @router.put("/users/{user_id}", response_model=UserOut)
-async def update_sub_user(user_id: str, user_in: UserUpdate):
-    # TODO: Add permission check
+async def update_sub_user(user_id: str, user_in: UserUpdate, current_user: Dict = Depends(get_current_user_dep)):
+    """Update a sub-user. Only the creator (super_admin) can update their users.
+    Prevent elevating role to SUPER_ADMIN.
+    """
     db = get_firestore_db()
     users_ref = db.collection("users")
-    
+
     doc_ref = users_ref.document(user_id)
     if not doc_ref.get().exists:
         raise HTTPException(status_code=404, detail="User not found")
-        
+
+    target = doc_ref.get().to_dict()
+    # Only owner can update
+    if current_user.get("role") != UserRole.SUPER_ADMIN or target.get("createdBy") != current_user.get("id"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions to update this user")
+
+    # Prevent promoting to super_admin
+    if user_in.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot set role to super_admin")
+
     update_data = user_in.dict(exclude_unset=True)
     update_data["updatedAt"] = datetime.utcnow().isoformat()
-    
+
     doc_ref.update(update_data)
-    
+
     updated_doc = doc_ref.get()
     user_data = updated_doc.to_dict()
     user_data["id"] = updated_doc.id
     return user_data
 
 @router.delete("/users/{user_id}")
-async def delete_sub_user(user_id: str):
-    # TODO: Add permission check
+async def delete_sub_user(user_id: str, current_user: Dict = Depends(get_current_user_dep)):
+    """Delete a sub-user. Only the creator (super_admin) can delete their users."""
     db = get_firestore_db()
     users_ref = db.collection("users")
-    
+
+    doc_ref = users_ref.document(user_id)
+    if not doc_ref.get().exists:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target = doc_ref.get().to_dict()
+    # Only owner can delete
+    if current_user.get("role") != UserRole.SUPER_ADMIN or target.get("createdBy") != current_user.get("id"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions to delete this user")
+
     users_ref.document(user_id).delete()
-    
+
     return {"message": "User deleted successfully"}
 
 # --- Legacy / General Auth ---
