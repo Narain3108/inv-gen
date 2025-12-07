@@ -232,12 +232,16 @@ async def update_company(
         if company_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
              
-        # Only Super Admin can update companies
-        if user.get("role") != "super_admin":
-             raise HTTPException(status_code=403, detail="Only Super Admins can update companies")
-        
-        if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+        # Allow Super Admins to update any company; allow Admins to update companies
+        # that are explicitly assigned to them via `allowedCompanyIds`.
+        user_role = user.get("role")
+        if user_role == "super_admin":
+            pass
+        elif user_role == "admin":
+            if company_id not in user.get("allowedCompanyIds", []):
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            raise HTTPException(status_code=403, detail="Only Super Admins or assigned Admins can update companies")
 
         update_data = company_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()

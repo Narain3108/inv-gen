@@ -47,11 +47,12 @@ export default function CompanySettingsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
 
-  // Redirect if not super_admin
+  // Allow super_admin and admin to access this page.
+  // Admins will see only companies assigned to them and may edit (but not create/delete).
   useEffect(() => {
-    if (!authLoading && user && user.role !== 'super_admin') {
+    if (!authLoading && user && user.role !== 'super_admin' && user.role !== 'admin') {
       router.push('/invoices/dashboard');
-      toast.error('Access denied. Only Super Admins can manage companies.');
+      toast.error('Access denied. Only Super Admins and Admins can manage companies.');
     }
   }, [user, authLoading, router]);
 
@@ -67,7 +68,7 @@ export default function CompanySettingsPage() {
     }
   }, [isLoading, companies]);
 
-  if (authLoading || (user && user.role !== 'super_admin')) {
+  if (authLoading || (user && user.role !== 'super_admin' && user.role !== 'admin')) {
     return null; // Or a loading spinner
   }
 
@@ -77,20 +78,31 @@ export default function CompanySettingsPage() {
   };
 
   const handleEditCompany = (company: Company) => {
+    // Admins may only edit companies assigned to them
+    if (user?.role === 'admin' && !(user?.allowedCompanyIds || []).includes(company.id)) {
+      toast.error('Access denied. You cannot edit this company.');
+      return;
+    }
+
     setEditingCompany(company);
     setIsFormOpen(true);
   };
 
   const handleDeleteCompany = (companyId: string) => {
+    // Only super_admin can delete companies
+    if (user?.role !== 'super_admin') {
+      toast.error('Only Super Admins can delete companies.');
+      return;
+    }
+
     setCompanyToDelete(companyId);
     setDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!companyToDelete) return;
-
     const idToDelete = companyToDelete;
-    
+
     // Optimistic Update
     removeCompany(idToDelete);
     setDeleteConfirmOpen(false);
@@ -163,6 +175,11 @@ export default function CompanySettingsPage() {
       const cleanedData = removeUndefined(companyData);
 
       if (editingCompany) {
+        // Admins can only update companies assigned to them
+        if (user?.role === 'admin' && !(user?.allowedCompanyIds || []).includes(editingCompany.id)) {
+          toast.error('Access denied. You cannot update this company.');
+          return;
+        }
         // Update existing company
         console.log('Updating company:', editingCompany.id, cleanedData);
         const updatedCompany = await companiesApi.update(editingCompany.id, cleanedData);
@@ -178,6 +195,11 @@ export default function CompanySettingsPage() {
         
         toast.success('Company updated successfully');
       } else {
+        // Only super_admin can create new companies
+        if (user?.role !== 'super_admin') {
+          toast.error('Only Super Admins can create companies.');
+          return;
+        }
         // Create new company
         console.log('Creating new company:', cleanedData);
         const newCompany = await companiesApi.create(cleanedData);
@@ -222,10 +244,12 @@ export default function CompanySettingsPage() {
             title="Company Management"
             description="Manage your company profiles and details"
           >
-            <Button onClick={handleCreateCompany}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Company
-            </Button>
+            {user?.role === 'super_admin' && (
+              <Button onClick={handleCreateCompany}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Company
+              </Button>
+            )}
           </PageHeader>
 
           {companies.length === 0 && !isLoading && (
@@ -239,11 +263,13 @@ export default function CompanySettingsPage() {
           )}
 
           <CompanyList
-            companies={companies}
+            companies={user?.role === 'super_admin' ? companies : companies.filter(c => (user?.allowedCompanyIds || []).includes(c.id))}
             selectedCompanyId={selectedCompany?.id}
             onSelect={setSelectedCompany}
             onEdit={handleEditCompany}
             onDelete={handleDeleteCompany}
+            canEdit={user?.role === 'super_admin' || user?.role === 'admin'}
+            canDelete={user?.role === 'super_admin'}
           />
 
           {/* Company Form Dialog */}

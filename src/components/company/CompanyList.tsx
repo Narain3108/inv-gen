@@ -20,6 +20,8 @@ interface CompanyListProps {
   onSelect: (company: Company) => void;
   onEdit: (company: Company) => void;
   onDelete: (companyId: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export function CompanyList({
@@ -28,6 +30,8 @@ export function CompanyList({
   onSelect,
   onEdit,
   onDelete,
+  canEdit = true,
+  canDelete = true,
 }: CompanyListProps) {
   if (companies.length === 0) {
     return (
@@ -93,29 +97,33 @@ export function CompanyList({
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(company);
-                }}
-              >
-                <Edit className="mr-1 h-3 w-3" />
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(company.id);
-                }}
-                className="text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="mr-1 h-3 w-3" />
-                Delete
-              </Button>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(company);
+                  }}
+                >
+                  <Edit className="mr-1 h-3 w-3" />
+                  Edit
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(company.id);
+                  }}
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Delete
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
