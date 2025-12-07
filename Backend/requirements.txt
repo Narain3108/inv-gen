@@ -33,6 +33,9 @@ firebase-admin==6.4.0
 # Cloudinary (for image uploads)
 cloudinary==1.37.0
 
+# Rate Limiting
+slowapi>=0.1.9
+
 # Development (optional)
 pytest==7.4.4
 pytest-asyncio==0.23.3

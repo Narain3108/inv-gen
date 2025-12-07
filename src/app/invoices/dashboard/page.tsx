@@ -102,12 +102,13 @@ function DashboardContent() {
     try {
       setLoading(true);
 
-      // Load invoices
-      const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
-      setInvoices(invoicesData || []);
+      // Load invoices and quotations in parallel
+      const [invoicesData, quotationsData] = await Promise.all([
+        invoicesApi.getByCompanyId(selectedCompany.id),
+        quotationsApi.getByCompanyId(selectedCompany.id)
+      ]);
 
-      // Load quotations
-      const quotationsData = await quotationsApi.getByCompanyId(selectedCompany.id);
+      setInvoices(invoicesData || []);
       setQuotations(quotationsData || []);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -123,7 +124,7 @@ function DashboardContent() {
   useEffect(() => {
     if (!selectedCompany || !companiesInitialized) return;
     loadData();
-  }, [selectedCompany, companiesInitialized, companies]);
+  }, [selectedCompany, companiesInitialized]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

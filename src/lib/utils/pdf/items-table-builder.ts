@@ -59,15 +59,15 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
   if (remainingRows > 0) {
     for (let i = 0; i < remainingRows; i++) {
       body.push([
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
-        { text: '', fontSize: 8 },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'left' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
+        { text: '', fontSize: 8, alignment: 'center' },
       ]);
     }
   }

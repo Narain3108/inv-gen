@@ -3,11 +3,12 @@ Firestore-based Quotations API
 Quotations are stored in a global 'quotations' collection with 'companyId' field.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.core.constants import Roles
 from app.core.audit import record_audit, compute_changes
 from datetime import datetime
@@ -157,7 +158,9 @@ class QuotationOut(BaseModel):
 
 
 @router.post("", response_model=QuotationOut)
+@limiter.limit("1/second")
 async def create_quotation(
+    request: Request,
     quotation: QuotationCreate,
     user: Dict = Depends(get_current_user)
 ):
@@ -209,7 +212,9 @@ async def create_quotation(
 
 
 @router.get("", response_model=List[QuotationOut])
+@limiter.limit("5/second")
 async def get_quotations(
+    request: Request,
     company_id: Optional[str] = Query(None, alias="company_id"),
     companyId: Optional[str] = Query(None, alias="companyId"),
     user: Dict = Depends(get_current_user)

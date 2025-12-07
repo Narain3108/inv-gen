@@ -3,11 +3,12 @@ Firestore-based Clients API
 Clients are stored in a global 'clients' collection with 'companyId' field.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from datetime import datetime
 from app.core.audit import record_audit, compute_changes
 
@@ -98,7 +99,9 @@ class ClientOut(BaseModel):
 
 
 @router.post("", response_model=ClientOut)
+@limiter.limit("1/second")
 async def create_client(
+    request: Request,
     client: ClientCreate,
     user: Dict = Depends(get_current_user)
 ):
@@ -152,7 +155,9 @@ async def create_client(
 
 
 @router.get("", response_model=List[ClientOut])
+@limiter.limit("5/second")
 async def get_clients(
+    request: Request,
     company_id: Optional[str] = Query(None, alias="companyId"),
     user: Dict = Depends(get_current_user)
 ):

@@ -3,12 +3,13 @@ Firestore-based Companies API
 Companies are nested under Users: users/{uid}/companies
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.audit import record_audit, compute_changes
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from datetime import datetime
 
 router = APIRouter()
@@ -93,7 +94,9 @@ class CompanyOut(BaseModel):
 
 
 @router.post("", response_model=CompanyOut)
+@limiter.limit("1/second")
 async def create_company(
+    request: Request,
     company: CompanyCreate,
     user: Dict = Depends(get_current_user)
 ):
@@ -145,7 +148,9 @@ async def create_company(
 
 
 @router.get("", response_model=List[CompanyOut])
+@limiter.limit("5/second")
 async def get_companies(
+    request: Request,
     user: Dict = Depends(get_current_user)
 ):
     """Get all companies for the current organization"""

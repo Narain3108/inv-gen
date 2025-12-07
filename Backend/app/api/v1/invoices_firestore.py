@@ -3,12 +3,13 @@ Firestore-based Invoices API
 Invoices are nested under Companies: users/{uid}/companies/{cid}/invoices
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.audit import record_audit, compute_changes
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.core.constants import Roles
 from datetime import datetime
 import logging
@@ -172,7 +173,9 @@ class InvoiceOut(BaseModel):
 
 
 @router.post("", response_model=InvoiceOut)
+@limiter.limit("1/second")
 async def create_invoice(
+    request: Request,
     invoice: InvoiceCreate,
     user: Dict = Depends(get_current_user)
 ):
@@ -217,10 +220,59 @@ async def create_invoice(
         raise HTTPException(status_code=500, detail=f"Error creating invoice: {str(e)}")
 
 
+@router.get("/generate_number")
+@limiter.limit("5/second")
+async def generate_number(
+    request: Request,
+    company_id: str = Query(..., alias="company"),
+    user: Dict = Depends(get_current_user)
+):
+    """Generate next invoice number"""
+    try:
+        db = get_firestore_db()
+        
+        if not verify_company_access(db, user, company_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+            
+        # Get company settings
+        comp_doc = db.collection("companies").document(company_id).get()
+        if not comp_doc.exists:
+            raise HTTPException(status_code=404, detail="Company not found")
+            
+        company_data = comp_doc.to_dict()
+        config = company_data.get("invoiceNumbering", {})
+        
+        # Count invoices
+        query = db.collection("invoices").where("companyId", "==", company_id)
+        docs = query.select(['id']).stream()
+        count = sum(1 for _ in docs)
+        
+        # Logic
+        prefix = config.get("prefix", "")
+        suffix = config.get("suffix", "")
+        next_number = config.get("nextNumber")
+        
+        if not next_number:
+            next_number = count + 1
+            
+        padded_number = str(next_number).zfill(3)
+        invoice_number = f"{prefix}{padded_number}{suffix}"
+        
+        return {"invoice_number": invoice_number}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating number: {str(e)}")
+
+
 @router.get("", response_model=List[InvoiceOut])
+@limiter.limit("5/second")
 async def get_invoices(
+    request: Request,
     company_id: Optional[str] = Query(None, alias="company_id"),
     companyId: Optional[str] = Query(None, alias="companyId"),
+    invoice_number: Optional[str] = Query(None, alias="invoiceNumber"),
     user: Dict = Depends(get_current_user)
 ):
     """Get invoices. If company_id is provided, fetch from that company. Else fetch all accessible invoices."""
@@ -242,7 +294,11 @@ async def get_invoices(
                 logger.warning("get_invoices: access denied. user=%s role=%s requested_company=%s", user.get('id'), user.get('role'), target_company_id)
                 raise HTTPException(status_code=403, detail="Access denied to this company")
             query = query.where("companyId", "==", target_company_id)
-        else:
+            
+        if invoice_number:
+            query = query.where("invoiceNumber", "==", invoice_number)
+        
+        if not target_company_id and not invoice_number:
             # If no company specified, filter by allowed companies
             if user.get("role") != Roles.SUPER_ADMIN:
                 if not allowed_companies:

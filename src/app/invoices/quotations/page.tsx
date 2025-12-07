@@ -372,13 +372,15 @@ function QuotationsContent() {
       console.error("Failed to reload company data", e);
     }
 
-    // Count existing invoices for this company
-    const invoices = await invoicesApi.getAll({ company_id: selectedCompany?.id || '' });
+    // Generate invoice number from backend
+    try {
+      const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
+      setInvoiceNumber(invoice_number);
+    } catch (e) {
+      console.error("Failed to generate invoice number", e);
+      toast.error("Failed to generate invoice number");
+    }
 
-    // Use company's invoice numbering settings when available
-    const suggestedNumber = generateInvoiceNumber(currentCompany || selectedCompany, invoices.length);
-
-    setInvoiceNumber(suggestedNumber);
     setConvertingQuotation(quotation);
   };
 
@@ -392,9 +394,10 @@ function QuotationsContent() {
       // Check if invoice number already exists using API
       const existingInvoices = await invoicesApi.getAll({ 
         company_id: selectedCompany.id,
+        invoiceNumber: invoiceNumber.trim()
       });
       
-      if (existingInvoices.some(inv => inv.invoiceNumber === invoiceNumber.trim())) {
+      if (existingInvoices.length > 0) {
         toast.error('Invoice number already exists');
         return;
       }

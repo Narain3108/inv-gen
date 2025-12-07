@@ -79,6 +79,8 @@ export class ApiError extends Error {
  */
 class ApiClient {
   private baseURL: string;
+  // Track in-flight GET requests to dedupe identical requests
+  private inFlightRequests: Map<string, Promise<any>> = new Map();
 
   constructor(baseURL: string) {
     this.baseURL = (baseURL || '').replace(/\/+$/,'');
@@ -176,19 +178,36 @@ class ApiClient {
       console.debug('[apiClient] GET', url.toString());
     }
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: this.getHeaders(),
-      credentials: 'include', // Send cookies
-      cache: 'no-store', // Prevent caching of API responses
-    });
+    const key = url.toString();
 
-    const result = await this.handleResponse<T>(response);
-    if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
-      console.debug('[apiClient] GET response', url.toString(), result);
+    // If an identical GET is already in flight, return that promise (dedupe)
+    if (this.inFlightRequests.has(key)) {
+      return this.inFlightRequests.get(key) as Promise<T>;
     }
 
-    return transformCase ? snakeToCamel(result) : result;
+    const promise = (async () => {
+      try {
+        const response = await fetch(key, {
+          method: 'GET',
+          headers: this.getHeaders(),
+          credentials: 'include', // Send cookies
+          cache: 'no-store', // Prevent caching of API responses
+        });
+
+        const result = await this.handleResponse<T>(response);
+        if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
+          console.debug('[apiClient] GET response', key, result);
+        }
+
+        return transformCase ? snakeToCamel(result) : result;
+      } finally {
+        // Clean up in-flight cache regardless of success/error
+        this.inFlightRequests.delete(key);
+      }
+    })();
+
+    this.inFlightRequests.set(key, promise);
+    return promise as Promise<T>;
   }
 
   async post<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {

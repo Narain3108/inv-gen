@@ -251,10 +251,15 @@ function InvoicesContent() {
       // Auto-generate invoice number if not provided
       let invoiceNumber = data.invoiceNumber?.trim();
       if (!invoiceNumber) {
-        // Count existing invoices for this company
-        const invoiceCount = invoices.length;
-        invoiceNumber = generateInvoiceNumber(company, invoiceCount);
-        console.log(`🔢 Auto-generated invoice number: ${invoiceNumber} (based on ${invoiceCount} existing invoices)`);
+        try {
+           const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
+           invoiceNumber = invoice_number;
+           console.log(`🔢 Auto-generated invoice number from backend: ${invoiceNumber}`);
+        } catch (e) {
+           console.error("Failed to generate number from backend, falling back to local", e);
+           const invoiceCount = invoices.length;
+           invoiceNumber = generateInvoiceNumber(company, invoiceCount);
+        }
       }
 
       // Clean up invoice items to remove undefined values

@@ -33,6 +33,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { DollarSign, Calendar, CreditCard, FileText, Clock, Hash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'react-hot-toast';
 
 const paymentFormSchema = z.object({
   amount: z.number()
@@ -208,8 +209,12 @@ export function PaymentDialog({
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               <span>
-                                {payment.paymentDate?.toDate 
-                                  ? formatDate(payment.paymentDate.toDate()) 
+                                {payment.paymentDate
+                                  ? formatDate(
+                                      typeof payment.paymentDate === 'string'
+                                        ? new Date(payment.paymentDate)
+                                        : payment.paymentDate
+                                    )
                                   : 'N/A'}
                               </span>
                             </div>
@@ -231,8 +236,12 @@ export function PaymentDialog({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground text-right">
-                          {payment.recordedAt?.toDate 
-                            ? formatDate(payment.recordedAt.toDate()) 
+                          {payment.recordedAt
+                            ? formatDate(
+                                typeof payment.recordedAt === 'string'
+                                  ? new Date(payment.recordedAt)
+                                  : payment.recordedAt
+                              )
                             : 'N/A'}
                         </div>
                       </div>

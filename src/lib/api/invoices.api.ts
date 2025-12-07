@@ -10,6 +10,7 @@ export interface InvoiceFilters {
   search?: string;
   company_id?: string;
   client_id?: string;
+  invoiceNumber?: string;
   status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
   payment_status?: 'unpaid' | 'partial' | 'paid';
   date_from?: string;
