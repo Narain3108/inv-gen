@@ -48,7 +48,7 @@ export default function UserManagementPage() {
       }
     };
     loadData();
-  }, [organization, loadCompanies]);
+  }, [user, loadCompanies]);
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
@@ -178,6 +178,7 @@ function UserDialog({ open, onOpenChange, companies, onSuccess }: {
       setIsLoading(false);
     }
   };
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

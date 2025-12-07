@@ -5,7 +5,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProductCategory } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Package } from 'lucide-react';
 import { formatDate } from '@/utils/formatters';
 import { usersApi } from '@/lib/api/users.api';
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface CategoryListProps {
@@ -142,6 +141,9 @@ export function CategoryList({ categories, onEdit, onDelete, loading }: Category
               {category.createdAt && (
                 <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
                   Created {formatDate(category.createdAt)}
+                  {canViewCreators && (
+                    <span className="text-xs text-muted-foreground ml-2">by {category.createdByUsername || creatorNames[category.createdBy || ''] || 'Unknown'}</span>
+                  )}
                 </p>
               )}
             </div>

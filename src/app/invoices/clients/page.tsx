@@ -67,11 +67,17 @@ function ClientsContent() {
       const clientData = {
         ...data,
         companyId: selectedCompany.id, // Add companyId from context
-        billingAddress: data.billingAddress || null,
-        shippingAddress: data.shippingAddress || null,
-        bankDetails: data.bankDetails || null,
-        gstin: data.gstin || null,
-        pan: data.pan || null,
+        billingAddress: data.billingAddress || undefined,
+        shippingAddress: data.shippingAddress || undefined,
+        bankDetails: data.bankDetails ? Object.fromEntries(
+          Object.entries(data.bankDetails).filter(([, v]) => v != null)
+        ) as any : undefined,
+        gstin: data.gstin || undefined,
+        pan: data.pan || undefined,
+        contact: data.contact ? {
+          ...data.contact,
+          website: data.contact.website || undefined,
+        } : undefined,
       };
 
       if (editingClient) {

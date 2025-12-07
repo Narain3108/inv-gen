@@ -212,7 +212,7 @@ export function QuotationList({
                     <td className="p-3">
                       <span className="text-sm">{getClientName(quotation.clientId)}</span>
                       {canViewCreators && (
-                        <p className="text-xs text-muted-foreground mt-1">Created by: {quotation.createdByUsername || creatorNames[quotation.createdBy] || quotation.createdBy}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {quotation.createdByUsername || (quotation.createdBy ? creatorNames[quotation.createdBy] : undefined) || quotation.createdBy}</p>
                       )}
                     </td>
                     <td className="p-3">

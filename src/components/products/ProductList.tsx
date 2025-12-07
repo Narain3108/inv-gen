@@ -165,7 +165,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                       )}
                       {/* Creator info */}
                       {(user?.role === 'super_admin' || user?.role === 'admin') && (
-                        <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || creatorNames[product.createdBy] || product.createdBy}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || (product.createdBy ? creatorNames[product.createdBy] : undefined) || product.createdBy}</p>
                       )}
                     </div>
                   </td>
@@ -259,7 +259,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                     <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
                   )}
                   {(user?.role === 'super_admin' || user?.role === 'admin') && (
-                    <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || creatorNames[product.createdBy] || product.createdBy}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || (product.createdBy ? creatorNames[product.createdBy] : undefined) || product.createdBy}</p>
                   )}
                 </div>
                 {user?.role !== 'employee' && (

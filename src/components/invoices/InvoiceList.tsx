@@ -174,7 +174,7 @@ export function InvoiceList({
                     <td className="p-3">
                       <span className="text-sm">{getClientName(invoice.clientId)}</span>
                       {canViewCreators && (
-                        <p className="text-xs text-muted-foreground mt-1">Created by: {invoice.createdByUsername || creatorNames[invoice.createdBy] || invoice.createdBy}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {invoice.createdByUsername || (invoice.createdBy ? creatorNames[invoice.createdBy] : undefined) || invoice.createdBy}</p>
                       )}
                     </td>
                     <td className="p-3">

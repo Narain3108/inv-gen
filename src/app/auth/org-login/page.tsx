@@ -1,5 +1,4 @@
-' use client';
-import OrgLoginForm from '@/components/auth/OrgLoginForm';
+"use client";
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2 } from 'lucide-react';

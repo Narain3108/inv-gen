@@ -22,6 +22,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  username?: string;
   photoURL?: string;
   role: UserRole;
   organizationId: string;
@@ -118,6 +119,8 @@ export interface ProductCategory {
   description?: string;
   products: CategoryProduct[];
   defaultGstRate: number; // Default GST rate for this category
+  createdBy?: string; // user id of creator (optional)
+  createdByUsername?: string; // snapshot username for display (optional)
   createdAt: string | Date;
   updatedAt?: string | Date;
 }
@@ -186,6 +189,8 @@ export interface Client {
   shippingAddress?: Address;
   shippingAddresses?: Address[];
   autoFetched?: boolean;
+  createdBy?: string;
+  createdByUsername?: string;
   createdAt: string | Date;
   updatedAt?: string | Date;
 }
@@ -250,6 +255,8 @@ export interface Invoice {
   referenceNumber?: string;
   companyId: string;
   clientId: string;
+  createdBy?: string;
+  createdByUsername?: string;
   date: string | Date;
   shippingAddress?: Address;
   items: InvoiceItem[];
@@ -290,6 +297,8 @@ export interface Quotation {
   quotationNumber: string;
   companyId: string;
   clientId: string;
+  createdBy?: string;
+  createdByUsername?: string;
   date: string | Date;
   validUntil: string | Date; // Validity period for quotation
   status: QuotationStatus;

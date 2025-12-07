@@ -28,7 +28,7 @@
     "firebase": "^12.5.0",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.552.0",
-    "next": "16.0.1",
+    "next": "^16.0.7",
     "pdfmake": "^0.2.20",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/next": "^9.0.0",
     "@types/node": "^20",
     "@types/pdfmake": "^0.2.12",
     "@types/react": "^19",

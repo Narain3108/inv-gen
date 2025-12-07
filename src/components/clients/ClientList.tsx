@@ -126,7 +126,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                         <p className="text-xs text-muted-foreground mt-1">PAN: {client.pan}</p>
                       )}
                       {canViewCreators && (
-                        <p className="text-xs text-muted-foreground mt-1">Created by: {client.createdByUsername || creatorNames[client.createdBy] || client.createdBy}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {client.createdByUsername || (client.createdBy ? creatorNames[client.createdBy] : undefined) || client.createdBy}</p>
                       )}
                     </div>
                   </td>

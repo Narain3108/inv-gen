@@ -70,24 +70,31 @@ function ProductsContent() {
     if (!selectedCompany) return;
 
     try {
-      // Filter out undefined values
+      // Filter out undefined values and null values
       // Remove itemCode if it's empty or undefined
       const cleanData = { ...data };
       if (!cleanData.itemCode || cleanData.itemCode.trim() === '') {
         delete cleanData.itemCode;
       }
+      
+      // Remove null values and replace with undefined
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key as keyof typeof cleanData] === null) {
+          delete cleanData[key as keyof typeof cleanData];
+        }
+      });
 
       if (editingProduct) {
         // Update existing product using API - don't send companyId
         console.log('Updating product:', editingProduct.id, cleanData);
-        await productsApi.update(editingProduct.id, cleanData);
+        await productsApi.update(editingProduct.id, cleanData as Partial<Product>);
         toast.success('Product updated successfully');
       } else {
         // Create new product using API - include companyId
-        const productData = {
+        const productData: Partial<Product> = {
           ...cleanData,
           companyId: selectedCompany.id,
-        };
+        } as Partial<Product>;
         console.log('Creating new product:', productData);
         const newProduct = await productsApi.create(productData);
         console.log('Created product with ID:', newProduct.id);

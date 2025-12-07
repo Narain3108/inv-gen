@@ -56,7 +56,7 @@ function QuotationsContent() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [company, setCompany] = useState<Company | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | undefined>();
@@ -418,7 +418,10 @@ function QuotationsContent() {
         cgst: convertingQuotation.cgst,
         sgst: convertingQuotation.sgst,
         igst: convertingQuotation.igst,
-        paymentStatus: 'unpaid' as const,
+        paymentStatus: 'pending' as const,
+        amountPaid: 0,
+        amountPending: convertingQuotation.totalAmount,
+        payments: [],
       };
 
       const newInvoice = await invoicesApi.create(invoiceData);
@@ -444,7 +447,13 @@ function QuotationsContent() {
 
   const handleUpdateStatus = async (quotation: Quotation, status: QuotationStatus) => {
     try {
-      await quotationsApi.updateStatus(quotation.id, status, quotation.companyId);
+      // Filter out 'pending' and 'converted' statuses which are not supported by the API
+      let validStatus = status === 'pending' ? 'draft' : status;
+      if (validStatus === 'converted') {
+        toast.error('Use "Convert to Invoice" to change status to converted');
+        return;
+      }
+      await quotationsApi.updateStatus(quotation.id, validStatus as 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired', quotation.companyId);
       toast.success(`Quotation marked as ${status}`);
       await loadData();
     } catch (error) {

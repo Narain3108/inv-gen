@@ -71,14 +71,19 @@ function CategoriesContent() {
     setEditingCategory(undefined);
   };
 
-  const handleSubmit = async (data: ProductCategoryFormData) => {
+  const handleSubmit = async (data: any) => {
     if (!selectedCompany) return;
     
     try {
+      const cleanData = {
+        ...data,
+        description: data.description ?? undefined,
+      };
+      
       if (editingCategory) {
-        await updateProductCategory(selectedCompany.id, editingCategory.id, data);
+        await updateProductCategory(selectedCompany.id, editingCategory.id, cleanData);
       } else {
-        await createProductCategory(selectedCompany.id, data);
+        await createProductCategory(selectedCompany.id, cleanData);
       }
 
       handleCloseForm();
