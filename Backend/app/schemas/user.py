@@ -20,6 +20,7 @@ class UserBase(BaseSchema):
     """Base user schema"""
     email: EmailStr
     name: str = Field(..., min_length=1, max_length=255)
+    username: Optional[str] = None
     role: UserRole = UserRole.EMPLOYEE
     organizationId: str
     allowedCompanyIds: List[str] = []

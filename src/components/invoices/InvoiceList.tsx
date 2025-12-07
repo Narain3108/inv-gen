@@ -20,6 +20,8 @@ import {
 import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, DollarSign } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
+import { usersApi } from '@/lib/api/users.api';
+import { useEffect } from 'react';
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -43,6 +45,33 @@ export function InvoiceList({
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
   const canEdit = user?.role === 'super_admin' || user?.role === 'admin';
+  const canViewCreators = user?.role === 'super_admin' || user?.role === 'admin';
+  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    const idsToFetch = new Set<string>();
+    invoices.forEach((inv) => {
+      if (canViewCreators && !inv.createdByUsername && inv.createdBy) idsToFetch.add(inv.createdBy);
+    });
+    if (idsToFetch.size === 0) return;
+    
+    (async () => {
+      try {
+        const users = await usersApi.getBatch(Array.from(idsToFetch));
+        if (!mounted) return;
+        const newNames: Record<string, string> = {};
+        users.forEach(u => {
+          newNames[u.id] = u.username || u.name;
+        });
+        setCreatorNames(prev => ({ ...prev, ...newNames }));
+      } catch (e) {
+        console.error('Failed to fetch creator names', e);
+      }
+    })();
+    
+    return () => { mounted = false; };
+  }, [invoices, user]);
 
   const getClientName = (clientId: string) => {
     // Safety check: if clients isn't loaded yet, show loading indicator
@@ -144,6 +173,9 @@ export function InvoiceList({
                     </td>
                     <td className="p-3">
                       <span className="text-sm">{getClientName(invoice.clientId)}</span>
+                      {canViewCreators && (
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {invoice.createdByUsername || creatorNames[invoice.createdBy] || invoice.createdBy}</p>
+                      )}
                     </td>
                     <td className="p-3">
                       <span className="text-sm">

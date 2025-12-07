@@ -34,6 +34,8 @@ export { uploadsApi } from './uploads.api';
 export type { UploadResponse, DeleteResponse } from './uploads.api';
 
 export { customizationsApi } from './customizations.api';
+export { auditApi } from './audit.api';
+export type { AuditFilters } from './audit.api';
 
 // Import for centralized API object
 import { companiesApi } from './companies.api';
@@ -44,6 +46,7 @@ import { invoicesApi } from './invoices.api';
 import { quotationsApi } from './quotations.api';
 import { uploadsApi } from './uploads.api';
 import { customizationsApi } from './customizations.api';
+import { auditApi } from './audit.api';
 
 /**
  * Centralized API object for convenience
@@ -57,4 +60,5 @@ export const api = {
   quotations: quotationsApi,
   uploads: uploadsApi,
   customizations: customizationsApi,
+  audit: auditApi,
 };

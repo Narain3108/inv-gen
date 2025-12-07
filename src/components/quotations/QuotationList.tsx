@@ -21,6 +21,8 @@ import {
 import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, ArrowRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
+import { usersApi } from '@/lib/api/users.api';
+import { useEffect } from 'react';
 import { ROLES } from '@/lib/constants';
 
 interface QuotationListProps {
@@ -46,6 +48,33 @@ export function QuotationList({
 }: QuotationListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
+  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+  const canViewCreators = user?.role === 'super_admin' || user?.role === 'admin';
+
+  useEffect(() => {
+    let mounted = true;
+    const idsToFetch = new Set<string>();
+    quotations.forEach((q) => {
+      if (canViewCreators && !q.createdByUsername && q.createdBy) idsToFetch.add(q.createdBy);
+    });
+    if (idsToFetch.size === 0) return;
+    
+    (async () => {
+      try {
+        const users = await usersApi.getBatch(Array.from(idsToFetch));
+        if (!mounted) return;
+        const newNames: Record<string, string> = {};
+        users.forEach(u => {
+          newNames[u.id] = u.username || u.name;
+        });
+        setCreatorNames(prev => ({ ...prev, ...newNames }));
+      } catch (e) {
+        console.error('Failed to fetch creator names', e);
+      }
+    })();
+    
+    return () => { mounted = false; };
+  }, [quotations, user]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -182,6 +211,9 @@ export function QuotationList({
                     </td>
                     <td className="p-3">
                       <span className="text-sm">{getClientName(quotation.clientId)}</span>
+                      {canViewCreators && (
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {quotation.createdByUsername || creatorNames[quotation.createdBy] || quotation.createdBy}</p>
+                      )}
                     </td>
                     <td className="p-3">
                       <span className="text-sm">

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.audit import record_audit, compute_changes
 from app.core.deps import get_current_user
 from datetime import datetime
 
@@ -114,11 +115,25 @@ async def create_company(
         company_data["createdBy"] = user.get("id")
         company_data["createdAt"] = datetime.utcnow()
         company_data["updatedAt"] = datetime.utcnow()
+        # Snapshot creator username and role
+        try:
+            company_data["createdByUsername"] = user.get("username") or user.get("name")
+            company_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global companies collection
         doc_ref = db.collection("companies").document()
         doc_ref.set(company_data)
-        
+
+        # Write audit log: create
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=doc_ref.id, resource_type="company", resource_id=doc_ref.id, action="create", actor=actor, meta={"name": company_data.get("name")})
+        except Exception:
+            # Audit failure should not break the main flow
+            pass
+
         # Return the created company
         company_data["id"] = doc_ref.id
         return serialize_firestore_doc(company_data)
@@ -226,9 +241,27 @@ async def update_company(
 
         update_data = company_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
+        # Snapshot updater info
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
         
+        old = company_data.copy()
         doc_ref.update(update_data)
-        
+
+        # Write audit log: update (store changes)
+        try:
+            updated_doc = doc_ref.get()
+            new = updated_doc.to_dict()
+            changes = compute_changes(old, new)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="company", resource_id=company_id, action="update", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         # Return updated document
         updated_doc = doc_ref.get()
         company_data = updated_doc.to_dict()
@@ -265,8 +298,15 @@ async def delete_company(
         if user.get("role") != "super_admin":
              raise HTTPException(status_code=403, detail="Only Super Admins can delete companies")
 
+        # Capture snapshot before delete for audit
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="company", resource_id=company_id, action="delete", actor=actor, meta={"name": company_data.get("name")})
+        except Exception:
+            pass
+
         doc_ref.delete()
-        
+
         return {"message": "Company deleted successfully"}
         
     except HTTPException:

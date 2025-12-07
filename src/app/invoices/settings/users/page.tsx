@@ -45,7 +45,8 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      if (currentUser.role !== 'super_admin') {
+      // Allow both super_admin and admin to access user management. Admins have limited scope.
+      if (currentUser.role !== 'super_admin' && currentUser.role !== 'admin') {
         toast.error('Unauthorized access');
         router.push('/invoices/dashboard');
         return;
@@ -56,9 +57,9 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      if (!currentUser?.organizationId) return;
       setLoading(true);
-      const data = await usersApi.getOrgUsers(currentUser.organizationId);
+      // Backend implements RBAC-aware filtering for the requesting user
+      const data = await usersApi.getAll();
       setUsers(data);
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -88,8 +89,10 @@ export default function UsersPage() {
       if (selectedUser) {
         await usersApi.update(selectedUser.id, {
           name: data.name,
-          role: data.role,
-          allowedCompanyIds: data.allowedCompanyIds,
+          role: currentUser?.role === 'admin' ? 'employee' : data.role,
+          allowedCompanyIds: currentUser?.role === 'admin'
+            ? (data.allowedCompanyIds || []).filter((c: string) => (currentUser.allowedCompanyIds || []).includes(c))
+            : data.allowedCompanyIds,
         });
         toast.success('User updated successfully');
       } else {
@@ -97,14 +100,18 @@ export default function UsersPage() {
           toast.error('Password is required for new users');
           return;
         }
-        await usersApi.create({
+        // Enforce admin constraints client-side for better UX; backend also enforces
+        const payload: any = {
           name: data.name,
           email: data.email,
           password: data.password,
-          role: data.role,
-          allowedCompanyIds: data.allowedCompanyIds,
+          role: currentUser?.role === 'admin' ? 'employee' : data.role,
+          allowedCompanyIds: currentUser?.role === 'admin'
+            ? (data.allowedCompanyIds || []).filter((c: string) => (currentUser.allowedCompanyIds || []).includes(c))
+            : data.allowedCompanyIds,
           organizationId: currentUser?.organizationId,
-        });
+        };
+        await usersApi.create(payload);
         toast.success('User created successfully');
       }
       setIsDialogOpen(false);
@@ -282,6 +289,10 @@ export default function UsersPage() {
             user={selectedUser} 
             onSubmit={handleFormSubmit} 
             onCancel={() => setIsDialogOpen(false)} 
+            // If current user is admin, restrict available companies to their allowed set
+            availableCompanies={currentUser?.role === 'admin'
+              ? companies.filter(c => (currentUser.allowedCompanyIds || []).includes(c.id))
+              : companies}
           />
         </DialogContent>
       </Dialog>

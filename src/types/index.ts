@@ -150,6 +150,9 @@ export interface Product {
   type: 'product' | 'service';
   hasSerialNumber?: boolean; // Whether this product requires serial numbers
   categoryId?: string; // Reference to global product category
+  createdBy?: string; // user id of creator
+  createdByUsername?: string; // snapshot of creator username for display
+  createdByRole?: string;
   createdAt: string | Date;
   updatedAt?: string | Date;
 }

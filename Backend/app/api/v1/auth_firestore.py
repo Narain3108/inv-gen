@@ -211,12 +211,13 @@ async def create_sub_user(user_in: UserCreate, current_user: Dict = Depends(get_
     db = get_firestore_db()
     users_ref = db.collection("users")
 
-    # Permission check: only super_admin can create sub-users
-    if current_user.get("role") != UserRole.SUPER_ADMIN:
+    # Permission check: allow super_admin and admin
+    caller_role = current_user.get("role")
+    if caller_role not in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="Insufficient permissions to create users")
 
-    # Prevent creating another super_admin
-    if user_in.role == UserRole.SUPER_ADMIN:
+    # Prevent creating super_admin by anyone other than super_admin
+    if user_in.role == UserRole.SUPER_ADMIN and caller_role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=403, detail="Cannot create users with role super_admin")
 
     # Global uniqueness check for email
@@ -224,8 +225,19 @@ async def create_sub_user(user_in: UserCreate, current_user: Dict = Depends(get_
     for _ in existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Enforce admin constraints: if caller is admin, force role to employee and restrict allowedCompanyIds
+    payload = user_in.dict()
+    if caller_role == UserRole.ADMIN:
+        # Admins cannot create admins; force employee
+        payload['role'] = UserRole.EMPLOYEE
+        allowed = payload.get('allowedCompanyIds') or []
+        caller_allowed = current_user.get('allowedCompanyIds') or []
+        invalid = [c for c in allowed if c not in caller_allowed]
+        if invalid:
+            raise HTTPException(status_code=400, detail=f"Cannot assign companies not allowed to you: {invalid}")
+
     user_id = str(uuid.uuid4())
-    user_data = user_in.dict()
+    user_data = payload
     user_data["id"] = user_id
     user_data["password"] = get_password_hash(user_in.password)
     user_data["createdAt"] = datetime.utcnow().isoformat()

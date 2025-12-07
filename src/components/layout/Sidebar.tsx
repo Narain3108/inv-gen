@@ -182,7 +182,8 @@ export function Sidebar({ className }: SidebarProps) {
       <nav className="flex-1 space-y-1 p-3 sm:p-4 overflow-y-auto hide-scrollbar">
         {(() => {
           const isSuper = user?.role === ROLES.SUPER_ADMIN;
-          // For super admins, exclude Settings from the main list so we can render it after User Management
+          // Show User Management to both super_admin and admin, but keep Settings rendered separately only for super_admin
+          const showPrivilegedNav = user?.role === ROLES.SUPER_ADMIN || user?.role === ROLES.ADMIN;
           const mainNav = navItems.filter((item) => {
             if (item.title === 'Settings' && isSuper) return false;
             if (user?.role === 'employee' && item.title === 'Settings') return false;
@@ -230,8 +231,8 @@ export function Sidebar({ className }: SidebarProps) {
                 );
               })}
 
-              {/* Super Admin Items */}
-              {isSuper && superAdminNavItems.map((item) => {
+              {/* Privileged Items (visible to Super Admins and Admins) */}
+              {showPrivilegedNav && superAdminNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 

@@ -52,10 +52,13 @@ interface UserFormProps {
   user?: User;
   onSubmit: (data: UserFormData) => Promise<void>;
   onCancel: () => void;
+  // If provided, use these companies as available options (useful to limit admin choices)
+  availableCompanies?: Company[];
 }
 
-export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
-  const { companies } = useAppData();
+export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserFormProps) {
+  const { companies: globalCompanies } = useAppData();
+  const companies = availableCompanies || globalCompanies;
   const [showPassword, setShowPassword] = useState(false);
   const isEditing = !!user;
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
 from datetime import datetime
+from app.core.audit import record_audit, compute_changes
 
 router = APIRouter()
 
@@ -115,14 +116,19 @@ async def create_client(
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
              raise HTTPException(status_code=403, detail="Access denied to this company")
 
-        # Restrict Employee from Creating Clients
-        if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot create clients")
+        # Employees are allowed to create clients as long as they have access to the company
+        # (previously blocked). Access itself is enforced above by checking allowedCompanyIds.
 
         client_data["organizationId"] = user.get("organizationId")
         client_data["createdAt"] = datetime.utcnow()
         client_data["updatedAt"] = datetime.utcnow()
         client_data["createdBy"] = user.get("id")
+        # Snapshot creator username (prefer username, fallback to name)
+        try:
+            client_data["createdByUsername"] = user.get("username") or user.get("name")
+            client_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global clients collection
         doc_ref = db.collection("clients").document()
@@ -130,6 +136,13 @@ async def create_client(
         
         # Return the created client
         client_data["id"] = doc_ref.id
+        # Record audit (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="client", resource_id=doc_ref.id, action="create", actor=actor, meta={"name": client_data.get("clientName")})
+        except Exception:
+            pass
+
         return serialize_firestore_doc(client_data)
         
     except HTTPException:
@@ -219,18 +232,38 @@ async def update_client(
         if client_data.get("organizationId") != user.get("organizationId"):
              raise HTTPException(status_code=403, detail="Access denied")
 
-        # Restrict Employee from Update
+        # Restrict Employee from Update — employees cannot edit any records
         if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot update records")
+            raise HTTPException(status_code=403, detail="Employees cannot update records")
 
         update_data = client_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
-        
+
+        # Capture old state
+        old_data = client_data.copy()
+
+        # Snapshot updater username for traceability
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
+
         doc_ref.update(update_data)
-        
+
         updated_doc = doc_ref.get()
         client_data = updated_doc.to_dict()
         client_data["id"] = updated_doc.id
+
+        # Record audit (best-effort)
+        try:
+            changes = compute_changes(old_data, client_data)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=client_data.get("companyId"), resource_type="client", resource_id=client_id, action="update", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         return serialize_firestore_doc(client_data)
         
     except HTTPException:
@@ -262,6 +295,13 @@ async def delete_client(
         # Restrict Employee from Delete
         if user.get("role") == "employee":
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
+
+        # Record audit before deletion (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=client_data.get("companyId"), resource_type="client", resource_id=client_id, action="delete", actor=actor, meta={"name": client_data.get("clientName")})
+        except Exception:
+            pass
 
         doc_ref.delete()
         return {"message": "Client deleted successfully"}

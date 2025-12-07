@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any, Annotated
 from pydantic import BaseModel, Field, BeforeValidator
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
+from app.core.audit import record_audit, compute_changes
 from datetime import datetime
 
 router = APIRouter()
@@ -118,6 +119,12 @@ async def create_product(
         product_data["createdAt"] = datetime.utcnow()
         product_data["updatedAt"] = datetime.utcnow()
         product_data["createdBy"] = user.get("id")
+        # Snapshot creator username (prefer explicit username, fallback to name)
+        try:
+            product_data["createdByUsername"] = user.get("username") or user.get("name")
+            product_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global products collection
         doc_ref = db.collection("products").document()
@@ -125,6 +132,13 @@ async def create_product(
         
         # Return the created product
         product_data["id"] = doc_ref.id
+        # Record audit (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=product_data.get("companyId"), resource_type="product", resource_id=doc_ref.id, action="create", actor=actor, meta={"productName": product_data.get("productName")})
+        except Exception:
+            pass
+
         return serialize_firestore_doc(product_data)
         
     except HTTPException:
@@ -229,20 +243,39 @@ async def update_product(
         # Verify Access
         company_id = product_data.get("companyId")
         if user.get("role") != "super_admin" and company_id not in user.get("allowedCompanyIds", []):
-             raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Access denied")
 
-        # Restrict Employee from Update
+        # Restrict Employee from Update — employees cannot edit any records
         if user.get("role") == "employee":
-             raise HTTPException(status_code=403, detail="Employees cannot update records")
+            raise HTTPException(status_code=403, detail="Employees cannot update records")
 
         update_data = product_update.dict(by_alias=True, exclude_unset=True)
         update_data["updatedAt"] = datetime.utcnow()
-        
+        # Snapshot updater username for traceability (prefer username, fallback to name)
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
+
+        # Capture old state
+        old_data = product_data.copy()
+
         doc_ref.update(update_data)
-        
+
         updated_doc = doc_ref.get()
         product_data = updated_doc.to_dict()
         product_data["id"] = updated_doc.id
+
+        # Record audit (best-effort)
+        try:
+            changes = compute_changes(old_data, product_data)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=product_data.get("companyId"), resource_type="product", resource_id=product_id, action="update", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         return serialize_firestore_doc(product_data)
         
     except HTTPException:
@@ -275,6 +308,13 @@ async def delete_product(
         # Restrict Employee from Delete
         if user.get("role") == "employee":
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
+
+        # Record audit before deletion (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=product_data.get("companyId"), resource_type="product", resource_id=product_id, action="delete", actor=actor, meta={"productName": product_data.get("productName")})
+        except Exception:
+            pass
 
         doc_ref.delete()
         

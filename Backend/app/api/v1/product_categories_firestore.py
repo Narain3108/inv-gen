@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
 from datetime import datetime
+from app.core.audit import record_audit, compute_changes
 
 router = APIRouter()
 
@@ -84,6 +85,12 @@ async def create_product_category(
         category_data["created_at"] = datetime.utcnow().isoformat()
         category_data["updated_at"] = datetime.utcnow().isoformat()
         category_data["createdBy"] = user.get("id")
+        # Snapshot creator username and role for display/audit
+        try:
+            category_data["createdByUsername"] = user.get("username") or user.get("name")
+            category_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global product_categories collection
         doc_ref = db.collection("product_categories").document()
@@ -91,6 +98,13 @@ async def create_product_category(
         
         # Return the created category
         category_data["id"] = doc_ref.id
+        # Record audit (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="product_category", resource_id=doc_ref.id, action="create", actor=actor, meta={"categoryName": category_data.get("categoryName")})
+        except Exception:
+            pass
+
         return serialize_firestore_doc(category_data)
         
     except HTTPException:
@@ -199,12 +213,32 @@ async def update_product_category(
 
         update_data = category_update.dict(by_alias=True, exclude_unset=True)
         update_data["updated_at"] = datetime.utcnow().isoformat()
-        
+
+        # Snapshot updater info
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
+
+        # Capture old state
+        old_data = category_data.copy()
+
         doc_ref.update(update_data)
-        
+
         updated_doc = doc_ref.get()
         category_data = updated_doc.to_dict()
         category_data["id"] = updated_doc.id
+
+        # Record audit (best-effort)
+        try:
+            changes = compute_changes(old_data, category_data)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=category_data.get("companyId"), resource_type="product_category", resource_id=category_id, action="update", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         return serialize_firestore_doc(category_data)
         
     except HTTPException:
@@ -237,6 +271,13 @@ async def delete_product_category(
         # Restrict Employee from Delete
         if user.get("role") == "employee":
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
+
+        # Record audit before deletion (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=category_data.get("companyId"), resource_type="product_category", resource_id=category_id, action="delete", actor=actor, meta={"categoryName": category_data.get("categoryName")})
+        except Exception:
+            pass
 
         doc_ref.delete()
         return {"message": "Product category deleted successfully"}

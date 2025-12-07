@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
+from app.core.audit import record_audit, compute_changes
 from app.core.deps import get_current_user
 from app.core.constants import Roles
 from datetime import datetime
@@ -188,11 +189,24 @@ async def create_invoice(
         invoice_data["createdAt"] = datetime.utcnow()
         invoice_data["updatedAt"] = datetime.utcnow()
         invoice_data["createdBy"] = user.get("id")
+        # Snapshot creator username for display/audit
+        try:
+            invoice_data["createdByUsername"] = user.get("username") or user.get("name")
+            invoice_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global invoices collection
         doc_ref = db.collection("invoices").document()
         doc_ref.set(invoice_data)
-        
+
+        # Audit: invoice create
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=invoice.company_id, resource_type="invoice", resource_id=doc_ref.id, action="create", actor=actor, meta={"invoiceNumber": invoice_data.get("invoiceNumber")})
+        except Exception:
+            pass
+
         # Return the created invoice
         invoice_data["id"] = doc_ref.id
         return serialize_firestore_doc(invoice_data)
@@ -307,17 +321,33 @@ async def update_invoice(
 
         # Allow employees to record payments only (restricted set of fields)
         if user.get("role") == Roles.EMPLOYEE:
-            # Define allowed fields that an employee may patch (payment recording)
-            allowed_payment_fields = {"payments", "amountPaid", "amount_pending", "amountPending", "paymentStatus", "payment_status", "updatedAt", "updated_at"}
-            # Normalize keys to aliases as they will be present in update_data (by_alias=True)
+            # Define allowed fields that an employee may update (payment recording)
+            allowed_payment_fields = {"payments", "amountPaid", "amount_paid", "amount_pending", "amountPending", "paymentStatus", "payment_status", "updatedAt", "updated_at"}
             incoming_keys = set(update_data.keys())
-            # If there's any key outside allowed_payment_fields, reject
             if not incoming_keys.issubset(allowed_payment_fields):
                 raise HTTPException(status_code=403, detail="Employees can only record payments")
         update_data["updatedAt"] = datetime.utcnow()
+        # Snapshot updater username for traceability
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
         
+        old = invoice_data.copy()
         doc_ref.update(update_data)
-        
+
+        # Audit: invoice update
+        try:
+            updated_doc = doc_ref.get()
+            new = updated_doc.to_dict()
+            changes = compute_changes(old, new)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="invoice", resource_id=invoice_id, action="update", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         updated_doc = doc_ref.get()
         invoice_data = updated_doc.to_dict()
         invoice_data["id"] = updated_doc.id
@@ -355,15 +385,26 @@ async def patch_invoice(
 
         # Allow employees to record payments only (restricted set of fields)
         if user.get("role") == Roles.EMPLOYEE:
-            allowed_payment_fields = {"payments", "amountPaid", "amount_pending", "amountPending", "paymentStatus", "payment_status", "updatedAt", "updated_at"}
+            allowed_payment_fields = {"payments", "amountPaid", "amount_paid", "amount_pending", "amountPending", "paymentStatus", "payment_status", "updatedAt", "updated_at"}
             incoming_keys = set(update_data.keys())
             if not incoming_keys.issubset(allowed_payment_fields):
                 raise HTTPException(status_code=403, detail="Employees can only record payments")
 
         update_data["updatedAt"] = datetime.utcnow()
 
+        old = invoice_data.copy()
         doc_ref.update(update_data)
-        
+
+        # Audit: invoice patch
+        try:
+            updated_doc = doc_ref.get()
+            new = updated_doc.to_dict()
+            changes = compute_changes(old, new)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="invoice", resource_id=invoice_id, action="patch", actor=actor, changes=changes)
+        except Exception:
+            pass
+
         updated_doc = doc_ref.get()
         invoice_data = updated_doc.to_dict()
         invoice_data["id"] = updated_doc.id
@@ -400,8 +441,15 @@ async def delete_invoice(
         if user.get("role") == Roles.EMPLOYEE:
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
 
+        # Audit delete
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="invoice", resource_id=invoice_id, action="delete", actor=actor, meta={"invoiceNumber": invoice_data.get("invoiceNumber")})
+        except Exception:
+            pass
+
         doc_ref.delete()
-        
+
         return {"message": "Invoice deleted successfully"}
         
     except HTTPException:

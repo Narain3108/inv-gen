@@ -31,6 +31,43 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'product' | 'service'>('all');
   const { user } = useAuth();
+  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+
+  // When products change, fetch missing creator names for admins/super_admins
+  React.useEffect(() => {
+    let mounted = true;
+    const loadCreators = async () => {
+      if (!user) return;
+      if (!(user.role === 'super_admin' || user.role === 'admin')) return;
+
+      const idsToFetch = new Set<string>();
+      products.forEach((p) => {
+        if (!p.createdByUsername && p.createdBy) {
+          if (!creatorNames[p.createdBy]) idsToFetch.add(p.createdBy);
+        }
+      });
+
+      if (idsToFetch.size === 0) return;
+
+      const fetched: Record<string, string> = {};
+      for (const id of Array.from(idsToFetch)) {
+        try {
+          const usr = await (await import('@/lib/api/users.api')).usersApi.getById(id);
+          if (!mounted) return;
+          fetched[id] = usr.username || usr.name || id;
+        } catch (e) {
+          // ignore individual lookup failures
+        }
+      }
+
+      if (mounted && Object.keys(fetched).length > 0) {
+        setCreatorNames(prev => ({ ...prev, ...fetched }));
+      }
+    };
+
+    loadCreators();
+    return () => { mounted = false; };
+  }, [products, user]);
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
@@ -126,6 +163,10 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                           {product.description}
                         </p>
                       )}
+                      {/* Creator info */}
+                      {(user?.role === 'super_admin' || user?.role === 'admin') && (
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || creatorNames[product.createdBy] || product.createdBy}</p>
+                      )}
                     </div>
                   </td>
                   <td className="p-4">
@@ -216,6 +257,9 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                   </div>
                   {product.description && (
                     <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+                  )}
+                  {(user?.role === 'super_admin' || user?.role === 'admin') && (
+                    <p className="text-xs text-muted-foreground mt-1">Created by: {product.createdByUsername || creatorNames[product.createdBy] || product.createdBy}</p>
                   )}
                 </div>
                 {user?.role !== 'employee' && (

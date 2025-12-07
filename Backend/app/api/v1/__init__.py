@@ -11,6 +11,7 @@ from app.api.v1 import (
     quotations_firestore,
     customizations_firestore,
     product_categories_firestore
+    ,audit_firestore
 )
 
 api_router = APIRouter()
@@ -30,3 +31,4 @@ api_router.include_router(quotations_firestore.router, prefix="/quotations", tag
 api_router.include_router(customizations_firestore.router, tags=["Customizations (Company Subcollection)"])
 api_router.include_router(product_categories_firestore.router, prefix="/categories", tags=["Product Categories (Global)"])
 api_router.include_router(product_categories_firestore.router, prefix="/product-categories", tags=["Product Categories (Global)"])
+api_router.include_router(audit_firestore.router, prefix="/audit", tags=["Audit Logs"])

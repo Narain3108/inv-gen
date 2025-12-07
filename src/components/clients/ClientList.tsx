@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usersApi } from '@/lib/api/users.api';
+import { useEffect } from 'react';
 
 interface ClientListProps {
   clients: Client[];
@@ -30,6 +32,33 @@ interface ClientListProps {
 export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
+  const canViewCreators = user?.role === 'super_admin' || user?.role === 'admin';
+  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    const idsToFetch = new Set<string>();
+    clients.forEach((c) => {
+      if (canViewCreators && !c.createdByUsername && c.createdBy) idsToFetch.add(c.createdBy);
+    });
+    if (idsToFetch.size === 0) return;
+    
+    (async () => {
+      try {
+        const users = await usersApi.getBatch(Array.from(idsToFetch));
+        if (!mounted) return;
+        const newNames: Record<string, string> = {};
+        users.forEach(u => {
+          newNames[u.id] = u.username || u.name;
+        });
+        setCreatorNames(prev => ({ ...prev, ...newNames }));
+      } catch (e) {
+        console.error('Failed to fetch creator names', e);
+      }
+    })();
+    
+    return () => { mounted = false; };
+  }, [clients, user]);
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch =
@@ -95,6 +124,9 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                       <p className="font-semibold text-foreground">{client.clientName}</p>
                       {client.pan && (
                         <p className="text-xs text-muted-foreground mt-1">PAN: {client.pan}</p>
+                      )}
+                      {canViewCreators && (
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {client.createdByUsername || creatorNames[client.createdBy] || client.createdBy}</p>
                       )}
                     </div>
                   </td>

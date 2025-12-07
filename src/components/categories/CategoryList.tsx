@@ -12,6 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Package } from 'lucide-react';
 import { formatDate } from '@/utils/formatters';
+import { usersApi } from '@/lib/api/users.api';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CategoryListProps {
   categories: ProductCategory[];
@@ -21,6 +24,30 @@ interface CategoryListProps {
 }
 
 export function CategoryList({ categories, onEdit, onDelete, loading }: CategoryListProps) {
+  const { user } = useAuth();
+  const canViewCreators = user?.role === 'super_admin' || user?.role === 'admin';
+  const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    const idsToFetch = new Set<string>();
+    categories.forEach((c) => {
+      if (canViewCreators && !c.createdByUsername && c.createdBy) idsToFetch.add(c.createdBy);
+    });
+    if (idsToFetch.size === 0) return;
+    (async () => {
+      for (const id of Array.from(idsToFetch)) {
+        try {
+          const u = await usersApi.getById(id);
+          if (!mounted) return;
+          setCreatorNames((s) => ({ ...s, [id]: u.username || u.name }));
+        } catch (e) {
+          // ignore
+        }
+      }
+    })();
+    return () => { mounted = false; };
+  }, [categories, user]);
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">

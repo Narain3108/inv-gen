@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.core.firebase import get_firestore_db
 from app.core.deps import get_current_user
 from app.core.constants import Roles
+from app.core.audit import record_audit, compute_changes
 from datetime import datetime
 import logging
 
@@ -177,6 +178,12 @@ async def create_quotation(
         quotation_data["createdAt"] = datetime.utcnow()
         quotation_data["updatedAt"] = datetime.utcnow()
         quotation_data["createdBy"] = user.get("id")
+        # Snapshot creator username and role for display/audit
+        try:
+            quotation_data["createdByUsername"] = user.get("username") or user.get("name")
+            quotation_data["createdByRole"] = user.get("role")
+        except Exception:
+            pass
         
         # Add to global quotations collection
         doc_ref = db.collection("quotations").document()
@@ -186,6 +193,13 @@ async def create_quotation(
         
         doc_ref.set(quotation_data)
         
+        # Record audit (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="quotation", resource_id=doc_ref.id, action="create", actor=actor, meta={"quotationNumber": quotation_data.get("quotationNumber")})
+        except Exception:
+            logger.exception("Failed to record audit for create_quotation")
+
         return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
@@ -294,20 +308,57 @@ async def update_quotation(
 
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
 
-        # Allow employees to only update conversion/status-related fields (convertedToInvoiceId, status)
+        # Allow employees only to update conversion/status fields (convert quotation to invoice)
         if user.get("role") == Roles.EMPLOYEE:
             allowed_fields = {"status", "convertedToInvoiceId", "converted_to_invoice_id", "updatedAt", "updated_at"}
             incoming = set(update_data.keys())
             if not incoming.issubset(allowed_fields):
                 raise HTTPException(status_code=403, detail="Employees can only update quotation status/converted fields")
+            # If employee is converting the quotation to an invoice, snapshot converter info
+            if "convertedToInvoiceId" in update_data or "converted_to_invoice_id" in update_data:
+                try:
+                    update_data["convertedAt"] = datetime.utcnow()
+                    update_data["convertedBy"] = user.get("id")
+                    update_data["convertedByUsername"] = user.get("username") or user.get("name")
+                    update_data["convertedByRole"] = user.get("role")
+                except Exception:
+                    pass
 
         update_data["updatedAt"] = datetime.utcnow()
+        # Snapshot updater info for traceability
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
+
+        # Capture old state
+        old_data = quotation_data.copy()
 
         doc_ref.update(update_data)
         
         updated_doc = doc_ref.get()
         quotation_data = updated_doc.to_dict()
         quotation_data["id"] = updated_doc.id
+
+        # Record audit with computed changes (best-effort)
+        try:
+            new_data = quotation_data
+            changes = compute_changes(old_data, new_data)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="quotation", resource_id=quotation_id, action="update", actor=actor, changes=changes)
+            # If this update included a conversion, write a specific convert audit
+            try:
+                old_conv = old_data.get("convertedToInvoiceId") or old_data.get("converted_to_invoice_id")
+                new_conv = new_data.get("convertedToInvoiceId") or new_data.get("converted_to_invoice_id")
+                if new_conv and not old_conv:
+                    record_audit(db, company_id=company_id, resource_type="quotation", resource_id=quotation_id, action="convert", actor=actor, meta={"invoiceId": new_conv})
+            except Exception:
+                logger.exception("Failed to record conversion audit for update_quotation")
+        except Exception:
+            logger.exception("Failed to record audit for update_quotation")
+
         return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
@@ -340,20 +391,57 @@ async def patch_quotation(
 
         update_data = quotation_update.dict(by_alias=True, exclude_unset=True)
 
-        # Allow employees to only patch conversion/status-related fields
+        # Allow employees only to patch conversion/status fields (convert quotation to invoice)
         if user.get("role") == Roles.EMPLOYEE:
             allowed_fields = {"status", "convertedToInvoiceId", "converted_to_invoice_id", "updatedAt", "updated_at"}
             incoming = set(update_data.keys())
             if not incoming.issubset(allowed_fields):
                 raise HTTPException(status_code=403, detail="Employees can only patch quotation status/converted fields")
+            # If employee is converting the quotation to an invoice, snapshot converter info
+            if "convertedToInvoiceId" in update_data or "converted_to_invoice_id" in update_data:
+                try:
+                    update_data["convertedAt"] = datetime.utcnow()
+                    update_data["convertedBy"] = user.get("id")
+                    update_data["convertedByUsername"] = user.get("username") or user.get("name")
+                    update_data["convertedByRole"] = user.get("role")
+                except Exception:
+                    pass
 
         update_data["updatedAt"] = datetime.utcnow()
+        # Snapshot updater info for traceability
+        try:
+            update_data["updatedBy"] = user.get("id")
+            update_data["updatedByUsername"] = user.get("username") or user.get("name")
+            update_data["updatedByRole"] = user.get("role")
+        except Exception:
+            pass
+
+        # Capture old state
+        old_data = quotation_data.copy()
 
         doc_ref.update(update_data)
-        
+
         updated_doc = doc_ref.get()
         quotation_data = updated_doc.to_dict()
         quotation_data["id"] = updated_doc.id
+
+        # Record audit with computed changes (best-effort)
+        try:
+            new_data = quotation_data
+            changes = compute_changes(old_data, new_data)
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="quotation", resource_id=quotation_id, action="patch", actor=actor, changes=changes)
+            # If this patch included a conversion, write a specific convert audit
+            try:
+                old_conv = old_data.get("convertedToInvoiceId") or old_data.get("converted_to_invoice_id")
+                new_conv = new_data.get("convertedToInvoiceId") or new_data.get("converted_to_invoice_id")
+                if new_conv and not old_conv:
+                    record_audit(db, company_id=company_id, resource_type="quotation", resource_id=quotation_id, action="convert", actor=actor, meta={"invoiceId": new_conv})
+            except Exception:
+                logger.exception("Failed to record conversion audit for patch_quotation")
+        except Exception:
+            logger.exception("Failed to record audit for patch_quotation")
+
         return serialize_firestore_doc(quotation_data)
         
     except HTTPException:
@@ -386,6 +474,13 @@ async def delete_quotation(
         # Restrict Employee from Delete
         if user.get("role") == Roles.EMPLOYEE:
              raise HTTPException(status_code=403, detail="Employees cannot delete records")
+
+        # Record audit before deletion (best-effort)
+        try:
+            actor = {"id": user.get("id"), "username": user.get("username"), "role": user.get("role")}
+            record_audit(db, company_id=company_id, resource_type="quotation", resource_id=quotation_id, action="delete", actor=actor, meta={"quotationNumber": quotation_data.get("quotationNumber")})
+        except Exception:
+            logger.exception("Failed to record audit for delete_quotation")
 
         doc_ref.delete()
         

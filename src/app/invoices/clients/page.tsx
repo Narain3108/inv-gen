@@ -153,12 +153,10 @@ function ClientsContent() {
             onExportExcel={handleExportExcel}
             onExportCSV={handleExportCSV}
           />
-          {user?.role !== 'employee' && (
-            <Button onClick={() => handleOpenForm()}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add Client
-            </Button>
-          )}
+          <Button onClick={() => handleOpenForm()}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Client
+          </Button>
         </div>
       </PageHeader>
 
