@@ -64,9 +64,9 @@ function DialogContent({
         // Direct match with Radix Title
         if (node.type === DialogPrimitive.Title) return true;
         // Match by data-slot attribute used by our DialogTitle wrapper
-        if (node.props && node.props['data-slot'] === 'dialog-title') return true;
+        if (node.props && (node.props as Record<string, any>)['data-slot'] === 'dialog-title') return true;
         // Recurse into its children
-        if (containsTitle(node.props.children)) return true;
+        if (containsTitle((node.props as Record<string, any>).children)) return true;
       }
     }
     return false;

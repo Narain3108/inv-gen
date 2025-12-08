@@ -82,7 +82,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
 
     setIsFetchingGSTIN(true);
     try {
-      const details = await fetchGSTINDetails(gstin);
+      const details = await fetchGSTINDetails(gst);
       if (details) {
         setValue('clientName', details.legalName);
         setValue('address.state', details.stateName);

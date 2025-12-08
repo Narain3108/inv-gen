@@ -592,7 +592,7 @@ export function QuotationForm({
                         <Controller
                           control={control}
                           name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? ''}
+                          defaultValue={item?.discount ?? 0}
                           render={({ field }) => (
                             <Input
                               type="number"
@@ -719,7 +719,7 @@ export function QuotationForm({
                         <Controller
                           control={control}
                           name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? ''}
+                          defaultValue={item?.discount ?? 0}
                           render={({ field }) => (
                             <Input
                               type="number"

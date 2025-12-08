@@ -94,7 +94,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
 
     setIsFetchingGSTIN(true);
     try {
-      const details = await fetchGSTINDetails(gstin);
+      const details = await fetchGSTINDetails(gst);
       if (details) {
         setValue('name', details.legalName);
         setValue('address.state', details.stateName);

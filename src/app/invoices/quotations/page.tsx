@@ -419,7 +419,7 @@ function QuotationsContent() {
         sgst: convertingQuotation.sgst,
         igst: convertingQuotation.igst,
         // Preserve tax breakdown (GST split) from quotation if present
-        taxBreakdown: convertingQuotation.taxBreakdown || convertingQuotation.tax_breakdown || undefined,
+        taxBreakdown: convertingQuotation.taxBreakdown || undefined,
         paymentStatus: 'pending' as const,
         amountPaid: 0,
         amountPending: convertingQuotation.totalAmount,

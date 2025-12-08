@@ -678,7 +678,7 @@ export function InvoiceForm({
                         <Controller
                           control={control}
                           name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? ''}
+                          defaultValue={item?.discount ?? 0}
                           render={({ field }) => (
                             <Input
                               type="number"
@@ -863,7 +863,7 @@ export function InvoiceForm({
                         <Controller
                           control={control}
                           name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? ''}
+                          defaultValue={item?.discount ?? 0}
                           render={({ field }) => (
                             <Input
                               type="number"
@@ -872,7 +872,7 @@ export function InvoiceForm({
                               max="100"
                               {...field}
                               value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                               className="text-center text-lg font-semibold"
                             />
                           )}
