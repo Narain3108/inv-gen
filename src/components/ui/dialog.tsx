@@ -54,6 +54,24 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Helper to recursively check for a DialogPrimitive.Title in children
+  const containsTitle = (nodes: any): boolean => {
+    if (!nodes) return false;
+    const arr = React.Children.toArray(nodes);
+    for (const node of arr) {
+      // If it's a React element
+      if (React.isValidElement(node)) {
+        // Direct match with Radix Title
+        if (node.type === DialogPrimitive.Title) return true;
+        // Match by data-slot attribute used by our DialogTitle wrapper
+        if (node.props && node.props['data-slot'] === 'dialog-title') return true;
+        // Recurse into its children
+        if (containsTitle(node.props.children)) return true;
+      }
+    }
+    return false;
+  };
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -65,6 +83,10 @@ function DialogContent({
         )}
         {...props}
       >
+        {/* Ensure there is always a DialogTitle for accessibility (screen readers / linters) */}
+        {!containsTitle(children) && (
+          <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>
+        )}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

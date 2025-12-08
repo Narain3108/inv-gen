@@ -37,10 +37,14 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
         { text: (startIndex + index + 1).toString(), fontSize: 8, alignment: 'center' },
         { 
           text: [
-            { text: item.description || '', fontSize: 8, bold: true },
-            item.serialNumbers?.length ? { text: `\nS.No: ${item.serialNumbers.join(', ')}`, fontSize: 7, italics: true, color: '#555' } : ''
+            // Product name (bold)
+            { text: item.description || (item.productName || ''), fontSize: 8, bold: true },
+            // Product description (regular) - shown on next line if present
+            item.productDescription ? { text: `\n${item.productDescription}`, fontSize: 7, color: '#333' } : '',
+            // Serial numbers (regular, smaller) on next line if present
+            item.serialNumbers?.length ? { text: `\nS.No: ${item.serialNumbers.join(', ')}`, fontSize: 7, color: '#333' } : ''
           ],
-          alignment: 'left' 
+          alignment: 'left'
         },
         { text: item.hsn || '-', fontSize: 8, alignment: 'center' },
         { text: `${item.quantity || 0} ${item.unit || ''}`, fontSize: 8, alignment: 'center' },

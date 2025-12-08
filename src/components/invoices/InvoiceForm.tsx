@@ -227,6 +227,7 @@ export function InvoiceForm({
       const invoiceItem: any = {
         productId: product.id,
         description: product.productName,
+        productDescription: product.description || '',
         hsn: product.hsn,
         quantity,
         unit: product.unit,
