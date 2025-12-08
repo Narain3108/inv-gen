@@ -68,7 +68,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
       unit: 'Nos',
       gstRate: 18,
       cessRate: 0,
-      stock: 0,
+      // leave `stock` undefined so the input can be empty and editable
       hasSerialNumber: false,
     } as any,
   });
@@ -192,7 +192,8 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
         price: data.price,
         gstRate: data.gstRate,
         cessRate: data.cessRate || 0,
-        stock: data.stock || 0,
+        // If stock is undefined/null/empty, default to 0 for persistence
+        stock: data.stock ?? 0,
         type: data.type,
         hasSerialNumber: data.hasSerialNumber || false,
       };
@@ -424,13 +425,11 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
                 type="number"
                 step="1"
                 min="0"
-                {...register('stock', { valueAsNumber: true })}
-                value={watch('stock') ?? 0}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0;
-                  setValue('stock', val);
-                }}
-                placeholder="0"
+                // allow empty value; Zod will preprocess/validate before submit
+                {...register('stock')}
+                // Provide a stable uncontrolled initial value so React doesn't warn
+                defaultValue={product?.stock ?? ''}
+                placeholder=""
               />
               <p className="text-xs text-muted-foreground">
                 Current available stock quantity

@@ -54,13 +54,20 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
     resolver: zodResolver(companyFormSchema) as any,
     defaultValues: company ? {
       name: company.name,
-      gstin: company.gstin,
-      pan: company.pan,
-      website: company.website,
-      logoUrl: company.logoUrl,
-      address: company.address,
-      contact: company.contact,
-      bankDetails: company.bankDetails,
+      // Ensure gstin/pan default to empty string to avoid null reference issues
+      gstin: company.gstin || '',
+      pan: company.pan || '',
+      website: company.website || '',
+      logoUrl: company.logoUrl || '',
+      address: company.address || {
+        country: 'India',
+        street: '',
+        city: '',
+        state: '',
+        pincode: '',
+      },
+      contact: company.contact || { phone: '', email: '' },
+      bankDetails: company.bankDetails || {},
       termsAndConditions: company.termsAndConditions || '',
       additionalNotes: company.additionalNotes || '',
     } : {
@@ -76,10 +83,14 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
 
   // Auto-fetch GSTIN details
   const handleFetchGSTIN = async () => {
-    if (!gstin || gstin.length !== 15) {
+    const gst = (gstin ?? '').toString().trim().toUpperCase();
+    if (!gst || gst.length !== 15) {
       toast.error('Please enter a valid 15-character GSTIN');
       return;
     }
+
+    // set normalized GSTIN back to form so value and validation are consistent
+    setValue('gstin', gst);
 
     setIsFetchingGSTIN(true);
     try {

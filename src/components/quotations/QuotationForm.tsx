@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { quotationFormSchema } from '@/lib/validations';
 import { Quotation, Product, Client, InvoiceItem, Company, Address } from '@/types';
@@ -92,7 +92,7 @@ export function QuotationForm({
     } : {
       date: new Date().toISOString().split('T')[0],
       validUntil: getDefaultValidUntil(),
-      items: [{ productId: '', quantity: 1, unitPrice: 0, discount: 0 }],
+      items: [{ productId: '' }],
     } as any,
   });
 
@@ -551,33 +551,59 @@ export function QuotationForm({
                         )}
                       </td>
                       <td className="p-2">
-                        <Input
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={item?.quantity || 1}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          className="text-center w-full text-base font-medium"
+                        <Controller
+                          control={control}
+                          name={`items.${index}.quantity` as const}
+                          defaultValue={item?.quantity ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="1"
+                              min="1"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
+                              className="text-center w-full text-base font-medium"
+                            />
+                          )}
                         />
                       </td>
                       <td className="p-2 text-right">
-                        <div className="font-medium text-base">{formatCurrency(unitPrice)}</div>
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unitPrice` as const}
+                          defaultValue={item?.unitPrice ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-right w-full text-base font-medium"
+                              placeholder="0.00"
+                            />
+                          )}
+                        />
                       </td>
                       <td className="p-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          value={item?.discount || 0}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setValue(`items.${index}.discount`, val, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          className="text-center w-full text-base font-medium"
+                        <Controller
+                          control={control}
+                          name={`items.${index}.discount` as const}
+                          defaultValue={item?.discount ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-center w-full text-base font-medium"
+                            />
+                          )}
                         />
                       </td>
                       <td className="p-2 text-right font-medium text-base">
@@ -647,40 +673,64 @@ export function QuotationForm({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Quantity</Label>
-                        <Input
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={item?.quantity || 1}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            setValue(`items.${index}.quantity`, val, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          className="text-center text-lg font-semibold"
+                        <Controller
+                          control={control}
+                          name={`items.${index}.quantity` as const}
+                          defaultValue={item?.quantity ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="1"
+                              min="1"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
+                              className="text-center text-lg font-semibold"
+                            />
+                          )}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Unit Price</Label>
-                        <div className="h-10 flex items-center justify-center border rounded-md bg-muted px-3">
-                          <span className="font-semibold text-lg">{formatCurrency(unitPrice)}</span>
-                        </div>
+                        <Label className="text-sm font medium">Unit Price</Label>
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unitPrice` as const}
+                          defaultValue={item?.unitPrice ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-right text-lg font-semibold"
+                              placeholder="0.00"
+                            />
+                          )}
+                        />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Discount %</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          value={item?.discount || 0}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setValue(`items.${index}.discount`, val, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          className="text-center text-lg font-semibold"
+                        <Controller
+                          control={control}
+                          name={`items.${index}.discount` as const}
+                          defaultValue={item?.discount ?? ''}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-center text-lg font-semibold"
+                            />
+                          )}
                         />
                       </div>
                       <div className="space-y-2">
@@ -699,7 +749,7 @@ export function QuotationForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() => append({ productId: '', quantity: 1, unitPrice: 0, discount: 0 } as any)}
+            onClick={() => append({ productId: '' } as any)}
             className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />

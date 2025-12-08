@@ -91,11 +91,17 @@ export const bankDetailsSchema = z.object({
 
 export const companyFormSchema = z.object({
   name: z.string().min(2, 'Company name is required').max(200),
-  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')).nullish(),
+  // Preprocess GSTIN: trim and uppercase but do NOT enforce format validation here
+  gstin: z.preprocess((val) => typeof val === 'string' ? val.trim().toUpperCase() : val,
+    z.string().optional().or(z.literal('')).nullish()
+  ),
   address: addressSchema,
   contact: contactSchema,
   bankDetails: bankDetailsSchema,
-  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')).nullish(),
+  // Preprocess PAN: trim and uppercase but do NOT enforce format validation here
+  pan: z.preprocess((val) => typeof val === 'string' ? val.trim().toUpperCase() : val,
+    z.string().optional().or(z.literal('')).nullish()
+  ),
   website: z.string().url('Invalid website URL').optional().or(z.literal('')).nullish(),
   logoUrl: z.string().url('Invalid logo URL').optional().or(z.literal('')).nullish(),
   signatureUrl: z.string().url('Invalid signature URL').optional().or(z.literal('')).nullish(),
@@ -127,7 +133,17 @@ export const productFormSchema = z.object({
   price: z.number().min(0, 'Price must be positive'),
   gstRate: z.number().min(0).max(28),
   cessRate: z.number().min(0).max(100).optional().nullish(),
-  stock: z.number().min(0).optional().nullish(),
+  // Allow `stock` input to be empty in the form (user can type),
+  // but when present it must be a number >= 0. Preprocess empty string -> undefined,
+  // and convert numeric strings to numbers for validation.
+  stock: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return Number.isNaN(n) ? val : n;
+    }
+    return val;
+  }, z.number().min(0).optional().nullish()),
   type: z.enum(['product', 'service']),
   hasSerialNumber: z.boolean().optional().nullish(),
 });
@@ -136,10 +152,16 @@ export const productFormSchema = z.object({
 
 export const clientFormSchema = z.object({
   clientName: z.string().min(2, 'Client name is required').max(200),
-  gstin: z.string().regex(VALIDATION_PATTERNS.gstin, 'Invalid GSTIN format').optional().or(z.literal('')).nullish(),
+  // Normalize client GSTIN before validating
+  gstin: z.preprocess((val) => typeof val === 'string' ? val.trim().toUpperCase() : val,
+    z.string().optional().or(z.literal('')).nullish()
+  ),
   address: addressSchema,
   contact: contactSchema,
-  pan: z.string().regex(VALIDATION_PATTERNS.pan, 'Invalid PAN format').optional().or(z.literal('')).nullish(),
+  // Normalize PAN before validating
+  pan: z.preprocess((val) => typeof val === 'string' ? val.trim().toUpperCase() : val,
+    z.string().optional().or(z.literal('')).nullish()
+  ),
   bankDetails: bankDetailsSchema,
   billingAddress: addressSchema.nullish(),
   shippingAddress: addressSchema.nullish(),
@@ -151,10 +173,31 @@ export const invoiceItemSchema = z.object({
   productId: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
   hsn: z.string().min(4, 'HSN/SAC is required'),
-  quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
+  quantity: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return Number.isNaN(n) ? val : n;
+    }
+    return val;
+  }, z.number().min(0.01, 'Quantity must be greater than 0')),
   unit: z.string().min(1, 'Unit is required'),
-  unitPrice: z.number().min(0, 'Unit price must be positive'),
-  discount: z.number().min(0).max(100).optional(),
+  unitPrice: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return Number.isNaN(n) ? val : n;
+    }
+    return val;
+  }, z.number().min(0, 'Unit price must be positive')),
+  discount: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return Number.isNaN(n) ? val : n;
+    }
+    return val;
+  }, z.number().min(0).max(100).optional()),
   gstRate: z.number().min(0).max(28),
   cessRate: z.number().min(0).max(100).optional(),
   cgst: z.number(),
@@ -174,9 +217,30 @@ export const invoiceFormSchema = z.object({
   shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
-    quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
-    unitPrice: z.number().min(0, 'Price must be a positive number'),
-    discount: z.number().min(0).max(100).optional().default(0),
+    quantity: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0.01, 'Quantity must be greater than 0')),
+    unitPrice: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0, 'Price must be a positive number')),
+    discount: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0).max(100).optional()),
   })).min(1, 'At least one item is required'),
 });
 
@@ -190,9 +254,30 @@ export const quotationFormSchema = z.object({
   shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
-    quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
-    unitPrice: z.number().min(0, 'Price must be a positive number'),
-    discount: z.number().min(0).max(100).optional().default(0),
+    quantity: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0.01, 'Quantity must be greater than 0')),
+    unitPrice: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0, 'Price must be a positive number')),
+    discount: z.preprocess((val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      if (typeof val === 'string') {
+        const n = Number(val);
+        return Number.isNaN(n) ? val : n;
+      }
+      return val;
+    }, z.number().min(0).max(100).optional()),
   })).min(1, 'At least one item is required'),
 });
 

@@ -71,10 +71,14 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
 
   // Auto-fetch GSTIN details
   const handleFetchGSTIN = async () => {
-    if (!gstin || gstin.length !== 15) {
+    const gst = (gstin ?? '').toString().trim().toUpperCase();
+    if (!gst || gst.length !== 15) {
       toast.error('Please enter a valid 15-character GSTIN');
       return;
     }
+
+    // normalize back to the form
+    setValue('gstin', gst);
 
     setIsFetchingGSTIN(true);
     try {
