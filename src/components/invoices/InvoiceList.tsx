@@ -142,8 +142,8 @@ export function InvoiceList({
         </div>
       </div>
 
-      {/* Invoices Table */}
-      <Card className="overflow-hidden">
+      {/* Invoices Table (Desktop) */}
+      <Card className="overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="border-b bg-muted/50">
@@ -252,6 +252,91 @@ export function InvoiceList({
           </table>
         </div>
       </Card>
+
+      {/* Invoices Cards - Mobile */}
+      <div className="space-y-3 md:hidden">
+        {filteredInvoices.map((invoice) => {
+          const roundTo2 = (num: number) => Math.round((num || 0) * 100) / 100;
+          const amountPending = roundTo2(invoice.amountPending ?? invoice.totalAmount);
+          const paymentStatus = (amountPending <= 0.01) ? 'paid' : (invoice.paymentStatus || 'pending');
+
+          return (
+            <Card key={invoice.id} className="p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView(invoice)}>
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <span className="font-mono font-medium text-sm">{invoice.invoiceNumber}</span>
+                  <p className="text-sm text-muted-foreground">{getClientName(invoice.clientId)}</p>
+                </div>
+                {getPaymentStatusBadge(invoice)}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDate(invoice.date)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Pending</p>
+                  <p className={`font-medium ${amountPending > 0.01 ? 'text-orange-600' : 'text-green-600'}`}>
+                    {amountPending > 0.01 ? formatCurrency(amountPending) : '-'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center border-t pt-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Amount</p>
+                  <p className="text-lg font-bold text-primary">{formatCurrency(invoice.totalAmount)}</p>
+                </div>
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    variant={paymentStatus === 'paid' ? 'ghost' : 'outline'}
+                    onClick={() => onPayment(invoice)}
+                    className="h-8"
+                  >
+                    <DollarSign className="h-3.5 w-3.5 mr-1" />
+                    {paymentStatus === 'paid' ? 'History' : 'Payment'}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onView(invoice)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDownload(invoice)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download PDF
+                      </DropdownMenuItem>
+                      {canEdit && (
+                        <>
+                          <DropdownMenuItem onClick={() => onEdit(invoice)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDelete(invoice)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* No Results */}
       {filteredInvoices.length === 0 && invoices.length > 0 && (
