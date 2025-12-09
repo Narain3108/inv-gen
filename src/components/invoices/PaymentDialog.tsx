@@ -33,7 +33,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { DollarSign, Calendar, CreditCard, FileText, Clock, Hash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const paymentFormSchema = z.object({
   amount: z.number()

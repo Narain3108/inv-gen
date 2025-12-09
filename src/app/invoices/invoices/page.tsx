@@ -530,25 +530,26 @@ function InvoicesContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Invoices</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Invoices</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Create and manage your invoices
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <ExportButton
             onExportExcel={handleExportExcel}
             onExportCSV={handleExportCSV}
+            className="flex-1 sm:flex-none"
           />
-          <Button variant="outline" onClick={() => setIsCustomizationDialogOpen(true)}>
+          <Button variant="outline" onClick={() => setIsCustomizationDialogOpen(true)} className="flex-1 sm:flex-none">
             <Settings className="mr-2 h-4 w-4" />
-            Customize Bill
+            <span className="whitespace-nowrap">Customize Bill</span>
           </Button>
-          <Button onClick={handleAddInvoice}>
+          <Button onClick={handleAddInvoice} className="flex-1 sm:flex-none">
             <Plus className="mr-2 h-4 w-4" />
-            New Invoice
+            <span className="whitespace-nowrap">New Invoice</span>
           </Button>
         </div>
       </div>

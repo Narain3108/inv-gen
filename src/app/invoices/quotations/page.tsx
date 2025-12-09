@@ -485,33 +485,35 @@ function QuotationsContent() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Quotations
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Create and manage price estimates for clients
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <ExportButton
             onExportExcel={handleExportExcel}
             onExportCSV={handleExportCSV}
+            className="flex-1 sm:flex-none"
           />
           <Button 
             variant="outline"
             onClick={() => setIsCustomizationDialogOpen(true)}
+            className="flex-1 sm:flex-none"
           >
             <Settings className="mr-2 h-4 w-4" />
-            Customize Bill
+            <span className="whitespace-nowrap">Customize Bill</span>
           </Button>
           <Button 
             onClick={handleAddQuotation} 
-            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all"
+            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all flex-1 sm:flex-none"
           >
             <Plus className="mr-2 h-4 w-4" />
-            New Quotation
+            <span className="whitespace-nowrap">New Quotation</span>
           </Button>
         </div>
       </div>

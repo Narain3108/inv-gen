@@ -23,13 +23,15 @@ interface ExportButtonProps {
   onExportCSV: () => Promise<boolean>;
   label?: string;
   variant?: 'default' | 'outline' | 'ghost';
+  className?: string;
 }
 
 export function ExportButton({ 
   onExportExcel, 
   onExportCSV,
   label = 'Export',
-  variant = 'outline'
+  variant = 'outline',
+  className
 }: ExportButtonProps) {
   const [exporting, setExporting] = useState(false);
 
@@ -53,7 +55,7 @@ export function ExportButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} disabled={exporting}>
+        <Button variant={variant} disabled={exporting} className={className}>
           {exporting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
