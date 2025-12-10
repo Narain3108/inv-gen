@@ -63,8 +63,8 @@ export function Header({ onMenuClick, className }: HeaderProps) {
           <Search className="h-5 w-5" />
         </Button>
 
-        {/* Theme Toggle */}
-        <ThemeToggle className="shrink-0" />
+        {/* Theme Toggle (temporarily disabled) */}
+        {/* <ThemeToggle className="shrink-0" /> */}
 
         {/* Logout */}
         <Button
