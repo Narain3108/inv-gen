@@ -24,6 +24,7 @@ import { PAYMENT_MODES } from '@/lib/constants';
 import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
+import { productsApi } from '@/lib/api/products.api';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -54,6 +55,14 @@ export function InvoiceForm({
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [serialNumbers, setSerialNumbers] = useState<Record<number, string[]>>({});
   const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
+  // Sync localProducts with props.products
+  // We use localProducts to allow optimistic updates and refreshing of product data (e.g. serial numbers)
+  // without waiting for the parent to re-fetch everything.
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
   
   // Shipping Address State
   const [shippingAddressMode, setShippingAddressMode] = useState<'default' | 'select' | 'new'>('default');
@@ -161,20 +170,99 @@ export function InvoiceForm({
   }, [watchClientId, clients]);
 
   // Handle product selection for an item
-  const handleProductSelect = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId);
+  const handleProductSelect = async (index: number, productId: string) => {
+    const product = localProducts.find(p => p.id === productId);
     if (product) {
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
-      // The rest of the fields are not in the form, they will be calculated
+      
+      // Auto-fill serial numbers if available
+      if (product.hasSerialNumber && product.serialNumbers && product.serialNumbers.length > 0) {
+        const currentQty = Number(watchItems[index]?.quantity) || 1;
+        const availableSerials = product.serialNumbers.slice(0, currentQty);
+        
+        // Update serial numbers state
+        setSerialNumbers(prev => ({
+          ...prev,
+          [index]: availableSerials
+        }));
+        
+        if (availableSerials.length < currentQty) {
+          toast.info(`Auto-filled ${availableSerials.length} serial numbers. Please enter the remaining ${currentQty - availableSerials.length}.`);
+        } else {
+          toast.success(`Auto-filled ${availableSerials.length} serial numbers.`);
+        }
+      }
+
+      // Fetch fresh product data to ensure serial numbers are up to date
+      try {
+        const freshProduct = await productsApi.getById(productId);
+        if (freshProduct) {
+            setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
+            
+            // Re-run auto-fill with fresh data if needed
+            if (freshProduct.hasSerialNumber && freshProduct.serialNumbers && freshProduct.serialNumbers.length > 0) {
+                const currentQty = Number(watchItems[index]?.quantity) || 1;
+                const currentSerials = serialNumbers[index] || [];
+                
+                // If fresh product has more serials, update
+                if (freshProduct.serialNumbers.length > (product.serialNumbers?.length || 0)) {
+                     const availableSerials = freshProduct.serialNumbers.slice(0, currentQty);
+                     setSerialNumbers(prev => ({
+                        ...prev,
+                        [index]: availableSerials
+                     }));
+                }
+            }
+        }
+      } catch (error) {
+        console.error("Failed to refresh product details", error);
+      }
     }
   };
+
+  // Watch for quantity changes to update serial numbers auto-fill
+  useEffect(() => {
+    watchItems.forEach((item, index) => {
+      if (item.productId) {
+        const product = localProducts.find(p => p.id === item.productId);
+        if (product?.hasSerialNumber && product.serialNumbers) {
+          const currentQty = Number(item.quantity) || 0;
+          const currentSerials = serialNumbers[index] || [];
+          
+          // Only auto-fill if we have more quantity than serials and haven't manually edited (simple heuristic: check length)
+          // Or better: just ensure we don't lose existing ones, but fill up to available
+          if (currentQty > currentSerials.length) {
+             const needed = currentQty - currentSerials.length;
+             // Find unused serials from product pool that are NOT already in currentSerials
+             const unusedFromPool = product.serialNumbers.filter(s => !currentSerials.includes(s));
+             const toAdd = unusedFromPool.slice(0, needed);
+             
+             if (toAdd.length > 0) {
+               setSerialNumbers(prev => ({
+                 ...prev,
+                 [index]: [...currentSerials, ...toAdd]
+               }));
+             }
+          }
+        }
+      }
+    });
+  }, [watchItems, localProducts]); // Be careful with dependency loop, watchItems changes on every keystroke
+
 
   // Calculate totals
   const calculateTotals = () => {
     if (!watchItems || !selectedClient) return null;
 
-    const validItems = watchItems.filter((item: any) => item.productId && item.quantity > 0 && item.unitPrice >= 0);
+    // Build list of valid items, preserving original indices so serial numbers map correctly
+    const validItems = watchItems.reduce((acc: Array<{ item: any; index: number }>, item: any, idx: number) => {
+      if (item.productId && item.quantity > 0 && item.unitPrice >= 0) {
+        acc.push({ item, index: idx });
+      }
+      return acc;
+    }, []);
+
     if (validItems.length === 0) return null;
 
     let subtotal = 0;
@@ -186,8 +274,8 @@ export function InvoiceForm({
 
     const isInterState = companyState !== selectedClient.address.state;
 
-    const processedItems: InvoiceItem[] = validItems.map((item: any) => {
-      const product = products.find(p => p.id === item.productId);
+    const processedItems: InvoiceItem[] = validItems.map(({ item, index }) => {
+      const product = localProducts.find(p => p.id === item.productId);
       if (!product) return null;
 
       const quantity = Number(item.quantity) || 0;
@@ -248,9 +336,9 @@ export function InvoiceForm({
         invoiceItem.itemCode = product.itemCode;
       }
 
-      // Only add serialNumbers if product has serial numbers
-      if (product.hasSerialNumber && serialNumbers[validItems.indexOf(item)]) {
-        invoiceItem.serialNumbers = serialNumbers[validItems.indexOf(item)];
+      // Map serialNumbers using the original item index
+      if (product.hasSerialNumber && serialNumbers[index]) {
+        invoiceItem.serialNumbers = serialNumbers[index];
       }
 
       return invoiceItem;
@@ -261,10 +349,10 @@ export function InvoiceForm({
 
     // Calculate tax breakdown by GST rate
     const taxBreakdown = calculateTaxBreakdown(
-      validItems.map(item => ({
+      validItems.map(({ item }) => ({
         amount: Number(item.unitPrice) || 0,
         quantity: Number(item.quantity) || 0,
-        gstRate: products.find(p => p.id === item.productId)?.gstRate || 0,
+        gstRate: localProducts.find(p => p.id === item.productId)?.gstRate || 0,
         discount: Number(item.discount) || 0,
       })),
       companyState,
@@ -294,7 +382,7 @@ export function InvoiceForm({
     // Validate stock availability for products
     let hasStockError = false;
     watchItems.forEach((item: any) => {
-      const product = products.find(p => p.id === item.productId);
+      const product = localProducts.find(p => p.id === item.productId);
       if (product && product.type === 'product' && typeof product.stock === 'number') {
         const quantity = Number(item.quantity) || 0;
         if (quantity > product.stock) {
@@ -313,7 +401,7 @@ export function InvoiceForm({
     const newErrors: Record<number, string> = {};
     
     watchItems.forEach((item: any, index: number) => {
-      const product = products.find(p => p.id === item.productId);
+      const product = localProducts.find(p => p.id === item.productId);
       if (product?.hasSerialNumber) {
         const itemSerialNumbers = serialNumbers[index] || [];
         const quantity = Number(item.quantity) || 0;
@@ -594,7 +682,7 @@ export function InvoiceForm({
               <tbody>
                 {fields.map((field, index) => {
                   const item = watchItems?.[index];
-                  const product = item?.productId ? products.find(p => p.id === item.productId) : null;
+                  const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
                   const quantity = Number(item?.quantity) || 0;
                   const unitPrice = Number(item?.unitPrice) || 0;
                   const discount = Number(item?.discount) || 0;
@@ -612,7 +700,7 @@ export function InvoiceForm({
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {products.map((product) => {
+                            {localProducts.map((product) => {
                               const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
                               return (
                                 <SelectItem 
@@ -763,7 +851,7 @@ export function InvoiceForm({
           <div className="space-y-4 lg:hidden">
             {fields.map((field, index) => {
               const item = watchItems?.[index];
-              const product = item?.productId ? products.find(p => p.id === item.productId) : null;
+              const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
               const quantity = Number(item?.quantity) || 0;
               const unitPrice = Number(item?.unitPrice) || 0;
               const discount = Number(item?.discount) || 0;
@@ -796,7 +884,7 @@ export function InvoiceForm({
                           <SelectValue placeholder="Select product" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products.map((product) => {
+                          {localProducts.map((product) => {
                             const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
                             return (
                               <SelectItem 

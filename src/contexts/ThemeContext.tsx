@@ -17,27 +17,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Force light theme for now. Do not remove the original logic so it can be restored later.
     setMounted(true);
-    setThemeState('light');
-    // Ensure root does not have dark class
-    document.documentElement.classList.remove('dark');
+    const stored = localStorage.getItem('theme') as Theme;
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const initialTheme = stored || systemTheme;
+    setThemeState(initialTheme);
+    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
   }, []);
 
   const setTheme = (newTheme: Theme) => {
-    // Temporarily ignore requests to set dark theme; always persist light
-    setThemeState('light');
-    try {
-      localStorage.setItem('theme', 'light');
-    } catch (e) {
-      // ignore
-    }
-    document.documentElement.classList.remove('dark');
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
   const toggleTheme = () => {
-    // No-op for now; keep API so components calling toggleTheme won't break.
-    setTheme('light');
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   // Always provide context, even during SSR

@@ -152,6 +152,7 @@ export interface Product {
   stock?: number;
   type: 'product' | 'service';
   hasSerialNumber?: boolean; // Whether this product requires serial numbers
+  serialNumbers?: string[]; // Available serial numbers
   categoryId?: string; // Reference to global product category
   createdBy?: string; // user id of creator
   createdByUsername?: string; // snapshot of creator username for display

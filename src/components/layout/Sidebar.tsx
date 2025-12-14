@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Sparkles,
   UserCog,
+  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +60,11 @@ const navItems: NavItem[] = [
     title: 'Products',
     href: '/invoices/products',
     icon: Package,
+  },
+  {
+    title: 'Purchases',
+    href: '/invoices/purchases',
+    icon: ShoppingCart,
   },
   {
     title: 'Invoices',

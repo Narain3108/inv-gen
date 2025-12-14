@@ -1,0 +1,540 @@
+/**
+ * Purchase Form Component
+ * Form for adding products via purchase bills
+ */
+
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Product, ProductCategory } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, Plus, Trash2, Calculator, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatCurrency } from '@/utils/formatters';
+import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
+import { purchasesApi, PurchaseBill } from '@/lib/api/purchases.api';
+import { productsApi } from '@/lib/api/products.api';
+import { categoriesApi } from '@/lib/api/categories.api';
+import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
+
+// Schema Definition
+const purchaseItemSchema = z.object({
+  productName: z.string().min(1, "Product name is required"),
+  productId: z.string().optional(), // Optional because it might be a new product
+  hsn: z.string().optional(),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
+  unit: z.string().min(1, "Unit is required"),
+  unitPrice: z.number().min(0, "Price must be non-negative"),
+  gstRate: z.number().min(0),
+  cessRate: z.number().min(0).optional(),
+  amount: z.number().optional(),
+  hasSerialNumber: z.boolean(),
+  serialNumbers: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  categoryId: z.string().nullable().optional(),
+  itemCode: z.string().nullable().optional(),
+}).strict();
+
+
+const purchaseFormSchema = z.object({
+  billDate: z.string().min(1, "Bill date is required"),
+  billNumber: z.string().min(1, "Bill number is required"),
+  vendorName: z.string().optional(),
+  items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
+  totalAmount: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
+
+interface PurchaseFormProps {
+  companyId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+  initialData?: PurchaseBill;
+  purchaseId?: string;
+}
+
+export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purchaseId }: PurchaseFormProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [openComboboxes, setOpenComboboxes] = useState<Record<number, boolean>>({});
+
+  // Load products and categories for autocomplete
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [productsData, categoriesData] = await Promise.all([
+          productsApi.getAll({ company_id: companyId }),
+          categoriesApi.getAll()
+        ]);
+        setProducts(productsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Failed to load data", error);
+        toast.error("Failed to load products/categories");
+      }
+    };
+    loadData();
+  }, [companyId]);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<PurchaseFormData>({
+    resolver: zodResolver(purchaseFormSchema),
+    defaultValues: {
+      billDate: new Date().toISOString().split('T')[0],
+      billNumber: '',
+      vendorName: '',
+      items: [{ 
+        productName: '', 
+        quantity: 1, 
+        unit: 'Nos', 
+        unitPrice: 0, 
+        gstRate: 18, 
+        cessRate: 0, 
+        amount: 0, 
+        hasSerialNumber: false, 
+        serialNumbers: [],
+        productId: undefined,
+        hsn: undefined,
+        description: undefined,
+        categoryId: undefined,
+        itemCode: undefined,
+      }],
+      totalAmount: 0,
+      notes: '',
+    },
+  });
+
+  // Load initial data if editing
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        ...initialData,
+        billDate: initialData.billDate ? initialData.billDate.split('T')[0] : new Date().toISOString().split('T')[0],
+        // Ensure items are mapped correctly if needed, though PurchaseBill and PurchaseFormData are similar
+        items: initialData.items.map(item => ({
+          ...item,
+          productId: item.productId,
+          description: item.description,
+          categoryId: item.categoryId ?? undefined,
+          itemCode: item.itemCode ?? undefined,
+          // Ensure defaults for optional fields
+          hsn: item.hsn,
+          serialNumbers: item.serialNumbers || [],
+        }))
+      });
+    }
+  }, [initialData, reset]);
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'items',
+  });
+
+  const watchItems = watch('items');
+  const totalAmount = useWatch({ control, name: 'totalAmount' });
+
+  // Calculate totals whenever items change (guard against undefined watch)
+  useEffect(() => {
+    const items = Array.isArray(watchItems) ? watchItems : [];
+    const total = items.reduce((sum, item) => {
+      const qty = Number(item?.quantity) || 0;
+      const price = Number(item?.unitPrice) || 0;
+      const gst = Number(item?.gstRate) || 0;
+      const cess = Number(item?.cessRate) || 0;
+
+      const base = qty * price;
+      const tax = base * (gst / 100);
+      const cessAmount = base * (cess / 100);
+
+      return sum + base + tax + cessAmount;
+    }, 0);
+
+    setValue('totalAmount', total);
+  }, [watchItems, setValue]);
+
+  // Keep each item's `amount` field in sync so zod sees a numeric value for validation
+  useEffect(() => {
+    const items = Array.isArray(watchItems) ? watchItems : [];
+    items.forEach((item, idx) => {
+      const qty = Number(item?.quantity) || 0;
+      const price = Number(item?.unitPrice) || 0;
+      const gst = Number(item?.gstRate) || 0;
+      const cess = Number(item?.cessRate) || 0;
+
+      const base = qty * price;
+      const tax = base * (gst / 100);
+      const cessAmount = base * (cess / 100);
+      const amount = base + tax + cessAmount;
+
+      // Only update if different to avoid extra renders
+      const current = item?.amount;
+      if (typeof current !== 'number' || Number(current) !== Number(amount)) {
+        setValue(`items.${idx}.amount`, amount);
+      }
+    });
+  }, [watchItems, setValue]);
+
+  const handleProductSelect = (index: number, productName: string) => {
+    const existingProduct = products.find(p => p.productName.toLowerCase() === productName.toLowerCase());
+    
+    setValue(`items.${index}.productName`, productName);
+    
+    if (existingProduct) {
+      setValue(`items.${index}.productId`, existingProduct.id);
+      setValue(`items.${index}.hsn`, existingProduct.hsn);
+      setValue(`items.${index}.unit`, existingProduct.unit);
+      setValue(`items.${index}.unitPrice`, existingProduct.price); // Default to selling price, user can change
+      setValue(`items.${index}.gstRate`, existingProduct.gstRate);
+      setValue(`items.${index}.cessRate`, existingProduct.cessRate || 0);
+      setValue(`items.${index}.hasSerialNumber`, existingProduct.hasSerialNumber || false);
+      setValue(`items.${index}.categoryId`, existingProduct.categoryId ?? undefined);
+      setValue(`items.${index}.itemCode`, existingProduct.itemCode ?? undefined);
+      toast.success(`Auto-filled details for ${existingProduct.productName}`);
+    } else {
+      // Reset ID if new product
+      setValue(`items.${index}.productId`, undefined);
+      // Try to find category match for auto-fill
+      // (Simplified logic here, could be expanded)
+    }
+    
+    setOpenComboboxes(prev => ({ ...prev, [index]: false }));
+  };
+
+  const onSubmit = async (data: PurchaseFormData) => {
+    // Validate serial numbers
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
+      if (item.hasSerialNumber) {
+        if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
+          toast.error(`Item ${i + 1} (${item.productName}): Please enter all ${item.quantity} serial numbers`);
+          return;
+        }
+        if (item.serialNumbers.some(s => !s.trim())) {
+          toast.error(`Item ${i + 1}: Serial numbers cannot be empty`);
+          return;
+        }
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      // Compute per-item amount server expects (base + tax + cess)
+      const itemsWithAmounts = (data.items || []).map((it) => {
+        const qty = Number(it.quantity) || 0;
+        const price = Number(it.unitPrice) || 0;
+        const gst = Number(it.gstRate) || 0;
+        const cess = Number(it.cessRate) || 0;
+        const base = qty * price;
+        const tax = base * (gst / 100);
+        const cessAmount = base * (cess / 100);
+        return {
+          ...it,
+          amount: base + tax + cessAmount,
+        };
+      });
+
+      const payload = {
+        ...data,
+        companyId,
+        items: itemsWithAmounts,
+        totalAmount: itemsWithAmounts.reduce((s, it) => s + Number(it.amount || 0), 0),
+      } as any;
+
+      if (purchaseId) {
+        await purchasesApi.update(purchaseId, payload);
+        toast.success("Purchase bill updated successfully");
+      } else {
+        await purchasesApi.create(payload);
+        toast.success("Purchase bill created successfully");
+      }
+      onSuccess();
+    } catch (error) {
+      console.error("Error saving purchase:", error);
+      toast.error("Failed to save purchase bill");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onError = (errs: any) => {
+    try {
+      console.error('Validation errors', errs);
+      console.error('Validation errors (stringified):', JSON.stringify(errs, Object.getOwnPropertyNames(errs), 2));
+    } catch (e) {
+      console.error('Failed to stringify validation errors', e, errs);
+    }
+    toast.error('Please fix validation errors in the form');
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6 w-full max-w-none sm:max-w-6xl mx-auto px-2 sm:px-6 py-6 min-h-screen">
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle>Bill Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="billNumber">Bill Number *</Label>
+            <Input id="billNumber" {...register('billNumber')} placeholder="e.g. INV-001" />
+            {errors.billNumber && <p className="text-sm text-red-500">{errors.billNumber.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="billDate">Bill Date *</Label>
+            <Input id="billDate" type="date" {...register('billDate')} />
+            {errors.billDate && <p className="text-sm text-red-500">{errors.billDate.message}</p>}
+          </div>
+          <div className="space-y-2 sm:col-span-2 md:col-span-1">
+            <Label htmlFor="vendorName">Vendor Name</Label>
+            <Input id="vendorName" {...register('vendorName')} placeholder="Supplier Name" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Items</CardTitle>
+            <CardDescription className="hidden sm:block">Add products from the bill.</CardDescription>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => append({ 
+            productName: '', 
+            quantity: 1, 
+            unit: 'Nos', 
+            unitPrice: 0, 
+            gstRate: 18, 
+            cessRate: 0, 
+            amount: 0, 
+            hasSerialNumber: false, 
+            serialNumbers: [],
+            productId: undefined,
+            hsn: undefined,
+            description: undefined,
+            categoryId: undefined,
+            itemCode: undefined,
+          })}>
+            <Plus className="mr-2 h-4 w-4" /> Add Item
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {fields.map((field, index) => {
+            const item = watchItems[index];
+            const quantity = Number(item.quantity) || 0;
+            const hasSerial = item.hasSerialNumber;
+
+            return (
+              <div key={field.id} className="p-4 rounded-lg border bg-card text-card-foreground shadow-sm relative">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => remove(index)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 pr-10 sm:pr-6 min-w-0 items-center">
+                  {/* Product Name - Full width on mobile, 4 cols on desktop */}
+                  <div className="sm:col-span-3 space-y-1.5 min-w-0">
+                    <Label className="text-xs text-muted-foreground">Product Name *</Label>
+                    <div className="relative">
+                      <Input
+                        list={`products-list-${index}`}
+                        placeholder="Product name"
+                        className="h-9 w-full"
+                          {...register(`items.${index}.productName`)}
+                          onChange={(e) => {
+                            // Update RHF value and trigger product auto-fill
+                            setValue(`items.${index}.productName`, e.target.value);
+                            handleProductSelect(index, e.target.value);
+                          }}
+                      />
+                      <datalist id={`products-list-${index}`}>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.productName} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  {/* HSN - 1 col (reduced to allow wider Price) */}
+                  <div className="col-span-1 sm:col-span-1 space-y-1.5 min-w-0">
+                    <Label className="text-xs text-muted-foreground">HSN</Label>
+                    <Input className="h-9 w-full" {...register(`items.${index}.hsn`)} placeholder="HSN" />
+                  </div>
+
+                  {/* Qty & Unit - Grouped for better mobile layout */}
+                    <div className="col-span-1 sm:col-span-2 grid grid-cols-3 gap-2 min-w-0">
+                      <div className="space-y-1.5 min-w-0 col-span-1">
+                        <Label className="text-xs text-muted-foreground">Qty</Label>
+                        <Input 
+                            type="number" 
+                            min="1" 
+                        className="h-9 w-full"
+                            {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
+                        />
+                    </div>
+                      <div className="space-y-1.5 min-w-0 col-span-2">
+                        <Label className="text-xs text-muted-foreground">Unit</Label>
+                        <Select 
+                          value={item.unit || "Nos"} 
+                          onValueChange={(val) => setValue(`items.${index}.unit`, val)}
+                        >
+                        <SelectTrigger className="h-9 w-full sm:min-w-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                            <SelectContent>
+                                {PRODUCT_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                  </div>
+
+                  {/* Price - expanded to 2 cols for more input width */}
+                  <div className="col-span-1 sm:col-span-2 space-y-1.5 min-w-0 sm:pl-4">
+                    <Label className="text-xs text-muted-foreground">Price</Label>
+                    <Input 
+                        type="number" 
+                        step="0.01" 
+                        className="h-9 w-full"
+                        {...register(`items.${index}.unitPrice`, { valueAsNumber: true })} 
+                    />
+                  </div>
+
+                  {/* Price (smaller) */}
+                  
+                  {/* GST - moved left on sm */}
+                  <div className="col-span-1 sm:col-start-9 sm:col-span-2 space-y-1.5 min-w-0">
+                    <Label className="text-xs text-muted-foreground">GST %</Label>
+                    <Select
+                      value={item.gstRate !== undefined ? String(item.gstRate) : "18"}
+                      onValueChange={(val) => setValue(`items.${index}.gstRate`, Number(val))}
+                    >
+                      <SelectTrigger className="h-9 w-full sm:min-w-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GST_RATES.map(r => <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Amount - larger and pinned to right on sm */}
+                  <div className="col-span-1 sm:col-start-11 sm:col-span-2 space-y-1.5 min-w-0 sm:pl-4">
+                    <Label className="text-xs text-muted-foreground">Amount</Label>
+                    <div className="h-9 flex items-center justify-end px-3 rounded-md border bg-muted/50 text-sm font-medium w-full">
+                      {(() => {
+                        const qty = Number(item?.quantity) || 0;
+                        const price = Number(item?.unitPrice) || 0;
+                        const gst = Number(item?.gstRate) || 0;
+                        const cess = Number(item?.cessRate) || 0;
+                        const base = qty * price;
+                        const tax = base * (gst / 100);
+                        const cessAmount = base * (cess / 100);
+                        const amt = base + tax + cessAmount;
+                        return formatCurrency(amt);
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Serial Number Toggle & Section */}
+                <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div className="flex items-center gap-2 min-w-fit">
+                        <Label className="text-xs font-medium">Has Serial No?</Label>
+                        <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                <input 
+                                    type="radio" 
+                                    checked={hasSerial} 
+                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, true)}
+                                    className="w-3.5 h-3.5 accent-primary"
+                                /> Yes
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                <input 
+                                    type="radio" 
+                                    checked={!hasSerial} 
+                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, false)}
+                                    className="w-3.5 h-3.5 accent-primary"
+                                /> No
+                            </label>
+                        </div>
+                    </div>
+
+                    {hasSerial && (
+                        <div className="flex-1 bg-blue-50/50 p-3 rounded-md border border-blue-100/50">
+                            <Label className="text-xs text-blue-900 mb-2 block font-medium">
+                                Enter Serial Numbers ({quantity})
+                            </Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {Array.from({ length: quantity }).map((_, sIdx) => (
+                                    <Input
+                                        key={sIdx}
+                                        placeholder={`Serial #${sIdx + 1}`}
+                                  className="h-8 text-sm bg-white w-full"
+                                        value={item.serialNumbers?.[sIdx] || ''}
+                                        onChange={(e) => {
+                                            const newSerials = [...(item.serialNumbers || [])];
+                                            newSerials[sIdx] = e.target.value;
+                                            setValue(`items.${index}.serialNumbers`, newSerials);
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+              </div>
+            );
+          })}
+          
+          {fields.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+              <p>No items added yet</p>
+              <Button type="button" variant="link" onClick={() => append({ 
+                productName: '', quantity: 1, unit: 'Nos', unitPrice: 0, gstRate: 18, cessRate: 0, amount: 0, hasSerialNumber: false, serialNumbers: []
+              })}>
+                Add your first item
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-0 left-0 right-0 p-4 bg-background border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 z-10">
+        <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 max-w-4xl mx-auto">
+            <div className="flex justify-between w-full sm:w-auto sm:block text-right">
+                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="text-2xl font-bold text-primary">{formatCurrency(totalAmount || 0)}</p>
+            </div>
+            <div className="grid grid-cols-2 sm:flex w-full sm:w-auto gap-3">
+              <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancel</Button>
+              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Bill
+              </Button>
+            </div>
+        </div>
+      </div>
+    </form>
+  );
+}
