@@ -77,6 +77,7 @@ export interface FooterFormat {
   showSeal: boolean;
   showThankYouNote: boolean;
   thankYouText: string;
+  remarksText?: string;
 }
 
 export interface InvoiceCustomization {

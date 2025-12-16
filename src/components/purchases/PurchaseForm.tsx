@@ -69,6 +69,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [openComboboxes, setOpenComboboxes] = useState<Record<number, boolean>>({});
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
   // Load products and categories for autocomplete
   useEffect(() => {
@@ -315,22 +316,25 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
             <CardTitle>Items</CardTitle>
             <CardDescription className="hidden sm:block">Add products from the bill.</CardDescription>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={() => append({ 
-            productName: '', 
-            quantity: 1, 
-            unit: 'Nos', 
-            unitPrice: 0, 
-            gstRate: 18, 
-            cessRate: 0, 
-            amount: 0, 
-            hasSerialNumber: false, 
-            serialNumbers: [],
-            productId: undefined,
-            hsn: undefined,
-            description: undefined,
-            categoryId: undefined,
-            itemCode: undefined,
-          })}>
+          <Button type="button" size="sm" variant="outline" onClick={() => {
+            append({ 
+              productName: '', 
+              quantity: 1, 
+              unit: 'Nos', 
+              unitPrice: 0, 
+              gstRate: 18, 
+              cessRate: 0, 
+              amount: 0, 
+              hasSerialNumber: false, 
+              serialNumbers: [],
+              productId: undefined,
+              hsn: undefined,
+              description: undefined,
+              categoryId: undefined,
+              itemCode: undefined,
+            });
+            setActiveRowIndex(fields.length); // Set the newly added row as active
+          }}>
             <Plus className="mr-2 h-4 w-4" /> Add Item
           </Button>
         </CardHeader>
@@ -366,6 +370,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                             setValue(`items.${index}.productName`, e.target.value);
                             handleProductSelect(index, e.target.value);
                           }}
+                          onFocus={() => setActiveRowIndex(index)}
                       />
                       <datalist id={`products-list-${index}`}>
                         {products.map((product) => (
@@ -456,7 +461,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                   </div>
                 </div>
 
-                {/* Serial Number Toggle & Section */}
+                {/* Serial Number Toggle & Section - Only show if this row is active */}
+                {activeRowIndex === index && (
                 <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row sm:items-start gap-3">
                     <div className="flex items-center gap-2 min-w-fit">
                         <Label className="text-xs font-medium">Has Serial No?</Label>
@@ -503,6 +509,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                         </div>
                     )}
                 </div>
+                )}
               </div>
             );
           })}

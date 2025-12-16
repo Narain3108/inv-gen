@@ -56,6 +56,7 @@ export function InvoiceForm({
   const [serialNumbers, setSerialNumbers] = useState<Record<number, string[]>>({});
   const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
   const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
   // Sync localProducts with props.products
   // We use localProducts to allow optimistic updates and refreshing of product data (e.g. serial numbers)
@@ -180,6 +181,13 @@ export function InvoiceForm({
       if (product.hasSerialNumber && product.serialNumbers && product.serialNumbers.length > 0) {
         const currentQty = Number(watchItems[index]?.quantity) || 1;
         const availableSerials = product.serialNumbers.slice(0, currentQty);
+        
+        console.log(`[Invoice] Auto-filling serials for ${product.productName}:`, {
+          totalAvailable: product.serialNumbers.length,
+          requestedQty: currentQty,
+          fillingCount: availableSerials.length,
+          serials: availableSerials
+        });
         
         // Update serial numbers state
         setSerialNumbers(prev => ({
@@ -694,7 +702,10 @@ export function InvoiceForm({
                       <td className="p-2">
                         <Select
                           value={item?.productId || ''}
-                          onValueChange={(value) => handleProductSelect(index, value)}
+                          onValueChange={(value) => {
+                            handleProductSelect(index, value);
+                            setActiveRowIndex(index);
+                          }}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select product" />
@@ -796,8 +807,8 @@ export function InvoiceForm({
                         </Button>
                       </td>
                     </tr>
-                    {/* Serial Numbers Row (if product requires serial numbers) */}
-                    {product?.hasSerialNumber && (
+                    {/* Serial Numbers Row (if product requires serial numbers and this row is active) */}
+                    {product?.hasSerialNumber && activeRowIndex === index && (
                       <tr>
                         <td colSpan={9} className="p-3 bg-blue-50 border-t-2 border-blue-200">
                           <div className="space-y-3">
@@ -878,7 +889,10 @@ export function InvoiceForm({
                       <Label className="text-sm font-medium">Product/Service</Label>
                       <Select
                         value={item?.productId || ''}
-                        onValueChange={(value) => handleProductSelect(index, value)}
+                        onValueChange={(value) => {
+                          handleProductSelect(index, value);
+                          setActiveRowIndex(index);
+                        }}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select product" />
@@ -974,8 +988,8 @@ export function InvoiceForm({
                       </div>
                     </div>
 
-                    {/* Serial Numbers Section (if product requires serial numbers) */}
-                    {product?.hasSerialNumber && (
+                    {/* Serial Numbers Section (if product requires serial numbers and this row is active) */}
+                    {product?.hasSerialNumber && activeRowIndex === index && (
                       <div className="space-y-3 pt-3 border-t-2 border-blue-200 bg-blue-50 -mx-6 px-6 pb-4 mt-4">
                         <Label className="text-sm font-semibold text-blue-900">
                           Serial Numbers for {product.productName} ({quantity} required)
@@ -1023,7 +1037,10 @@ export function InvoiceForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() => append({ productId: '' } as any)}
+            onClick={() => {
+              append({ productId: '' } as any);
+              setActiveRowIndex(fields.length);
+            }}
             className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />

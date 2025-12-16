@@ -147,9 +147,19 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
     alignment: 'center',
   });
 
+  // Build left remarks column (small text), align vertically with signature
+  const remarksText = customization?.footer?.remarksText ?? 'Remarks: This is a computer-generated document.';
+  const leftColumn = {
+    width: '*',
+    stack: [
+      { text: remarksText, fontSize: 8, italics: false, margin: [0, 6, 0, 0] }
+    ],
+    alignment: 'left'
+  };
+
   return {
     columns: [
-      { width: '*', text: '' },
+      leftColumn,
       {
         width: 200,
         stack: signatureContent,
