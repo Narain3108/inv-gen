@@ -64,11 +64,12 @@ function ClientsContent() {
     try {
       // Clients are global in backend
       // Sanitize data to match backend expectations
-      const clientData = {
+      const clientData: any = {
         ...data,
         companyId: selectedCompany.id, // Add companyId from context
-        billingAddress: data.billingAddress || undefined,
-        shippingAddress: data.shippingAddress || undefined,
+        // Company address is used as billing address
+        billingAddress: data.address || undefined,
+        // Do NOT include shippingAddress from client form (shipping handled via invoices)
         bankDetails: data.bankDetails ? Object.fromEntries(
           Object.entries(data.bankDetails).filter(([, v]) => v != null)
         ) as any : undefined,
@@ -86,6 +87,8 @@ function ClientsContent() {
         toast.success('Client updated successfully');
       } else {
         // Create new client using API
+        // Initialize empty shippingAddresses array for newly created clients
+        clientData.shippingAddresses = [];
         await clientsApi.create(clientData);
         toast.success('Client created successfully');
       }

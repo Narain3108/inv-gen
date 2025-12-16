@@ -18,12 +18,33 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
   const billingLabel = customization?.addresses?.billingLabel || 'BILLING ADDRESS';
   const shippingLabel = customization?.addresses?.shippingLabel || 'SHIPPING ADDRESS';
 
-  // Use shipping address from document if available, otherwise fallback to client's shipping address, then client's main address
-  const shippingAddress = document?.shippingAddress || client.shippingAddress || client.address;
+  // If the document explicitly sets `shippingAddress` to null, treat that as an
+  // explicit opt-out: do not include a shipping address in the PDF. Otherwise,
+  // prefer document.shippingAddress when provided, then fall back to client's
+  // saved shippingAddress or main address.
+  let shippingAddress: any = undefined;
+  if (document && Object.prototype.hasOwnProperty.call(document, 'shippingAddress')) {
+    if (document.shippingAddress === null) {
+      // explicit opt-out: leave shippingAddress undefined and the builder
+      // will skip rendering the shipping block (handled below via showShipping)
+      shippingAddress = undefined;
+    } else if (document.shippingAddress) {
+      shippingAddress = document.shippingAddress;
+    } else {
+      // property exists but undefined-ish: fall back to client addresses
+      shippingAddress = client.shippingAddress || client.address;
+    }
+  } else {
+    shippingAddress = client.shippingAddress || client.address;
+  }
   const billingAddress = client.billingAddress || client.address;
 
   // Layout: billing on left, flexible spacer, shipping on right (right-aligned)
   const columns: any[] = [];
+
+  // If document explicitly opted out (shippingAddress === null), we should
+  // avoid rendering shipping-related UI/spacing as well.
+  const documentOptedOutShipping = document && Object.prototype.hasOwnProperty.call(document, 'shippingAddress') && document.shippingAddress === null;
 
   if (showBilling) {
     columns.push({
@@ -50,11 +71,11 @@ export const buildAddressSection = (client: Client, customization?: InvoiceCusto
   }
 
   // Flexible spacer to push shipping block to the right-most edge
-  if (showBilling && showShipping) {
+  if (showBilling && showShipping && !documentOptedOutShipping) {
     columns.push({ width: '*', text: '' });
   }
 
-  if (showShipping) {
+  if (showShipping && !documentOptedOutShipping) {
     columns.push({
       width: '45%',
       stack: [

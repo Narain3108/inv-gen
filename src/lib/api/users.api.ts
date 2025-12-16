@@ -10,7 +10,11 @@ export const usersApi = {
     return apiClient.get<User>(`/users/${id}`);
   },
   getBatch: async (ids: string[]): Promise<User[]> => {
-    return apiClient.post<User[]>('/users/batch', { ids });
+    // Some backends don't expose a POST /users/batch endpoint. Fall back
+    // to individual GETs so callers can still resolve creator names.
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    const results = await Promise.all(uniqueIds.map(id => apiClient.get<User>(`/users/${id}`)));
+    return results;
   },
   // Get all users (optionally backend supports filtering via query params)
   getAll: async (params?: Record<string, any>): Promise<User[]> => {

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { INDIAN_STATES } from '@/lib/constants';
@@ -34,7 +35,6 @@ interface ClientFormProps {
 export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
-  const [sameBillingAddress, setSameBillingAddress] = useState(true);
 
   const {
     register,
@@ -101,21 +101,18 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
   const handleFormSubmit = async (data: ClientFormData) => {
     console.log('Form submitted with data:', data);
     console.log('Form errors:', errors);
-    console.log('Same billing address:', sameBillingAddress);
     
     setIsLoading(true);
     try {
-      // If billing address is same as shipping, copy it; otherwise make it undefined
-      if (sameBillingAddress) {
-        data.billingAddress = data.address;
-      } else {
-        // Only include billing address if user unchecked the box
-        // If still same, remove it to avoid validation
-        if (!data.billingAddress || Object.keys(data.billingAddress).length === 0) {
-          data.billingAddress = undefined;
-        }
-      }
+      // Company address acts as the billing address. Always copy primary address
+      data.billingAddress = data.address;
       
+      // Ensure backend gets an empty shippingAddresses array for new clients
+      if (!client) {
+        // @ts-ignore - shippingAddresses may not be defined in the form type
+        data.shippingAddresses = [];
+      }
+
       await onSubmit(data);
       toast.success(client ? 'Client updated successfully' : 'Client created successfully');
     } catch (error) {
@@ -151,8 +148,16 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
         </div>
       )}
       
-      {/* Basic Information */}
-      <Card>
+      <Tabs defaultValue="basic">
+        <TabsList>
+          <TabsTrigger value="basic">Basic</TabsTrigger>
+          <TabsTrigger value="contact">Contact</TabsTrigger>
+          <TabsTrigger value="address">Address</TabsTrigger>
+          <TabsTrigger value="bank">Bank</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="basic">
+          <Card>
         <CardHeader>
           <CardTitle>Client Information</CardTitle>
           <CardDescription>Enter the client's basic details</CardDescription>
@@ -216,10 +221,11 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             )}
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
 
-      {/* Contact Information */}
-      <Card>
+        <TabsContent value="contact">
+          <Card>
         <CardHeader>
           <CardTitle>Contact Information</CardTitle>
           <CardDescription>Client contact details</CardDescription>
@@ -265,15 +271,16 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             )}
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
 
-      {/* Shipping Address */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Shipping Address</CardTitle>
-          <CardDescription>Where should we ship the goods/invoice?</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <TabsContent value="address">
+          <Card>
+            <CardHeader>
+              <CardTitle>Address</CardTitle>
+              <CardDescription>Primary address for the client</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
           {/* Street */}
           <div className="space-y-2">
             <Label htmlFor="address.street">Street Address *</Label>
@@ -338,11 +345,12 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               <p className="text-sm text-red-500">{errors.address.pincode.message}</p>
             )}
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Bank Details (Optional) */}
-      <Card>
+        <TabsContent value="bank">
+          <Card>
         <CardHeader>
           <CardTitle>Bank Details (Optional)</CardTitle>
           <CardDescription>Client's bank account information for payments</CardDescription>
@@ -418,96 +426,11 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             </div>
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
 
-      {/* Billing Address */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Billing Address</CardTitle>
-          <CardDescription>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="sameBillingAddress"
-                checked={sameBillingAddress}
-                onChange={(e) => setSameBillingAddress(e.target.checked)}
-                className="rounded"
-              />
-              <label htmlFor="sameBillingAddress" className="text-sm cursor-pointer">
-                Same as shipping address
-              </label>
-            </div>
-          </CardDescription>
-        </CardHeader>
-        {!sameBillingAddress && (
-          <CardContent className="space-y-4">
-            {/* Billing Street */}
-            <div className="space-y-2">
-              <Label htmlFor="billingAddress.street">Street Address *</Label>
-              <Textarea
-                id="billingAddress.street"
-                {...register('billingAddress.street')}
-                placeholder="Building, Street, Area"
-                rows={2}
-              />
-              {errors.billingAddress?.street && (
-                <p className="text-sm text-red-500">{errors.billingAddress.street.message}</p>
-              )}
-            </div>
-
-            {/* Billing City and State */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="billingAddress.city">City *</Label>
-                <Input
-                  id="billingAddress.city"
-                  {...register('billingAddress.city')}
-                  placeholder="City"
-                />
-                {errors.billingAddress?.city && (
-                  <p className="text-sm text-red-500">{errors.billingAddress.city.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="billingAddress.state">State *</Label>
-                <Select
-                  value={watch('billingAddress.state') || ''}
-                  onValueChange={(value) => setValue('billingAddress.state', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INDIAN_STATES.map((state) => (
-                      <SelectItem key={state.code} value={state.value}>
-                        {state.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.billingAddress?.state && (
-                  <p className="text-sm text-red-500">{errors.billingAddress.state.message}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Billing Pincode */}
-            <div className="space-y-2">
-              <Label htmlFor="billingAddress.pincode">Pincode *</Label>
-              <Input
-                id="billingAddress.pincode"
-                {...register('billingAddress.pincode')}
-                placeholder="400001"
-                maxLength={6}
-              />
-              {errors.billingAddress?.pincode && (
-                <p className="text-sm text-red-500">{errors.billingAddress.pincode.message}</p>
-              )}
-            </div>
-          </CardContent>
-        )}
-      </Card>
+        
+      </Tabs>
 
       {/* Form Actions */}
       <div className="flex justify-end gap-4">
