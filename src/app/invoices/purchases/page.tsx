@@ -7,7 +7,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { purchasesApi, PurchaseBill } from '@/lib/api/purchases.api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, Calendar, Package, Pencil, Trash2 } from 'lucide-react';
+import { Plus, FileText, Calendar, Package, Pencil, Trash2, Eye, Download } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DashboardLayout } from '@/components/layout';
@@ -226,6 +226,62 @@ export default function PurchaseHistoryPage() {
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Notes</p>
                     <p className="p-3 bg-muted/20 rounded text-sm">{selectedBill.notes}</p>
+                  </div>
+                )}
+
+                {/* Attachment Section */}
+                {selectedBill.attachmentUrl && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Attached Document</p>
+                    <div className="p-3 bg-muted/20 rounded flex items-start gap-4">
+                      {(
+                        selectedBill.attachmentUrl.includes('.pdf') || selectedBill.attachmentUrl.includes('resource_type/raw')
+                      ) ? (
+                        <div className="h-16 w-16 rounded-lg bg-red-100 flex items-center justify-center">
+                          <FileText className="h-8 w-8 text-red-600" />
+                        </div>
+                      ) : (
+                        <div className="h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
+                          <img src={selectedBill.attachmentUrl} alt="attachment" className="h-full w-full object-cover" />
+                        </div>
+                      )}
+
+                      <div className="flex-1">
+                        <p className="font-medium text-sm truncate">{selectedBill.attachmentUrl.split('/').slice(-1)[0]}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Uploaded document</p>
+
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(selectedBill.attachmentUrl, '_blank')}
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = selectedBill.attachmentUrl as string;
+                              link.download = '';
+                              link.target = '_blank';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

@@ -23,6 +23,8 @@ import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
 import { purchasesApi, PurchaseBill } from '@/lib/api/purchases.api';
 import { productsApi } from '@/lib/api/products.api';
 import { categoriesApi } from '@/lib/api/categories.api';
+import SerialManager from '@/components/shared/SerialManager';
+import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
@@ -31,15 +33,15 @@ const purchaseItemSchema = z.object({
   productName: z.string().min(1, "Product name is required"),
   productId: z.string().optional(), // Optional because it might be a new product
   hsn: z.string().optional(),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
   unit: z.string().min(1, "Unit is required"),
-  unitPrice: z.number().min(0, "Price must be non-negative"),
-  gstRate: z.number().min(0),
-  cessRate: z.number().min(0).optional(),
-  amount: z.number().optional(),
+  unitPrice: z.coerce.number().min(0, "Price must be non-negative"),
+  gstRate: z.coerce.number().min(0),
+  cessRate: z.coerce.number().min(0).optional(),
+  amount: z.coerce.number().optional(),
   hasSerialNumber: z.boolean(),
   serialNumbers: z.array(z.string()).optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   itemCode: z.string().nullable().optional(),
 }).strict();
@@ -50,8 +52,12 @@ const purchaseFormSchema = z.object({
   billNumber: z.string().min(1, "Bill number is required"),
   vendorName: z.string().optional(),
   items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
-  totalAmount: z.number().optional(),
+  totalAmount: z.preprocess((val) => {
+    if (val === '' || val === null || val === undefined) return undefined;
+    return Number(val);
+  }, z.number().optional()),
   notes: z.string().optional(),
+  attachmentUrl: z.string().optional(),
 });
 
 type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
@@ -66,10 +72,15 @@ interface PurchaseFormProps {
 
 export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purchaseId }: PurchaseFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(
+    (initialData as any)?.attachmentUrl
+  );
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [openComboboxes, setOpenComboboxes] = useState<Record<number, boolean>>({});
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+  // Serial modal index for purchase items
+  const [purchaseSerialModalIndex, setPurchaseSerialModalIndex] = useState<number | null>(null);
 
   // Load products and categories for autocomplete
   useEffect(() => {
@@ -97,7 +108,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
     watch,
     reset,
     formState: { errors },
-  } = useForm<PurchaseFormData>({
+  } = useForm({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       billDate: new Date().toISOString().split('T')[0],
@@ -130,6 +141,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
       reset({
         ...initialData,
         billDate: initialData.billDate ? initialData.billDate.split('T')[0] : new Date().toISOString().split('T')[0],
+        attachmentUrl: (initialData as any)?.attachmentUrl,
         // Ensure items are mapped correctly if needed, though PurchaseBill and PurchaseFormData are similar
         items: initialData.items.map(item => ({
           ...item,
@@ -220,6 +232,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
     setOpenComboboxes(prev => ({ ...prev, [index]: false }));
   };
 
+  // Purchase serial modal now delegated to shared SerialManager component
+
   const onSubmit = async (data: PurchaseFormData) => {
     // Validate serial numbers
     for (let i = 0; i < data.items.length; i++) {
@@ -258,8 +272,10 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         companyId,
         items: itemsWithAmounts,
         totalAmount: itemsWithAmounts.reduce((s, it) => s + Number(it.amount || 0), 0),
+        attachmentUrl: attachmentUrl, // Include client-uploaded attachment URL
       } as any;
 
+      // Save purchase with the attachment URL (no server-side upload needed)
       if (purchaseId) {
         await purchasesApi.update(purchaseId, payload);
         toast.success("Purchase bill updated successfully");
@@ -267,6 +283,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         await purchasesApi.create(payload);
         toast.success("Purchase bill created successfully");
       }
+
       onSuccess();
     } catch (error) {
       console.error("Error saving purchase:", error);
@@ -279,11 +296,27 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   const onError = (errs: any) => {
     try {
       console.error('Validation errors', errs);
-      console.error('Validation errors (stringified):', JSON.stringify(errs, Object.getOwnPropertyNames(errs), 2));
+      console.error('Validation errors (stringified):', JSON.stringify(errs, null, 2));
+
+      // Try to surface the first error path and message
+      const firstKey = Object.keys(errs)[0];
+      if (firstKey) {
+        const firstErr = (errs as any)[firstKey];
+        let msg = '';
+        if (firstErr && firstErr.message) msg = firstErr.message;
+        // If nested items array, try to extract
+        if (firstKey === 'items' && Array.isArray(firstErr) && firstErr.length > 0) {
+          const nested = firstErr.find((e: any) => e && Object.keys(e).length > 0) || firstErr[0];
+          msg = JSON.stringify(nested, null, 2);
+        }
+        toast.error(msg || 'Please fix validation errors in the form');
+      } else {
+        toast.error('Please fix validation errors in the form');
+      }
     } catch (e) {
       console.error('Failed to stringify validation errors', e, errs);
+      toast.error('Please fix validation errors in the form');
     }
-    toast.error('Please fix validation errors in the form');
   };
 
   return (
@@ -307,8 +340,60 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
             <Label htmlFor="vendorName">Vendor Name</Label>
             <Input id="vendorName" {...register('vendorName')} placeholder="Supplier Name" />
           </div>
+          <div className="sm:col-span-2 md:col-span-3">
+            <DocumentUpload
+              label="Purchase Bill Attachment (Optional)"
+              currentDocumentUrl={attachmentUrl}
+              onDocumentUploaded={(url) => {
+                setAttachmentUrl(url);
+                setValue('attachmentUrl', url);
+              }}
+              onDocumentRemoved={() => {
+                setAttachmentUrl(undefined);
+                setValue('attachmentUrl', undefined);
+              }}
+              folder="purchase-bills"
+              maxSize={3}
+            />
+          </div>
         </CardContent>
       </Card>
+
+      <SerialManager
+        open={purchaseSerialModalIndex !== null}
+        onClose={() => setPurchaseSerialModalIndex(null)}
+        productId={purchaseSerialModalIndex !== null ? watchItems?.[purchaseSerialModalIndex]?.productId : undefined}
+        initialSelected={purchaseSerialModalIndex !== null ? watchItems?.[purchaseSerialModalIndex]?.serialNumbers || [] : []}
+        quantity={purchaseSerialModalIndex !== null ? Number(watchItems?.[purchaseSerialModalIndex]?.quantity) || 0 : 0}
+        fetchFromDb={false}
+        claimFromDb={false}
+        onSave={async (selected) => {
+          if (purchaseSerialModalIndex === null) return;
+          const idx = purchaseSerialModalIndex;
+          // Save into the form field
+          setValue(`items.${idx}.serialNumbers`, selected as any);
+
+          // If productId exists, append these serials to product pool in DB
+          const productId = watchItems?.[idx]?.productId;
+          if (productId) {
+            try {
+              const prod = await productsApi.getById(productId);
+              const existingPool = prod.serialNumbers || [];
+              const toAdd = selected.filter((s) => !existingPool.includes(s));
+              if (toAdd.length > 0) {
+                const updated = [...existingPool, ...toAdd];
+                await productsApi.update(productId, { serialNumbers: updated });
+              }
+              toast.success('Serials saved to product and purchase item');
+            } catch (err) {
+              console.error('Failed to update product serials', err);
+              toast.warning('Saved to purchase item but failed to update product serial pool');
+            }
+          } else {
+            toast.success('Serials saved to purchase item');
+          }
+        }}
+      />
 
       <Card>
         <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
@@ -355,22 +440,21 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                     <Trash2 className="h-4 w-4" />
                 </Button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 pr-10 sm:pr-6 min-w-0 items-center">
-                  {/* Product Name - Full width on mobile, 4 cols on desktop */}
-                  <div className="sm:col-span-3 space-y-1.5 min-w-0">
-                    <Label className="text-xs text-muted-foreground">Product Name *</Label>
-                    <div className="relative">
+                <div className="space-y-3">
+                  {/* First Row: Product Name + Serial Button */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-3 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Product Name *</Label>
                       <Input
                         list={`products-list-${index}`}
                         placeholder="Product name"
                         className="h-9 w-full"
-                          {...register(`items.${index}.productName`)}
-                          onChange={(e) => {
-                            // Update RHF value and trigger product auto-fill
-                            setValue(`items.${index}.productName`, e.target.value);
-                            handleProductSelect(index, e.target.value);
-                          }}
-                          onFocus={() => setActiveRowIndex(index)}
+                        {...register(`items.${index}.productName`)}
+                        onChange={(e) => {
+                          setValue(`items.${index}.productName`, e.target.value);
+                          handleProductSelect(index, e.target.value);
+                        }}
+                        onFocus={() => setActiveRowIndex(index)}
                       />
                       <datalist id={`products-list-${index}`}>
                         {products.map((product) => (
@@ -378,85 +462,93 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                         ))}
                       </datalist>
                     </div>
+                    {hasSerial && (
+                      <div className="space-y-1.5 flex flex-col justify-end">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setPurchaseSerialModalIndex(index)} className="h-9">
+                          Serials ({(item.serialNumbers || []).filter(Boolean).length})
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* HSN - 1 col (reduced to allow wider Price) */}
-                  <div className="col-span-1 sm:col-span-1 space-y-1.5 min-w-0">
-                    <Label className="text-xs text-muted-foreground">HSN</Label>
-                    <Input className="h-9 w-full" {...register(`items.${index}.hsn`)} placeholder="HSN" />
-                  </div>
+                  {/* Second Row: HSN, Qty, Unit, Price, GST, Amount */}
+                  <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3">
+                    {/* HSN */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">HSN</Label>
+                      <Input className="h-9 w-full" {...register(`items.${index}.hsn`)} placeholder="HSN" />
+                    </div>
 
-                  {/* Qty & Unit - Grouped for better mobile layout */}
-                    <div className="col-span-1 sm:col-span-2 grid grid-cols-3 gap-2 min-w-0">
-                      <div className="space-y-1.5 min-w-0 col-span-1">
-                        <Label className="text-xs text-muted-foreground">Qty</Label>
-                        <Input 
-                            type="number" 
-                            min="1" 
+                    {/* Quantity */}
+                    <div className="sm:col-span-1 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Qty</Label>
+                      <Input 
+                        type="number" 
+                        min="1" 
                         className="h-9 w-full"
-                            {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
-                        />
+                        {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
+                      />
                     </div>
-                      <div className="space-y-1.5 min-w-0 col-span-2">
-                        <Label className="text-xs text-muted-foreground">Unit</Label>
-                        <Select 
-                          value={item.unit || "Nos"} 
-                          onValueChange={(val) => setValue(`items.${index}.unit`, val)}
-                        >
-                        <SelectTrigger className="h-9 w-full sm:min-w-0">
-                            <SelectValue />
-                          </SelectTrigger>
-                            <SelectContent>
-                                {PRODUCT_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                  </div>
 
-                  {/* Price - expanded to 2 cols for more input width */}
-                  <div className="col-span-1 sm:col-span-2 space-y-1.5 min-w-0 sm:pl-4">
-                    <Label className="text-xs text-muted-foreground">Price</Label>
-                    <Input 
+                    {/* Unit */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Unit</Label>
+                      <Select 
+                        value={item.unit || "Nos"} 
+                        onValueChange={(val) => setValue(`items.${index}.unit`, val)}
+                      >
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRODUCT_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Price */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Price</Label>
+                      <Input 
                         type="number" 
                         step="0.01" 
                         className="h-9 w-full"
                         {...register(`items.${index}.unitPrice`, { valueAsNumber: true })} 
-                    />
-                  </div>
+                      />
+                    </div>
 
-                  {/* Price (smaller) */}
-                  
-                  {/* GST - moved left on sm */}
-                  <div className="col-span-1 sm:col-start-9 sm:col-span-2 space-y-1.5 min-w-0">
-                    <Label className="text-xs text-muted-foreground">GST %</Label>
-                    <Select
-                      value={item.gstRate !== undefined ? String(item.gstRate) : "18"}
-                      onValueChange={(val) => setValue(`items.${index}.gstRate`, Number(val))}
-                    >
-                      <SelectTrigger className="h-9 w-full sm:min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GST_RATES.map(r => <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    {/* GST */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">GST %</Label>
+                      <Select
+                        value={item.gstRate !== undefined ? String(item.gstRate) : "18"}
+                        onValueChange={(val) => setValue(`items.${index}.gstRate`, Number(val))}
+                      >
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GST_RATES.map(r => <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  {/* Amount - larger and pinned to right on sm */}
-                  <div className="col-span-1 sm:col-start-11 sm:col-span-2 space-y-1.5 min-w-0 sm:pl-4">
-                    <Label className="text-xs text-muted-foreground">Amount</Label>
-                    <div className="h-9 flex items-center justify-end px-3 rounded-md border bg-muted/50 text-sm font-medium w-full">
-                      {(() => {
-                        const qty = Number(item?.quantity) || 0;
-                        const price = Number(item?.unitPrice) || 0;
-                        const gst = Number(item?.gstRate) || 0;
-                        const cess = Number(item?.cessRate) || 0;
-                        const base = qty * price;
-                        const tax = base * (gst / 100);
-                        const cessAmount = base * (cess / 100);
-                        const amt = base + tax + cessAmount;
-                        return formatCurrency(amt);
-                      })()}
+                    {/* Amount */}
+                    <div className="col-span-2 sm:col-span-3 space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Amount</Label>
+                      <div className="h-9 flex items-center justify-end px-3 rounded-md border bg-muted/50 text-sm font-medium w-full">
+                        {(() => {
+                          const qty = Number(item?.quantity) || 0;
+                          const price = Number(item?.unitPrice) || 0;
+                          const gst = Number(item?.gstRate) || 0;
+                          const cess = Number(item?.cessRate) || 0;
+                          const base = qty * price;
+                          const tax = base * (gst / 100);
+                          const cessAmount = base * (cess / 100);
+                          const amt = base + tax + cessAmount;
+                          return formatCurrency(amt);
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -531,7 +623,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 max-w-4xl mx-auto">
             <div className="flex justify-between w-full sm:w-auto sm:block text-right">
                 <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(totalAmount || 0)}</p>
+                <p className="text-2xl font-bold text-primary">{formatCurrency(Number(totalAmount) || 0)}</p>
             </div>
             <div className="grid grid-cols-2 sm:flex w-full sm:w-auto gap-3">
               <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancel</Button>

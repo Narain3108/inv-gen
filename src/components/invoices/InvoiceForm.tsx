@@ -26,6 +26,16 @@ import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
+import SerialManager from '@/components/shared/SerialManager';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -58,6 +68,9 @@ export function InvoiceForm({
   const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
   const [localProducts, setLocalProducts] = useState<Product[]>(products);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+
+  // Modal index to open serial manager for a row
+  const [serialModalIndex, setSerialModalIndex] = useState<number | null>(null);
 
   // Sync localProducts with props.products
   // We use localProducts to allow optimistic updates and refreshing of product data (e.g. serial numbers)
@@ -178,86 +191,21 @@ export function InvoiceForm({
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
       
-      // Auto-fill serial numbers if available
-      if (product.hasSerialNumber && product.serialNumbers && product.serialNumbers.length > 0) {
-        const currentQty = Number(watchItems[index]?.quantity) || 1;
-        const availableSerials = product.serialNumbers.slice(0, currentQty);
-        
-        console.log(`[Invoice] Auto-filling serials for ${product.productName}:`, {
-          totalAvailable: product.serialNumbers.length,
-          requestedQty: currentQty,
-          fillingCount: availableSerials.length,
-          serials: availableSerials
-        });
-        
-        // Update serial numbers state
-        setSerialNumbers(prev => ({
-          ...prev,
-          [index]: availableSerials
-        }));
-        
-        if (availableSerials.length < currentQty) {
-          toast.info(`Auto-filled ${availableSerials.length} serial numbers. Please enter the remaining ${currentQty - availableSerials.length}.`);
-        } else {
-          toast.success(`Auto-filled ${availableSerials.length} serial numbers.`);
-        }
-      }
-
-      // Fetch fresh product data to ensure serial numbers are up to date
+      // Fetch fresh product data to ensure serial numbers list is up to date (no auto-fill)
       try {
         const freshProduct = await productsApi.getById(productId);
         if (freshProduct) {
             setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
-            
-            // Re-run auto-fill with fresh data if needed
-            if (freshProduct.hasSerialNumber && freshProduct.serialNumbers && freshProduct.serialNumbers.length > 0) {
-                const currentQty = Number(watchItems[index]?.quantity) || 1;
-                const currentSerials = serialNumbers[index] || [];
-                
-                // If fresh product has more serials, update
-                if (freshProduct.serialNumbers.length > (product.serialNumbers?.length || 0)) {
-                     const availableSerials = freshProduct.serialNumbers.slice(0, currentQty);
-                     setSerialNumbers(prev => ({
-                        ...prev,
-                        [index]: availableSerials
-                     }));
-                }
-            }
         }
       } catch (error) {
         console.error("Failed to refresh product details", error);
       }
     }
   };
+  
+  const closeSerialModal = () => setSerialModalIndex(null);
 
-  // Watch for quantity changes to update serial numbers auto-fill
-  useEffect(() => {
-    watchItems.forEach((item, index) => {
-      if (item.productId) {
-        const product = localProducts.find(p => p.id === item.productId);
-        if (product?.hasSerialNumber && product.serialNumbers) {
-          const currentQty = Number(item.quantity) || 0;
-          const currentSerials = serialNumbers[index] || [];
-          
-          // Only auto-fill if we have more quantity than serials and haven't manually edited (simple heuristic: check length)
-          // Or better: just ensure we don't lose existing ones, but fill up to available
-          if (currentQty > currentSerials.length) {
-             const needed = currentQty - currentSerials.length;
-             // Find unused serials from product pool that are NOT already in currentSerials
-             const unusedFromPool = product.serialNumbers.filter(s => !currentSerials.includes(s));
-             const toAdd = unusedFromPool.slice(0, needed);
-             
-             if (toAdd.length > 0) {
-               setSerialNumbers(prev => ({
-                 ...prev,
-                 [index]: [...currentSerials, ...toAdd]
-               }));
-             }
-          }
-        }
-      }
-    });
-  }, [watchItems, localProducts]); // Be careful with dependency loop, watchItems changes on every keystroke
+  // No automatic serial auto-fill; user must manage serials via the modal.
 
 
   // Calculate totals
@@ -750,6 +698,17 @@ export function InvoiceForm({
                             })}
                           </SelectContent>
                         </Select>
+                        {/* Manage Serials Button */}
+                            {product?.hasSerialNumber && (
+                          <div className="mt-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                              Manage Serials
+                            </Button>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {(serialNumbers[index] || []).filter(Boolean).length} selected
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="p-2 text-center">
                         {product?.itemCode ? (
@@ -832,50 +791,7 @@ export function InvoiceForm({
                         </Button>
                       </td>
                     </tr>
-                    {/* Serial Numbers Row (if product requires serial numbers and this row is active) */}
-                    {product?.hasSerialNumber && activeRowIndex === index && (
-                      <tr>
-                        <td colSpan={9} className="p-3 bg-blue-50 border-t-2 border-blue-200">
-                          <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-blue-900">
-                              Serial Numbers for {product.productName} ({quantity} required)
-                            </Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                              {Array.from({ length: quantity }, (_, i) => {
-                                const currentSerialNumbers = serialNumbers[index] || [];
-                                return (
-                                  <div key={i} className="space-y-1">
-                                    <Label className="text-xs text-blue-800">Serial #{i + 1}</Label>
-                                    <Input
-                                      type="text"
-                                      placeholder={`SN${String(i + 1).padStart(3, '0')}`}
-                                      value={currentSerialNumbers[i] || ''}
-                                      onChange={(e) => {
-                                        const newSerialNumbers = [...(serialNumbers[index] || Array(quantity).fill(''))];
-                                        newSerialNumbers[i] = e.target.value;
-                                        setSerialNumbers(prev => ({ ...prev, [index]: newSerialNumbers }));
-                                        setSerialNumberErrors(prev => {
-                                          const newErrors = { ...prev };
-                                          delete newErrors[index];
-                                          return newErrors;
-                                        });
-                                      }}
-                                      className="text-sm"
-                                    />
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {serialNumberErrors[index] && (
-                              <p className="text-sm text-red-600 font-medium">{serialNumberErrors[index]}</p>
-                            )}
-                            <p className="text-xs text-blue-700">
-                              Filled: {(serialNumbers[index] || []).filter(sn => sn && sn.trim()).length} / {quantity}
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+                    {/* Serial input moved to modal — no inline inputs here */}
                   </React.Fragment>
                 );
               })}
@@ -937,6 +853,16 @@ export function InvoiceForm({
                           })}
                         </SelectContent>
                       </Select>
+                      {product?.hasSerialNumber && (
+                        <div className="mt-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                            Manage Serials
+                          </Button>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {(serialNumbers[index] || []).filter(Boolean).length} selected
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Quantity and Unit Price Row */}
@@ -1013,46 +939,7 @@ export function InvoiceForm({
                       </div>
                     </div>
 
-                    {/* Serial Numbers Section (if product requires serial numbers and this row is active) */}
-                    {product?.hasSerialNumber && activeRowIndex === index && (
-                      <div className="space-y-3 pt-3 border-t-2 border-blue-200 bg-blue-50 -mx-6 px-6 pb-4 mt-4">
-                        <Label className="text-sm font-semibold text-blue-900">
-                          Serial Numbers for {product.productName} ({quantity} required)
-                        </Label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {Array.from({ length: quantity }, (_, i) => {
-                            const currentSerialNumbers = serialNumbers[index] || [];
-                            return (
-                              <div key={i} className="space-y-1">
-                                <Label className="text-xs text-blue-800">Serial Number #{i + 1}</Label>
-                                <Input
-                                  type="text"
-                                  placeholder={`Enter serial number ${i + 1}`}
-                                  value={currentSerialNumbers[i] || ''}
-                                  onChange={(e) => {
-                                    const newSerialNumbers = [...(serialNumbers[index] || Array(quantity).fill(''))];
-                                    newSerialNumbers[i] = e.target.value;
-                                    setSerialNumbers(prev => ({ ...prev, [index]: newSerialNumbers }));
-                                    setSerialNumberErrors(prev => {
-                                      const newErrors = { ...prev };
-                                      delete newErrors[index];
-                                      return newErrors;
-                                    });
-                                  }}
-                                  className="text-base"
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {serialNumberErrors[index] && (
-                          <p className="text-sm text-red-600 font-medium">{serialNumberErrors[index]}</p>
-                        )}
-                        <p className="text-xs text-blue-700 font-medium">
-                          Filled: {(serialNumbers[index] || []).filter(sn => sn && sn.trim()).length} / {quantity}
-                        </p>
-                      </div>
-                    )}
+                    {/* Serial management via modal only — inline inputs removed */}
                   </CardContent>
                 </Card>
               );
@@ -1119,6 +1006,28 @@ export function InvoiceForm({
       )}
 
       {/* Form Actions */}
+      <SerialManager
+        open={serialModalIndex !== null}
+        onClose={() => setSerialModalIndex(null)}
+        productId={serialModalIndex !== null ? watchItems?.[serialModalIndex]?.productId : undefined}
+        initialSelected={serialModalIndex !== null ? serialNumbers[serialModalIndex] || [] : []}
+        quantity={serialModalIndex !== null ? Number(watchItems?.[serialModalIndex]?.quantity) || 0 : 0}
+        fetchFromDb={true}
+        claimFromDb={true}
+        onSave={async (selected) => {
+          if (serialModalIndex === null) return;
+          setSerialNumbers(prev => ({ ...prev, [serialModalIndex]: selected }));
+          const productId = watchItems?.[serialModalIndex]?.productId;
+          if (productId) {
+            try {
+              const fresh = await productsApi.getById(productId);
+              setLocalProducts(prev => prev.map(p => p.id === fresh.id ? fresh : p));
+            } catch (err) {
+              console.error('Failed to refresh product after claiming serials', err);
+            }
+          }
+        }}
+      />
       <div className="flex justify-end gap-3 pt-3">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} className="hover:scale-105 transition-transform">

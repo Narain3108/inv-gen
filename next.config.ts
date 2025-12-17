@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Produce a fully static exportable site (output -> `out/` via `next export`).
-  output: 'export',
+  // Disabled `output: 'export'` to allow dynamic routes and server-side rendering
+  // (was used for fully static export; removing avoids needing generateStaticParams for dynamic routes)
   reactCompiler: true,
   images: {
     // For static exported sites disable Next/Image optimization so files remain static.

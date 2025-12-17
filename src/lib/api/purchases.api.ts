@@ -32,6 +32,8 @@ export interface PurchaseBill {
   items: PurchaseItem[];
   totalAmount: number;
   notes?: string;
+  attachmentUrl?: string;
+  attachmentPublicId?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -70,6 +72,13 @@ export const purchasesApi = {
    */
   update: async (id: string, data: Partial<PurchaseBill>): Promise<PurchaseBill> => {
     return apiClient.put<PurchaseBill>(`/purchases/${id}`, data);
+  },
+
+  /**
+   * Upload attachment for a purchase (server-side Cloudinary upload)
+   */
+  uploadAttachment: async (id: string, file: File): Promise<PurchaseBill> => {
+    return apiClient.uploadFile<PurchaseBill>(`/purchases/${id}/attachment`, file);
   },
 
   /**

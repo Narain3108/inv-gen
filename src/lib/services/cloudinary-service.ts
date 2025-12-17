@@ -8,6 +8,7 @@
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dvwu6jtfm';
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'logosign';
 const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+const CLOUDINARY_RAW_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`;
 
 // Storage keys for uploaded image cache
 const IMAGE_CACHE_KEY = 'cloudinary_uploaded_images';
@@ -221,6 +222,96 @@ export async function uploadToCloudinary(
     });
   } catch (error) {
     console.error('Error uploading to Cloudinary:', error);
+    throw error;
+  }
+}
+
+/**
+ * Upload document (image or PDF) to Cloudinary with unsigned upload
+ * @param file - Document file to upload (image or PDF)
+ * @param folder - Optional folder path in Cloudinary
+ * @param onProgress - Optional progress callback
+ * @returns Cloudinary upload response with secure URL
+ */
+export async function uploadDocumentToCloudinary(
+  file: File,
+  folder?: string,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<CloudinaryUploadResponse> {
+  try {
+    // Validate file type
+    const isPdf = file.type === 'application/pdf';
+    const isImage = file.type.startsWith('image/');
+    
+    if (!isPdf && !isImage) {
+      throw new Error('Only image or PDF files are allowed');
+    }
+
+    // Validate file size (3MB limit for purchase bills)
+    const maxSize = 3 * 1024 * 1024; // 3MB
+    if (file.size > maxSize) {
+      throw new Error('File size must be less than 3MB');
+    }
+
+    console.log('📤 Uploading document:', file.name, 'Type:', file.type);
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    
+    if (folder) {
+      formData.append('folder', folder);
+    } else {
+      formData.append('folder', 'purchase-bills');
+    }
+
+    // Use appropriate upload URL based on file type
+    const uploadUrl = isPdf ? CLOUDINARY_RAW_UPLOAD_URL : CLOUDINARY_UPLOAD_URL;
+
+    // Upload to Cloudinary with progress tracking
+    const xhr = new XMLHttpRequest();
+
+    return new Promise((resolve, reject) => {
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            onProgress({
+              loaded: e.loaded,
+              total: e.total,
+              percentage: Math.round((e.loaded / e.total) * 100),
+            });
+          }
+        });
+      }
+
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          const response: CloudinaryUploadResponse = JSON.parse(xhr.responseText);
+          console.log('✅ Document uploaded successfully:', file.name);
+          resolve(response);
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload was cancelled'));
+      });
+
+      // Send request
+      xhr.open('POST', uploadUrl);
+      xhr.send(formData);
+    });
+  } catch (error) {
+    console.error('Error uploading document to Cloudinary:', error);
     throw error;
   }
 }
