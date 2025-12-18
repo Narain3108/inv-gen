@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { invoiceFormSchema } from '@/lib/validations';
+import { FieldValidators } from '@/lib/modules/form-handling';
 import { Invoice, Product, Client, Company, InvoiceItem, Address } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -21,6 +22,7 @@ import { Loader2, Plus, Trash2, Calculator, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate, formatClientDropdownLabel } from '@/utils/formatters';
+import { SearchableClientDropdown } from '@/components/shared';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
@@ -49,6 +51,7 @@ interface InvoiceFormProps {
   invoiceCount?: number;
   onSubmit: (data: InvoiceFormData) => Promise<void>;
   onCancel?: () => void;
+  onClientAdded?: (client: Client) => void;
 }
 
 export function InvoiceForm({
@@ -61,6 +64,7 @@ export function InvoiceForm({
   invoiceCount = 0,
   onSubmit,
   onCancel,
+  onClientAdded,
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -96,6 +100,7 @@ export function InvoiceForm({
     setValue,
     watch,
     control,
+    clearErrors,
     formState: { errors },
   } = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema) as any,
@@ -487,28 +492,25 @@ export function InvoiceForm({
             </div>
 
             {/* Client Selection */}
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="clientId">Client *</Label>
-              <Select
-                value={watch('clientId') || ''}
-                onValueChange={(value) => setValue('clientId', value)}
-              >
-                <SelectTrigger className="w-full sm:min-w-[260px]">
-                  <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent className="w-full sm:w-[380px]">
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id} className="text-sm">
-                      <span className="block max-w-[300px] truncate">
-                        {formatClientDropdownLabel(client, { maxLength: 64 })}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.clientId && (
-                <p className="text-sm text-red-500">{errors.clientId.message}</p>
-              )}
+            <div className="col-span-2">
+              <SearchableClientDropdown
+                clients={clients}
+                selectedClientId={watch('clientId') || ''}
+                onClientSelect={(clientId) => setValue('clientId', clientId)}
+                onClientAdded={(newClient) => {
+                  // Set the newly created client as selected
+                  setValue('clientId', newClient.id);
+                  // Clear any validation errors
+                  clearErrors('clientId');
+                  // Call parent callback to refresh clients list
+                  onClientAdded?.(newClient);
+                }}
+                label="Client"
+                required
+                error={errors.clientId?.message}
+                companyId={companyId}
+                placeholder="Search or select client..."
+              />
             </div>
 
             {/* Shipping Address Selection (opt-in) */}

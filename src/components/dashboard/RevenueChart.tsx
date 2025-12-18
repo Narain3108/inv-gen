@@ -9,6 +9,7 @@ import React, { useMemo } from 'react';
 import { Invoice } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { DashboardDataTransformer } from '@/lib/modules/data-transform';
 
 interface RevenueChartProps {
   invoices: Invoice[];
@@ -16,42 +17,30 @@ interface RevenueChartProps {
 
 export function RevenueChart({ invoices }: RevenueChartProps) {
   const monthlyData = useMemo(() => {
-    const data: Record<string, number> = {};
-    const now = new Date();
+    // Use the data transformer to get revenue chart data
+    const revenueData = DashboardDataTransformer.transformToRevenueChart(invoices, 'monthly');
     
-    // Get last 6 months
+    // Get last 6 months and ensure we have data for each
+    const now = new Date();
+    const monthsData: Record<string, number> = {};
+    
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-      data[key] = 0;
+      monthsData[key] = 0;
     }
     
-    // Calculate revenue per month
-    invoices.forEach(invoice => {
-      if (invoice.date) {
-        let date: Date;
-        if (invoice.date instanceof Date) {
-          date = invoice.date;
-        } else if (typeof invoice.date === 'string') {
-          date = new Date(invoice.date);
-        } else if (typeof invoice.date === 'object' && (invoice.date as any)._seconds) {
-          date = new Date((invoice.date as any)._seconds * 1000);
-        } else if (typeof invoice.date === 'object' && (invoice.date as any).toDate) {
-          date = (invoice.date as any).toDate();
-        } else {
-          return; // Skip invalid dates
-        }
-        
-        if (isNaN(date.getTime())) return; // Skip invalid dates
-        
-        const key = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-        if (key in data) {
-          data[key] += invoice.totalAmount || 0;
-        }
+    // Fill in actual revenue data
+    revenueData.forEach(({ date, value, label }) => {
+      const [year, month] = date.split('-');
+      const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+      const key = dateObj.toLocaleString('default', { month: 'short', year: 'numeric' });
+      if (key in monthsData) {
+        monthsData[key] = value;
       }
     });
     
-    return Object.entries(data).map(([month, revenue]) => ({ month, revenue }));
+    return Object.entries(monthsData).map(([month, revenue]) => ({ month, revenue }));
   }, [invoices]);
 
   const maxRevenue = Math.max(...monthlyData.map(d => d.revenue), 1);

@@ -58,7 +58,7 @@ export function QuotationList({
       if (canViewCreators && !q.createdByUsername && q.createdBy) idsToFetch.add(q.createdBy);
     });
     if (idsToFetch.size === 0) return;
-    
+
     (async () => {
       try {
         const users = await usersApi.getBatch(Array.from(idsToFetch));
@@ -72,7 +72,7 @@ export function QuotationList({
         console.error('Failed to fetch creator names', e);
       }
     })();
-    
+
     return () => { mounted = false; };
   }, [quotations, user]);
 
@@ -250,7 +250,7 @@ export function QuotationList({
                           {canConvert && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => onConvertToInvoice(quotation)}
                                 className="text-blue-600 font-medium"
                               >
@@ -260,33 +260,30 @@ export function QuotationList({
                             </>
                           )}
                           {user?.role !== ROLES.EMPLOYEE && (
-                          <>
-                          {quotation.status === 'pending' && !isExpired && (
                             <>
+                              {quotation.status === 'pending' && !isExpired && (
+                                <>
+                                  <DropdownMenuSeparator />
+
+                                  <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'rejected')}>
+                                    <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                                    Mark as Rejected
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'accepted')}>
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                                Mark as Accepted
+                              <DropdownMenuItem onClick={() => onEdit(quotation)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'rejected')}>
-                                <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                                Mark as Rejected
+                              <DropdownMenuItem
+                                onClick={() => onDelete(quotation)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
                               </DropdownMenuItem>
                             </>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onEdit(quotation)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onDelete(quotation)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                          </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -363,33 +360,33 @@ export function QuotationList({
                         Download PDF
                       </DropdownMenuItem>
                       {user?.role !== 'employee' && (
-                      <>
-                      {quotation.status === 'pending' && !isExpired && (
                         <>
+                          {quotation.status === 'pending' && !isExpired && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'accepted')}>
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                Accept
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'rejected')}>
+                                <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                                Reject
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'accepted')}>
-                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                            Accept
+                          <DropdownMenuItem onClick={() => onEdit(quotation)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onUpdateStatus(quotation, 'rejected')}>
-                            <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                            Reject
+                          <DropdownMenuItem
+                            onClick={() => onDelete(quotation)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
                           </DropdownMenuItem>
                         </>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onEdit(quotation)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onDelete(quotation)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                      </>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>

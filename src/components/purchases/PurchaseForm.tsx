@@ -27,6 +27,10 @@ import SerialManager from '@/components/shared/SerialManager';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ProductForm } from '@/components/products/ProductForm';
+import { SearchableProductDropdown } from '@/components/shared/SearchableProductDropdown';
+import { useAppData } from '@/contexts/AppDataContext';
 
 // Schema Definition
 const purchaseItemSchema = z.object({
@@ -77,10 +81,13 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   );
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [openComboboxes, setOpenComboboxes] = useState<Record<number, boolean>>({});
+
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   // Serial modal index for purchase items
   const [purchaseSerialModalIndex, setPurchaseSerialModalIndex] = useState<number | null>(null);
+
+  // App data context for real-time updates
+  const { refreshProducts } = useAppData();
 
   // Load products and categories for autocomplete
   useEffect(() => {
@@ -206,31 +213,30 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
     });
   }, [watchItems, setValue]);
 
-  const handleProductSelect = (index: number, productName: string) => {
-    const existingProduct = products.find(p => p.productName.toLowerCase() === productName.toLowerCase());
-    
+  const handleProductSelect = (index: number, productName: string, product?: Product) => {
     setValue(`items.${index}.productName`, productName);
     
-    if (existingProduct) {
-      setValue(`items.${index}.productId`, existingProduct.id);
-      setValue(`items.${index}.hsn`, existingProduct.hsn);
-      setValue(`items.${index}.unit`, existingProduct.unit);
-      setValue(`items.${index}.unitPrice`, existingProduct.price); // Default to selling price, user can change
-      setValue(`items.${index}.gstRate`, existingProduct.gstRate);
-      setValue(`items.${index}.cessRate`, existingProduct.cessRate || 0);
-      setValue(`items.${index}.hasSerialNumber`, existingProduct.hasSerialNumber || false);
-      setValue(`items.${index}.categoryId`, existingProduct.categoryId ?? undefined);
-      setValue(`items.${index}.itemCode`, existingProduct.itemCode ?? undefined);
-      toast.success(`Auto-filled details for ${existingProduct.productName}`);
+    if (product) {
+      setValue(`items.${index}.productId`, product.id);
+      setValue(`items.${index}.hsn`, product.hsn);
+      setValue(`items.${index}.unit`, product.unit);
+      setValue(`items.${index}.unitPrice`, product.price); // Default to selling price, user can change
+      setValue(`items.${index}.gstRate`, product.gstRate);
+      setValue(`items.${index}.cessRate`, product.cessRate || 0);
+      setValue(`items.${index}.hasSerialNumber`, product.hasSerialNumber || false);
+      setValue(`items.${index}.categoryId`, product.categoryId ?? undefined);
+      setValue(`items.${index}.itemCode`, product.itemCode ?? undefined);
+      toast.success(`Auto-filled details for ${product.productName}`);
     } else {
-      // Reset ID if new product
+      // Reset ID if new product name typed
       setValue(`items.${index}.productId`, undefined);
-      // Try to find category match for auto-fill
-      // (Simplified logic here, could be expanded)
+      setValue(`items.${index}.hsn`, undefined);
+      setValue(`items.${index}.categoryId`, undefined);
+      setValue(`items.${index}.itemCode`, undefined);
     }
-    
-    setOpenComboboxes(prev => ({ ...prev, [index]: false }));
   };
+
+
 
   // Purchase serial modal now delegated to shared SerialManager component
 
@@ -284,6 +290,9 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         toast.success("Purchase bill created successfully");
       }
 
+      // Set flag for purchase list to refresh
+      localStorage.setItem('purchase-created', 'true');
+      
       onSuccess();
     } catch (error) {
       console.error("Error saving purchase:", error);
@@ -296,25 +305,35 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   const onError = (errs: any) => {
     try {
       console.error('Validation errors', errs);
-      console.error('Validation errors (stringified):', JSON.stringify(errs, null, 2));
+      
+      // Safely extract error messages without JSON.stringify to avoid circular structure
+      const extractErrorMessage = (errorObj: any): string => {
+        if (typeof errorObj === 'string') return errorObj;
+        if (errorObj?.message) return errorObj.message;
+        if (Array.isArray(errorObj)) {
+          const firstError = errorObj.find(e => e && typeof e === 'object');
+          if (firstError) return extractErrorMessage(firstError);
+        }
+        if (typeof errorObj === 'object' && errorObj !== null) {
+          const keys = Object.keys(errorObj);
+          if (keys.length > 0) {
+            return extractErrorMessage(errorObj[keys[0]]);
+          }
+        }
+        return 'Validation error';
+      };
 
       // Try to surface the first error path and message
       const firstKey = Object.keys(errs)[0];
       if (firstKey) {
         const firstErr = (errs as any)[firstKey];
-        let msg = '';
-        if (firstErr && firstErr.message) msg = firstErr.message;
-        // If nested items array, try to extract
-        if (firstKey === 'items' && Array.isArray(firstErr) && firstErr.length > 0) {
-          const nested = firstErr.find((e: any) => e && Object.keys(e).length > 0) || firstErr[0];
-          msg = JSON.stringify(nested, null, 2);
-        }
+        const msg = extractErrorMessage(firstErr);
         toast.error(msg || 'Please fix validation errors in the form');
       } else {
         toast.error('Please fix validation errors in the form');
       }
     } catch (e) {
-      console.error('Failed to stringify validation errors', e, errs);
+      console.error('Failed to process validation errors', e);
       toast.error('Please fix validation errors in the form');
     }
   };
@@ -444,23 +463,23 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                   {/* First Row: Product Name + Serial Button */}
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div className="sm:col-span-3 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Product Name *</Label>
-                      <Input
-                        list={`products-list-${index}`}
-                        placeholder="Product name"
-                        className="h-9 w-full"
-                        {...register(`items.${index}.productName`)}
-                        onChange={(e) => {
-                          setValue(`items.${index}.productName`, e.target.value);
-                          handleProductSelect(index, e.target.value);
+                      <SearchableProductDropdown
+                        products={products}
+                        selectedProductName={item.productName}
+                        onProductSelect={(productName, product) => {
+                          handleProductSelect(index, productName, product);
+                          setActiveRowIndex(index);
                         }}
-                        onFocus={() => setActiveRowIndex(index)}
+                        onProductAdded={(newProduct) => {
+                          // Update local products list
+                          setProducts(prev => [...prev, newProduct]);
+                        }}
+                        placeholder="Search or type product name..."
+                        label="Product Name"
+                        required
+                        companyId={companyId}
+                        className="w-full"
                       />
-                      <datalist id={`products-list-${index}`}>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.productName} />
-                        ))}
-                      </datalist>
                     </div>
                     {hasSerial && (
                       <div className="space-y-1.5 flex flex-col justify-end">
@@ -634,6 +653,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
             </div>
         </div>
       </div>
+
+
     </form>
   );
 }

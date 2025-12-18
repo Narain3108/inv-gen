@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { clientFormSchema } from '@/lib/validations';
+import { FieldValidators } from '@/lib/modules/form-handling';
 import { Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,29 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
 
+  // Form default values
+  const defaultValues = client ? {
+    clientName: client.clientName,
+    gstin: client.gstin || '',
+    pan: client.pan || '',
+    address: client.address,
+    contact: {
+      ...client.contact,
+      website: client.contact.website || '',
+    },
+    billingAddress: client.billingAddress || undefined,
+  } : {
+    gstin: '',
+    pan: '',
+    address: {
+      country: 'India',
+    },
+    contact: {
+      website: '',
+    },
+    billingAddress: undefined,
+  } as any;
+
   const {
     register,
     handleSubmit,
@@ -44,27 +68,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
     formState: { errors },
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientFormSchema) as any,
-    defaultValues: client ? {
-      clientName: client.clientName,
-      gstin: client.gstin || '',
-      pan: client.pan || '',
-      address: client.address,
-      contact: {
-        ...client.contact,
-        website: client.contact.website || '',
-      },
-      billingAddress: client.billingAddress || undefined,
-    } : {
-      gstin: '',
-      pan: '',
-      address: {
-        country: 'India',
-      },
-      contact: {
-        website: '',
-      },
-      billingAddress: undefined, // Don't initialize billing address
-    } as any,
+    defaultValues,
   });
 
   const gstin = watch('gstin');
@@ -172,6 +176,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
                 {...register('gstin')}
                 placeholder="22AAAAA0000A1Z5"
                 maxLength={15}
+                autoComplete="off"
               />
               <Button
                 type="button"
@@ -201,6 +206,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               id="clientName"
               {...register('clientName')}
               placeholder="Enter client name"
+              autoComplete="off"
             />
             {errors.clientName && (
               <p className="text-sm text-red-500">{errors.clientName.message}</p>
@@ -238,6 +244,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               id="contact.phone"
               {...register('contact.phone')}
               placeholder="+91 98765 43210"
+              autoComplete="off"
             />
             {errors.contact?.phone && (
               <p className="text-sm text-red-500">{errors.contact.phone.message}</p>
@@ -252,6 +259,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               type="email"
               {...register('contact.email')}
               placeholder="client@example.com"
+              autoComplete="off"
             />
             {errors.contact?.email && (
               <p className="text-sm text-red-500">{errors.contact.email.message}</p>

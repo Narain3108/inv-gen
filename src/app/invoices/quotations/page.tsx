@@ -166,7 +166,7 @@ function QuotationsContent() {
       setProducts(productsData);
 
       // Load clients using API
-      const clientsData = await clientsApi.getAll();
+      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
       setClients(clientsData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -175,6 +175,16 @@ function QuotationsContent() {
       setLoading(false);
     }
   }, [selectedCompany]);
+
+  const refreshClients = async () => {
+    if (!selectedCompany) return;
+    try {
+      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error refreshing clients:', error);
+    }
+  };
 
   // Check for companies on mount only
   // Load data when company is selected
@@ -569,6 +579,12 @@ function QuotationsContent() {
             onCancel={() => {
               setIsDialogOpen(false);
               setEditingQuotation(undefined);
+            }}
+            onClientAdded={(newClient) => {
+              // Add the new client to the local list immediately
+              setClients(prev => [...prev, newClient]);
+              // Also refresh from server to ensure consistency
+              refreshClients();
             }}
           />
         </DialogContent>

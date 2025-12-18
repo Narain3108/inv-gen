@@ -5,8 +5,10 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Client } from '@/types';
+// Note: Modular utilities available for flat data structures
+// import { SearchEngine, PaginationHandler } from '@/lib/modules/table-utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +22,6 @@ import {
 import { Edit, MoreVertical, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
-import { useEffect } from 'react';
 
 interface ClientListProps {
   clients: Client[];
@@ -34,6 +35,9 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
   const { user } = useAuth();
   const canViewCreators = user?.role === 'super_admin' || user?.role === 'admin';
   const [creatorNames, setCreatorNames] = useState<Record<string, string>>({});
+
+  // Note: Using manual search for nested properties. 
+  // For flat objects, SearchEngine and PaginationHandler from table-utils can be used directly.
 
   useEffect(() => {
     let mounted = true;
@@ -60,16 +64,23 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
     return () => { mounted = false; };
   }, [clients, user]);
 
-  const filteredClients = clients.filter((client) => {
-    const matchesSearch =
-      client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (client.gstin?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      client.contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.contact.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.address.city.toLowerCase().includes(searchTerm.toLowerCase());
-
-    return matchesSearch;
-  });
+  // Use search engine for filtering
+  const filteredClients = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return clients;
+    }
+    
+    // Manual search for nested properties since SearchEngine doesn't support dot notation
+    const term = searchTerm.toLowerCase();
+    return clients.filter(client => 
+      client.clientName?.toLowerCase().includes(term) ||
+      client.gstin?.toLowerCase().includes(term) ||
+      client.contact?.email?.toLowerCase().includes(term) ||
+      client.contact?.phone?.toLowerCase().includes(term) ||
+      client.address?.city?.toLowerCase().includes(term) ||
+      client.address?.state?.toLowerCase().includes(term)
+    );
+  }, [searchTerm, clients]);
 
   if (clients.length === 0) {
     return (

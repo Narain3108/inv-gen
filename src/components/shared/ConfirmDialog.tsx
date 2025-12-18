@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DialogStateManager } from '@/lib/modules/dialog-management';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   onConfirm: () => void;
   variant?: 'default' | 'destructive';
+  dialogId?: string; // Optional ID for dialog management
 }
 
 export default function ConfirmDialog({
@@ -35,7 +37,16 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   onConfirm,
   variant = 'default',
+  dialogId,
 }: ConfirmDialogProps) {
+  // Create dialog config for centralized management if ID is provided
+  const dialogConfig = dialogId ? DialogStateManager.createConfirmDialog(
+    dialogId,
+    title,
+    description || '',
+    onConfirm,
+    () => onOpenChange(false)
+  ) : null;
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg dark:bg-background dark:border-primary/30">

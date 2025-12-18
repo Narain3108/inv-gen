@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, Trash2, Calculator, FileText, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatClientDropdownLabel } from '@/utils/formatters';
+import { SearchableClientDropdown } from '@/components/shared';
 import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ interface QuotationFormProps {
   quotationCount?: number;
   onSubmit: (data: QuotationFormData) => Promise<void>;
   onCancel?: () => void;
+  onClientAdded?: (client: Client) => void;
 }
 
 export function QuotationForm({
@@ -48,6 +50,7 @@ export function QuotationForm({
   quotationCount = 0,
   onSubmit,
   onCancel,
+  onClientAdded,
 }: QuotationFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -77,6 +80,7 @@ export function QuotationForm({
     setValue,
     watch,
     control,
+    clearErrors,
     formState: { errors },
   } = useForm<QuotationFormData>({
     resolver: zodResolver(quotationFormSchema) as any,
@@ -354,28 +358,25 @@ export function QuotationForm({
             </div>
 
             {/* Client Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="clientId">Client *</Label>
-              <Select
-                value={watch('clientId') || ''}
-                onValueChange={(value) => setValue('clientId', value)}
-              >
-                <SelectTrigger className="min-w-[260px] sm:min-w-[320px] md:min-w-[360px]">
-                  <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent className="w-[320px] sm:w-[380px]">
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id} className="text-sm">
-                      <span className="block max-w-[300px] truncate">
-                        {formatClientDropdownLabel(client, { maxLength: 64 })}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.clientId && (
-                <p className="text-sm text-red-500">{errors.clientId.message}</p>
-              )}
+            <div>
+              <SearchableClientDropdown
+                clients={clients}
+                selectedClientId={watch('clientId') || ''}
+                onClientSelect={(clientId) => setValue('clientId', clientId)}
+                onClientAdded={(newClient) => {
+                  // Set the newly created client as selected
+                  setValue('clientId', newClient.id);
+                  // Clear any validation errors
+                  clearErrors('clientId');
+                  // Call parent callback to refresh clients list
+                  onClientAdded?.(newClient);
+                }}
+                label="Client"
+                required
+                error={errors.clientId?.message}
+                companyId={companyId}
+                placeholder="Search or select client..."
+              />
             </div>
 
             {/* Shipping Address Selection (opt-in) */}

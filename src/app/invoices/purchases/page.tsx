@@ -39,23 +39,51 @@ export default function PurchaseHistoryPage() {
   const [selectedBill, setSelectedBill] = useState<PurchaseBill | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadPurchases = async () => {
-      if (selectedCompany) {
-        setIsLoading(true);
-        try {
-          const data = await purchasesApi.getAll({ company_id: selectedCompany.id });
-          setPurchases(data);
-        } catch (error) {
-          console.error("Failed to load purchases", error);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
+  const loadPurchases = async () => {
+    if (selectedCompany) {
+      setIsLoading(true);
+      try {
+        const data = await purchasesApi.getAll({ company_id: selectedCompany.id });
+        setPurchases(data);
+      } catch (error) {
+        console.error("Failed to load purchases", error);
+      } finally {
         setIsLoading(false);
       }
-    };
+    } else {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadPurchases();
+  }, [selectedCompany]);
+
+  // Listen for storage events to refresh when returning from new purchase page
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'purchase-created') {
+        loadPurchases();
+        localStorage.removeItem('purchase-created');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check on focus in case we're in the same tab
+    const handleFocus = () => {
+      if (localStorage.getItem('purchase-created')) {
+        loadPurchases();
+        localStorage.removeItem('purchase-created');
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [selectedCompany]);
 
   if (!user) return null;

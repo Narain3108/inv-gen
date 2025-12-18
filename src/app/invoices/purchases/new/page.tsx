@@ -34,7 +34,9 @@ export default function NewPurchasePage() {
   }
 
   const handleSuccess = async () => {
+    // Refresh products to update stock quantities
     await refreshProducts();
+    // Navigate back to purchases list
     router.push('/invoices/purchases');
   };
 
