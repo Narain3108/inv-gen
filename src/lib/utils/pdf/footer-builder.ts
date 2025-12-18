@@ -27,16 +27,18 @@ export const buildBankDetails = (company: Company, customization?: InvoiceCustom
       columns: [
         {
           width: '100%',
+          // build stack dynamically to include only present fields
           stack: [
-            { text: 'Our Bank Details:', fontSize: 8, bold: true, margin: [0, 0, 0, 2], alignment: 'center' },
-            { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'center' },
-            { text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'center' },
-            { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'center' },
-            {
-              text: company.bankDetails.upiId ? `UPI: ${company.bankDetails.upiId}` : '',
-              fontSize: 8,
-              alignment: 'center'
-            },
+            ((): any => {
+              const stack: any[] = [];
+              stack.push({ text: 'Our Bank Details:', fontSize: 8, bold: true, margin: [0, 0, 0, 2], alignment: 'center' });
+              if (company.bankDetails.bankName) stack.push({ text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'center' });
+              if (company.bankDetails.accountHolderName) stack.push({ text: `Account Holder: ${company.bankDetails.accountHolderName}`, fontSize: 8, alignment: 'center' });
+              if (company.bankDetails.accountNumber) stack.push({ text: `Account No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'center' });
+              if (company.bankDetails.ifscCode) stack.push({ text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'center' });
+              if (company.bankDetails.upiId) stack.push({ text: `UPI: ${company.bankDetails.upiId}`, fontSize: 8, alignment: 'center' });
+              return stack;
+            })(),
           ],
           alignment: 'center'
         },
@@ -202,9 +204,11 @@ export const buildHorizontalFooter = (company: Company, customization?: InvoiceC
         layout: 'noBorders',
         margin: [0, 0, 0, 4]
       },
-      { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'right' },
-      { text: `A/c No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'right' },
-      { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'right' },
+      // dynamically include only present fields (right-aligned)
+      ...(company.bankDetails.bankName ? [{ text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'right' }] : []),
+      ...(company.bankDetails.accountHolderName ? [{ text: `Account Holder: ${company.bankDetails.accountHolderName}`, fontSize: 8, alignment: 'right' }] : []),
+      ...(company.bankDetails.accountNumber ? [{ text: `A/c No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'right' }] : []),
+      ...(company.bankDetails.ifscCode ? [{ text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'right' }] : []),
       ...(company.bankDetails.upiId ? [{ text: `UPI: ${company.bankDetails.upiId}`, fontSize: 8, alignment: 'right' }] : []),
     ],
     margin: [10, 0, 0, 0]
