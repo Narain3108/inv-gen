@@ -112,6 +112,15 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
   // Build signature content - image if available, otherwise text
   const signatureContent: any[] = [];
 
+  // Add 'For: <Company Name>' above signature image (as per design)
+  signatureContent.push({
+    text: `For: ${company.name}`,
+    fontSize: 9,
+    bold: true,
+    alignment: 'center',
+    margin: [0, 0, 0, 6],
+  });
+
   // Add signature image if available
   if (company.signatureUrl) {
     signatureContent.push({
@@ -131,20 +140,12 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
     });
   }
 
-  // Add signature label
+  // Add signature label below signature
   signatureContent.push({
     text: signatureLabel,
     fontSize: 9,
     alignment: 'center',
     margin: [0, 0, 0, 2],
-  });
-
-  // Add company name
-  signatureContent.push({
-    text: company.name,
-    fontSize: 9,
-    bold: true,
-    alignment: 'center',
   });
 
   // Build left remarks column (small text), align vertically with signature
@@ -179,43 +180,39 @@ export const buildHorizontalFooter = (company: Company, customization?: InvoiceC
   const showNotes = customization?.footer?.showThankYouNote !== false;
   const notesText = customization?.footer?.thankYouText;
 
-  const columns = [];
+  // Ensure a two-column layout: Terms (left) and Bank Details (right).
+  // If either is missing, keep an empty placeholder so bank header doesn't span full width.
+  const leftColumn = (showTerms && termsText) ? {
+    width: '50%',
+    stack: [
+      { text: 'Terms & Conditions:', fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
+      { text: termsText, fontSize: 8 },
+    ],
+    margin: [0, 0, 10, 0]
+  } : { width: '50%', text: '' };
 
-  // Bank Details Column
-  if (showBankDetails && company.bankDetails) {
-    columns.push({
-      width: '*',
-      stack: [
-        // Title with light background to highlight bank subheading
-        {
-          table: {
-            widths: ['*'],
-            body: [[{ text: 'Bank Details', fontSize: 9, bold: true, fillColor: '#f3f4f6', margin: [4, 2, 4, 2] }]]
-          },
-          layout: 'noBorders',
-          margin: [0, 0, 0, 4]
+  const rightColumn = (showBankDetails && company.bankDetails) ? {
+    width: '50%',
+    stack: [
+      {
+        table: {
+          widths: ['*'],
+          body: [[{ text: 'Bank Details', fontSize: 9, bold: true, fillColor: '#f3f4f6', margin: [4, 2, 4, 2] }]]
         },
-        { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8 },
-        { text: `A/c No: ${company.bankDetails.accountNumber}`, fontSize: 8 },
-        { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8 },
-        ...(company.bankDetails.upiId ? [{ text: `UPI: ${company.bankDetails.upiId}`, fontSize: 8 }] : []),
-      ]
-    });
-  }
+        layout: 'noBorders',
+        margin: [0, 0, 0, 4]
+      },
+      { text: `Bank: ${company.bankDetails.bankName}`, fontSize: 8, alignment: 'right' },
+      { text: `A/c No: ${company.bankDetails.accountNumber}`, fontSize: 8, alignment: 'right' },
+      { text: `IFSC: ${company.bankDetails.ifscCode}`, fontSize: 8, alignment: 'right' },
+      ...(company.bankDetails.upiId ? [{ text: `UPI: ${company.bankDetails.upiId}`, fontSize: 8, alignment: 'right' }] : []),
+    ],
+    margin: [10, 0, 0, 0]
+  } : { width: '50%', text: '' };
 
-  // Terms Column
-  if (showTerms && termsText) {
-    columns.push({
-      width: '*',
-      stack: [
-        { text: 'Terms & Conditions:', fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
-        { text: termsText, fontSize: 8 },
-      ],
-      margin: [10, 0, 0, 0] // Left margin to separate
-    });
-  }
+  const columns = [leftColumn, rightColumn];
 
-  // Notes Column
+  // Notes Column (optional) - append as third column if present
   if (showNotes && notesText) {
     columns.push({
       width: '*',

@@ -50,7 +50,7 @@ export const buildHeader = (
       {
         width: '45%',
         stack: [
-          { text: company.name || '', fontSize: 12, bold: true, alignment: 'center' },
+          { text: company.name || '', fontSize: 12, bold: true, alignment: 'left' },
           company.address?.street ? { text: company.address.street, fontSize: 9, alignment: 'left' } : {},
           (company.address?.city || company.address?.state || company.address?.pincode)
             ? { text: `${company.address?.city || ''}${company.address?.city ? ', ' : ''}${company.address?.state || ''}${company.address?.pincode ? ' - ' + company.address?.pincode : ''}`, fontSize: 9, alignment: 'left' }
@@ -66,12 +66,12 @@ export const buildHeader = (
       {
         width: '35%',
         stack: [
-          { text: title, fontSize: 16, bold: true, alignment: 'center', margin: [0, 5, 0, 2] },
-          { text: `${type === 'invoice' ? 'Invoice No' : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'center' },
-          (document as any).referenceNumber ? { text: `Ref: ${(document as any).referenceNumber}`, fontSize: 9, alignment: 'center' } : {},
-          { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'center' },
+          { text: title, fontSize: 16, bold: true, alignment: 'right', margin: [0, 5, 0, 2] },
+          { text: `${type === 'invoice' ? 'Invoice No' : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'right' },
+          (document as any).referenceNumber ? { text: `Ref: ${(document as any).referenceNumber}`, fontSize: 9, alignment: 'right' } : {},
+          { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'right' },
         ],
-        alignment: 'center'
+        alignment: 'right'
       }
     ],
     margin: [0, 0, 0, 10]

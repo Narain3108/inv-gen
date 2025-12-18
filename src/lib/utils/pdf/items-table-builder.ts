@@ -9,19 +9,19 @@ import { safeCurrency } from './helpers';
  * Build fixed items table section (8 rows per page logic handled by generator)
  */
 export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any => {
+  // Updated columns: remove S.No column and merge GST% into GST Amt column
   const headers = [
-    { text: 'S.No', style: 'tableHeader', alignment: 'center' },
     { text: 'Description', style: 'tableHeader', alignment: 'center' },
     { text: 'HSN/SAC', style: 'tableHeader', alignment: 'center' },
     { text: 'Qty/Unit', style: 'tableHeader', alignment: 'center' },
     { text: 'Rate', style: 'tableHeader', alignment: 'center' },
-    { text: 'GST %', style: 'tableHeader', alignment: 'center' },
     { text: 'Taxable Amt', style: 'tableHeader', alignment: 'center' },
-    { text: 'GST Amt', style: 'tableHeader', alignment: 'center' },
+    { text: 'GST Amt (GST%)', style: 'tableHeader', alignment: 'center' },
     { text: 'Amount', style: 'tableHeader', alignment: 'center' },
   ];
 
-  const widths = [25, '*', 45, 45, 50, 35, 55, 50, 55];
+  // Widths adjusted: description gets more space (uses flexible '*')
+  const widths = ['*', 45, 45, 55, 65, 70, 60];
 
   const body = [
     headers,
@@ -33,9 +33,12 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
       // GST percentage (if available on item)
       const gstPercent = item.gstRate ?? item.gst_rate ?? null;
 
+      // Format GST amount with percentage in parentheses (e.g., 79.00(18%))
+      const gstAmountStr = safeCurrency(gstAmount);
+      const gstDisplay = gstPercent ? `${gstAmountStr}(${gstPercent}%)` : gstAmountStr;
+
       return [
-        { text: (startIndex + index + 1).toString(), fontSize: 8, alignment: 'center' },
-        { 
+        {
           text: [
             // Product name (bold)
             { text: item.description || (item.productName || ''), fontSize: 8, bold: true },
@@ -49,9 +52,8 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
         { text: item.hsn || '-', fontSize: 8, alignment: 'center' },
         { text: `${item.quantity || 0} ${item.unit || ''}`, fontSize: 8, alignment: 'center' },
         { text: safeCurrency(item.unitPrice), fontSize: 8, alignment: 'center' },
-        { text: gstPercent ? `${gstPercent}%` : '-', fontSize: 8, alignment: 'center' },
         { text: safeCurrency(taxable), fontSize: 8, alignment: 'center' },
-        { text: safeCurrency(gstAmount), fontSize: 8, alignment: 'center' },
+        { text: gstDisplay, fontSize: 8, alignment: 'center' },
         { text: safeCurrency(item.lineTotal), fontSize: 8, alignment: 'center' },
       ];
     })
@@ -63,9 +65,7 @@ export const buildFixedItemsTable = (items: any[], startIndex: number = 0): any 
   if (remainingRows > 0) {
     for (let i = 0; i < remainingRows; i++) {
       body.push([
-        { text: '', fontSize: 8, alignment: 'center' },
         { text: '', fontSize: 8, alignment: 'left' },
-        { text: '', fontSize: 8, alignment: 'center' },
         { text: '', fontSize: 8, alignment: 'center' },
         { text: '', fontSize: 8, alignment: 'center' },
         { text: '', fontSize: 8, alignment: 'center' },
