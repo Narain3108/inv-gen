@@ -26,7 +26,7 @@ export function ImageUpload({
   onImageRemoved,
   folder = 'logos',
   accept = 'image/png,image/jpeg,image/jpg',
-  maxSize = 5,
+  maxSize = 3,
   className = '',
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
@@ -39,6 +39,12 @@ export function ImageUpload({
   const handleFileSelect = (file: File) => {
     // Reset error
     setError(null);
+
+    // Reject video files explicitly
+    if (file.type.startsWith('video/')) {
+      setError('Video files are not allowed');
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {

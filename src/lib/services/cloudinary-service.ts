@@ -127,10 +127,10 @@ export async function uploadToCloudinary(
       throw new Error('Only image files are allowed');
     }
 
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Validate file size (3MB limit)
+    const maxSize = 3 * 1024 * 1024; // 3MB
     if (file.size > maxSize) {
-      throw new Error('File size must be less than 5MB');
+      throw new Error('File size must be less than 3MB');
     }
 
     // Check for existing upload (duplicate detection)

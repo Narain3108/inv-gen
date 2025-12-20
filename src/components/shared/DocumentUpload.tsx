@@ -26,7 +26,7 @@ export function DocumentUpload({
   onDocumentUploaded,
   onDocumentRemoved,
   folder = 'purchase-bills',
-  accept = 'image/png,image/jpeg,image/jpg,application/pdf',
+  accept = 'image/png,image/jpeg,image/jpg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   maxSize = 3,
   className = '',
 }: DocumentUploadProps) {
@@ -42,12 +42,19 @@ export function DocumentUpload({
     // Reset error
     setError(null);
 
+    // Reject video files explicitly
+    if (file.type.startsWith('video/')) {
+      setError('Video files are not allowed');
+      return;
+    }
+
     // Validate file type
     const isPdf = file.type === 'application/pdf';
     const isImage = file.type.startsWith('image/');
-    
-    if (!isPdf && !isImage) {
-      setError('Please select an image or PDF file');
+    const isDoc = file.type === 'application/msword' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (!isPdf && !isImage && !isDoc) {
+      setError('Please select an image, PDF, or Word document (DOC/DOCX)');
       return;
     }
 
@@ -69,7 +76,7 @@ export function DocumentUpload({
       };
       reader.readAsDataURL(file);
     } else {
-      // For PDFs, we'll show the uploaded URL after upload
+      // For PDFs and Word documents, we'll show the uploaded URL after upload
       setPreviewUrl(null);
     }
 
