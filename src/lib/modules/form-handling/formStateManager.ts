@@ -46,14 +46,14 @@ export function useFormState<T extends Record<string, any>>(config: FormConfig<T
     if (!validationSchema) return null;
 
     try {
-      const fieldSchema = validationSchema.shape[fieldName as string];
+      const fieldSchema = (validationSchema as any).shape?.[fieldName as string];
       if (fieldSchema) {
         fieldSchema.parse(value);
       }
       return null;
     } catch (error) {
       if (error instanceof ZodError) {
-        return error.errors[0]?.message || 'Invalid value';
+        return (error as any).issues?.[0]?.message || 'Invalid value';
       }
       return 'Validation error';
     }
@@ -69,8 +69,8 @@ export function useFormState<T extends Record<string, any>>(config: FormConfig<T
     } catch (error) {
       if (error instanceof ZodError) {
         const errors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          const path = err.path.join('.');
+        (error as any).issues.forEach((err: any) => {
+          const path = (err.path || []).join('.');
           errors[path] = err.message;
         });
         return errors;

@@ -68,6 +68,26 @@ export const buildHeader = (
         stack: [
           { text: title, fontSize: 16, bold: true, alignment: 'right', margin: [0, 5, 0, 2] },
           { text: `${type === 'invoice' ? 'Invoice No' : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'right' },
+          // PO Number and PO Date (only for invoices, only if present)
+          ...(type === 'invoice' && (document as Invoice).poNumber ? [
+            { text: `PO No: ${(document as Invoice).poNumber}${(document as Invoice).poDate ? ' | Date: ' + formatDate((document as Invoice).poDate!) : ''}`, fontSize: 9, alignment: 'right' }
+          ] : []),
+          // E-way Number (only for invoices). If empty, render a fixed-width NBSP placeholder
+          ...(type === 'invoice' ? [
+            (() => {
+              const raw = (document as Invoice).ewayNumber;
+              const display = raw && String(raw).trim() ? String(raw).trim() : '\u00A0\u00A0\u00A0\u00A0\u00A0';
+              // Render E-way in a two-column block constrained to a small fixed width on the right side
+              // This prevents the E-way label from appearing flush to the extreme page edge when empty.
+              return {
+                columns: [
+                  { width: '*', text: '' }, // flexible spacer
+                  { width: 120, text: `E-way No: ${display}`, fontSize: 9, alignment: 'right' }
+                ],
+                columnGap: 6
+              };
+            })()
+          ] : []),
           (document as any).referenceNumber ? { text: `Ref: ${(document as any).referenceNumber}`, fontSize: 9, alignment: 'right' } : {},
           { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'right' },
         ],

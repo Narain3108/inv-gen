@@ -4,19 +4,10 @@ export { TableSortManager } from './tableSortManager';
 export { PaginationHandler } from './paginationHandler';
 export { SearchEngine } from './searchEngine';
 
-export type {
-  FilterConfig,
-  FilterState,
-  SortDirection,
-  SortConfig,
-  MultiSortConfig,
-  PaginationConfig,
-  PaginationResult,
-  PaginationInfo,
-  SearchConfig,
-  SearchResult,
-  SearchMatch
-} from './tableFilterEngine';
+export type { FilterConfig, FilterState } from './tableFilterEngine';
+export type { SortDirection, SortConfig, MultiSortConfig } from './tableSortManager';
+export type { PaginationConfig, PaginationResult, PaginationInfo } from './paginationHandler';
+export type { SearchConfig, SearchResult, SearchMatch } from './searchEngine';
 
 // Main exports - use the classes directly for static methods
 // Example usage:

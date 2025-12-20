@@ -125,8 +125,8 @@ export class FormValidationEngine {
     } catch (error) {
       if (error instanceof ZodError) {
         const errors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          const path = err.path.join('.');
+        (error as any).issues.forEach((err: any) => {
+          const path = (err.path || []).join('.');
           errors[path] = err.message;
         });
         return errors;
@@ -258,3 +258,8 @@ export const commonValidationRules = {
     message: `Must be no more than ${max}`,
   }),
 };
+
+// Compatibility type exports expected by module index
+export type ValidationSchema = ZodSchema<any>;
+export type ValidationError = Record<string, string>;
+export type ValidatorFunction = (value: any) => boolean | Promise<boolean>;

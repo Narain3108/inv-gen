@@ -7,9 +7,12 @@ export type {
   DialogState,
   DialogEventType,
   DialogEvent,
+} from './dialogStateManager';
+
+export type {
   QueuedModal,
   ModalQueueConfig
-} from './dialogStateManager';
+} from './modalQueue';
 
 // Main exports - use the classes directly for static methods
 // Example usage:

@@ -581,10 +581,17 @@ function QuotationsContent() {
               setEditingQuotation(undefined);
             }}
             onClientAdded={(newClient) => {
-              // Add the new client to the local list immediately
-              setClients(prev => [...prev, newClient]);
-              // Also refresh from server to ensure consistency
-              refreshClients();
+              // Optimistically add client AFTER the form has already selected it internally
+              // Use setTimeout to ensure form's setValue runs first
+              setTimeout(() => {
+                setClients(prev => {
+                  // Avoid duplicates
+                  if (prev.find(c => c.id === newClient.id)) return prev;
+                  return [...prev, newClient];
+                });
+                // Also refresh from server in background
+                refreshClients();
+              }, 0);
             }}
           />
         </DialogContent>

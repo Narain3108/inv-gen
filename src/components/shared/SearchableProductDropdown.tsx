@@ -127,6 +127,11 @@ export function SearchableProductDropdown({
     try {
       const productData = {
         ...data,
+        description: data.description ?? undefined,
+        itemCode: data.itemCode ?? undefined,
+        cessRate: data.cessRate ?? undefined,
+        stock: data.stock ?? undefined,
+        hasSerialNumber: data.hasSerialNumber ?? undefined,
         companyId,
       };
       const newProduct = await productsApi.create(productData);

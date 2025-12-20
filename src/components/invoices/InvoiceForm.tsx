@@ -107,6 +107,14 @@ export function InvoiceForm({
     defaultValues: invoice ? {
       invoiceNumber: invoice.invoiceNumber,
       referenceNumber: invoice.referenceNumber || '',
+      poNumber: invoice.poNumber || '',
+      poDate: (() => {
+        if (!invoice.poDate) return '';
+        if (typeof invoice.poDate === 'string') return invoice.poDate.split('T')[0];
+        const dateObj = invoice.poDate instanceof Date ? invoice.poDate : new Date(invoice.poDate);
+        return isNaN(dateObj.getTime()) ? '' : dateObj.toISOString().split('T')[0];
+      })(),
+      ewayNumber: invoice.ewayNumber || '',
       clientId: invoice.clientId,
       date: (() => {
         if (!invoice.date) return new Date().toISOString().split('T')[0];
@@ -422,6 +430,9 @@ export function InvoiceForm({
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
         referenceNumber: data.referenceNumber,
+        poNumber: data.poNumber,
+        poDate: data.poDate,
+        ewayNumber: data.ewayNumber,
         clientId: data.clientId,
         date: data.date,
         companyId,
@@ -478,13 +489,52 @@ export function InvoiceForm({
               )}
             </div>
 
+            {/* PO Number */}
+            <div className="space-y-2">
+              <Label htmlFor="poNumber">PO Number</Label>
+              <Input
+                id="poNumber"
+                {...register('poNumber')}
+                placeholder="Optional"
+              />
+              <p className="text-xs text-muted-foreground">
+                Purchase Order Number (if any)
+              </p>
+            </div>
+
+            {/* PO Date */}
+            <div className="space-y-2">
+              <Label htmlFor="poDate">PO Date</Label>
+              <Input
+                id="poDate"
+                type="date"
+                {...register('poDate')}
+              />
+              <p className="text-xs text-muted-foreground">
+                Purchase Order Date (if any)
+              </p>
+            </div>
+
+            {/* E-way Number */}
+            <div className="space-y-2">
+              <Label htmlFor="ewayNumber">E-way Number</Label>
+              <Input
+                id="ewayNumber"
+                {...register('ewayNumber')}
+                placeholder="Optional"
+              />
+              <p className="text-xs text-muted-foreground">
+                E-way bill number (if any)
+              </p>
+            </div>
+
             {/* Reference Number */}
             <div className="space-y-2">
               <Label htmlFor="referenceNumber">Reference Number</Label>
               <Input
                 id="referenceNumber"
                 {...register('referenceNumber')}
-                placeholder="Optional (e.g. PO Number)"
+                placeholder="Optional"
               />
               <p className="text-xs text-muted-foreground">
                 Optional reference

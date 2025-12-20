@@ -30,35 +30,35 @@ export const invoicesApi = {
    * Get all invoices with optional filters
    */
   getAll: async (filters?: InvoiceFilters): Promise<Invoice[]> => {
-    return apiClient.get<Invoice[]>('/invoices', filters);
+    return apiClient.get<Invoice[]>('/invoices', filters, true);
   },
 
   /**
    * Get invoices by company ID
    */
   getByCompanyId: async (companyId: string): Promise<Invoice[]> => {
-    return apiClient.get<Invoice[]>('/invoices', { company_id: companyId });
+    return apiClient.get<Invoice[]>('/invoices', { company_id: companyId }, true);
   },
 
   /**
    * Get a single invoice by ID
    */
   getById: async (id: string): Promise<Invoice> => {
-    return apiClient.get<Invoice>(`/invoices/${id}`);
+    return apiClient.get<Invoice>(`/invoices/${id}`, undefined, true);
   },
 
   /**
    * Create a new invoice
    */
   create: async (data: Partial<Invoice>): Promise<Invoice> => {
-    return apiClient.post<Invoice>('/invoices', data);
+    return apiClient.post<Invoice>('/invoices', data, true);
   },
 
   /**
    * Update an existing invoice
    */
   update: async (id: string, data: Partial<Invoice>): Promise<Invoice> => {
-    return apiClient.put<Invoice>(`/invoices/${id}`, data);
+    return apiClient.put<Invoice>(`/invoices/${id}`, data, true);
   },
 
   /**
@@ -66,7 +66,7 @@ export const invoicesApi = {
    */
   partialUpdate: async (id: string, data: Partial<Invoice>, companyId?: string): Promise<Invoice> => {
     const url = companyId ? `/invoices/${id}?companyId=${companyId}` : `/invoices/${id}`;
-    return apiClient.patch<Invoice>(url, data);
+    return apiClient.patch<Invoice>(url, data, true);
   },
 
   /**

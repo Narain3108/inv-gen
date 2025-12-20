@@ -254,6 +254,9 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
   referenceNumber?: string;
+  poNumber?: string;
+  poDate?: string | Date;
+  ewayNumber?: string;
   companyId: string;
   clientId: string;
   createdBy?: string;

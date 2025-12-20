@@ -212,6 +212,9 @@ export const invoiceItemSchema = z.object({
 export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().optional(),
   referenceNumber: z.string().optional(),
+  poNumber: z.string().max(100, 'PO Number must be less than 100 characters').optional().or(z.literal('')).nullish(),
+  poDate: z.string().optional().or(z.literal('')).nullish(),
+  ewayNumber: z.string().max(50, 'E-way Number must be less than 50 characters').optional().or(z.literal('')).nullish(),
   clientId: z.string().min(1, 'Client is required'),
   date: z.string().min(1, 'Invoice date is required'), // Store as string, convert to Date in handler
   shippingAddress: addressSchema.optional(),
