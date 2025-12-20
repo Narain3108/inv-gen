@@ -58,9 +58,6 @@ function InvoicesContent() {
     companies,
     companiesLoading,
     companiesInitialized,
-    clients,
-    clientsLoading,
-    clientsInitialized,
     products,
     productsLoading,
     productsInitialized,
@@ -68,6 +65,7 @@ function InvoicesContent() {
   } = useAppData();
   
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -163,14 +161,24 @@ function InvoicesContent() {
     }
   }, [selectedCompany, setSelectedCompany]);
 
-  // Define loadData function - only loads invoices now
+  // Define loadData function - loads invoices, clients, products, and company
   const loadInvoices = React.useCallback(async () => {
     if (!selectedCompany) return;
 
     setLoading(true);
     try {
-      console.log('📡 Fetching invoices for company:', selectedCompany.name);
+      console.log('📡 Fetching data for company:', selectedCompany.name);
       
+      // Fetch fresh company data
+      const freshCompany = await companiesApi.getById(selectedCompany.id);
+      setCompany(freshCompany);
+      
+      // Update global store if stale
+      if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
+        console.log('🔄 Updating stale selected company in store');
+        setSelectedCompany(freshCompany);
+      }
+
       const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
       
       // Sort in memory (API might already sort, but to be safe)
@@ -181,18 +189,33 @@ function InvoicesContent() {
       });
 
       setInvoices(invoicesData);
-      console.log('✅ Invoices loaded:', invoicesData.length);
+      
+      // Load clients using API
+      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
+      setClients(clientsData);
+      
+      console.log('✅ Data loaded: invoices:', invoicesData.length, 'clients:', clientsData.length);
     } catch (error) {
-      console.error('Error loading invoices:', error);
-      toast.error('Failed to load invoices');
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, setSelectedCompany]);
+
+  const refreshClients = async () => {
+    if (!selectedCompany) return;
+    try {
+      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error refreshing clients:', error);
+    }
+  };
 
   // Load invoices when company is selected and data is ready
   useEffect(() => {
-    if (!companiesInitialized || !clientsInitialized) {
+    if (!companiesInitialized) {
       return; // Wait for global data to load
     }
 
@@ -212,7 +235,7 @@ function InvoicesContent() {
         console.log('⚠️ Skipping invoice load for invalid/stale company:', selectedCompany.name);
       }
     }
-  }, [selectedCompany, companiesInitialized, clientsInitialized, companies, loadInvoices]);
+  }, [selectedCompany, companiesInitialized, companies, loadInvoices]);
 
   const handleAddInvoice = async () => {
     // Check if company exists
@@ -516,7 +539,7 @@ function InvoicesContent() {
     return exportToCSV(data, `invoices-${new Date().toISOString().split('T')[0]}`);
   };
 
-  if (loading || !companiesInitialized || !clientsInitialized) {
+  if (loading || !companiesInitialized) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -603,6 +626,19 @@ function InvoicesContent() {
               invoiceCount={invoices.length}
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
+              onClientAdded={(newClient) => {
+                // Optimistically add client AFTER the form has already selected it internally
+                // Use setTimeout to ensure form's setValue runs first
+                setTimeout(() => {
+                  setClients(prev => {
+                    // Avoid duplicates
+                    if (prev.find(c => c.id === newClient.id)) return prev;
+                    return [...prev, newClient];
+                  });
+                  // Also refresh from server in background
+                  refreshClients();
+                }, 0);
+              }}
             />
           )}
         </DialogContent>
