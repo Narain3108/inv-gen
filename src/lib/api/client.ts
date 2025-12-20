@@ -81,6 +81,7 @@ class ApiClient {
   private baseURL: string;
   // Track in-flight GET requests to dedupe identical requests
   private inFlightRequests: Map<string, Promise<any>> = new Map();
+  private csrfToken: string | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = (baseURL || '').replace(/\/+$/,'');
@@ -137,7 +138,7 @@ class ApiClient {
     return response.json();
   }
 
-  private getHeaders(customHeaders?: HeadersInit): HeadersInit {
+  private async getHeaders(customHeaders?: HeadersInit, includeCsrf = true): Promise<HeadersInit> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -154,12 +155,48 @@ class ApiClient {
       if (userToken) {
         headers['Authorization'] = `Bearer ${userToken}`;
       }
+
+      // If using cookie-based auth (no Authorization header present) and CSRF enabled,
+      // ensure we have a CSRF token and include it on state-changing requests.
+      try {
+        const hasAuth = !!headers['Authorization'];
+        if (!hasAuth && includeCsrf) {
+          await this.ensureCsrfToken();
+          if (this.csrfToken) {
+            headers['X-CSRF-Token'] = this.csrfToken;
+          }
+        }
+      } catch (e) {
+        // ignore CSRF fetch failures here; calls will fail server-side if required
+      }
     }
 
     return {
       ...headers,
       ...customHeaders,
     };
+  }
+
+  private async ensureCsrfToken(): Promise<void> {
+    if (this.csrfToken) return;
+    // Fetch CSRF token endpoint; it relies on cookie auth (credentials: include)
+    try {
+      const url = buildUrl(this.baseURL, '/auth/csrf-token');
+      const resp = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!resp.ok) return;
+      const data = await resp.json().catch(() => null);
+      if (data && data.csrfToken) this.csrfToken = data.csrfToken;
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Public helper: allow callers to prime CSRF token after cookie login
+  public async initCsrf(): Promise<void> {
+    await this.ensureCsrfToken();
   }
 
   async get<T>(endpoint: string, params?: Record<string, any>, transformCase = false): Promise<T> {
@@ -189,7 +226,7 @@ class ApiClient {
       try {
         const response = await fetch(key, {
           method: 'GET',
-          headers: this.getHeaders(),
+          headers: await this.getHeaders(),
           credentials: 'include', // Send cookies
           cache: 'no-store', // Prevent caching of API responses
         });
@@ -220,7 +257,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -242,7 +279,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       method: 'PUT',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -264,7 +301,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -285,7 +322,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: this.getHeaders(),
+      headers: await this.getHeaders(),
       credentials: 'include', // Send cookies
     });
 
@@ -307,10 +344,15 @@ class ApiClient {
       });
     }
 
+    const headers = await this.getHeaders({}, true);
+    // Remove Content-Type when sending FormData so browser sets correct boundary
+    if (headers && (headers as any)['Content-Type']) delete (headers as any)['Content-Type'];
+
     const response = await fetch(buildUrl(this.baseURL, endpoint), {
       method: 'POST',
       body: formData,
       credentials: 'include', // Send cookies
+      headers,
       // Don't set Content-Type header - browser will set it with boundary
     });
 

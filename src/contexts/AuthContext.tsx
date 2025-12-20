@@ -4,6 +4,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@/types';
 import { authApi } from '@/lib/api/auth.api';
+import { apiClient } from '@/lib/api/client';
 import { usersApi } from '@/lib/api/users.api';
 import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
@@ -110,6 +111,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const freshUser = await usersApi.getMe();
       setUser(freshUser);
       localStorage.setItem('userData', JSON.stringify(freshUser));
+
+      // Prime CSRF token for cookie-based sessions so mutating requests include it
+      try {
+        await apiClient.initCsrf();
+      } catch (e) {
+        // ignore failures; requests will attempt to fetch CSRF lazily
+      }
 
       toast.success(`Welcome back, ${freshUser.name}`);
 
