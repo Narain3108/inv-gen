@@ -512,17 +512,33 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                     {/* Unit */}
                     <div className="sm:col-span-2 space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <Select 
-                        value={item.unit || "Nos"} 
-                        onValueChange={(val) => setValue(`items.${index}.unit`, val)}
-                      >
-                        <SelectTrigger className="h-9 w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PRODUCT_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Controller
+                        control={control}
+                        name={`items.${index}.unit` as const}
+                        defaultValue={item?.unit ?? 'Nos'}
+                        render={({ field }) => (
+                          <>
+                            <Input
+                              list={`unit-options-${index}`}
+                              {...field}
+                              className="h-9 w-full"
+                              placeholder="Unit"
+                            />
+                            <datalist id={`unit-options-${index}`}>
+                              <option value="Nos" />
+                              <option value="Pcs" />
+                              <option value="Kgs" />
+                              <option value="Gms" />
+                              <option value="Ltrs" />
+                              <option value="Mtrs" />
+                              <option value="Hrs" />
+                              <option value="Days" />
+                              <option value="Box" />
+                              <option value="Set" />
+                            </datalist>
+                          </>
+                        )}
+                      />
                     </div>
 
                     {/* Price */}

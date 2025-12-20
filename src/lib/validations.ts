@@ -220,6 +220,7 @@ export const invoiceFormSchema = z.object({
   shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
+    unit: z.string().min(1, 'Unit is required').optional(),
     quantity: z.preprocess((val) => {
       if (val === '' || val === null || val === undefined) return undefined;
       if (typeof val === 'string') {
@@ -257,6 +258,7 @@ export const quotationFormSchema = z.object({
   shippingAddress: addressSchema.optional(),
   items: z.array(z.object({
     productId: z.string().min(1, 'Please select a product'),
+    unit: z.string().min(1, 'Unit is required').optional(),
     quantity: z.preprocess((val) => {
       if (val === '' || val === null || val === undefined) return undefined;
       if (typeof val === 'string') {

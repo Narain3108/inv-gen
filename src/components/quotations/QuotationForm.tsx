@@ -147,6 +147,7 @@ export function QuotationForm({
     if (product) {
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
+      setValue(`items.${index}.unit`, product.unit);
     }
   };
 
@@ -208,7 +209,7 @@ export function QuotationForm({
         productDescription: product.description || '',
         hsn: product.hsn,
         quantity,
-        unit: product.unit,
+        unit: item.unit || product.unit,
         unitPrice,
         discount,
         gstRate: product.gstRate,
@@ -535,6 +536,7 @@ export function QuotationForm({
                   <th className="p-2 text-left">Product/Service</th>
                   <th className="p-2 text-center w-24">Item Code</th>
                   <th className="p-2 text-center w-32">Quantity</th>
+                  <th className="p-2 text-center w-24">Unit</th>
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
                   <th className="p-2 text-right w-36">Amount</th>
@@ -593,6 +595,35 @@ export function QuotationForm({
                               onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
                               className="text-center w-full text-base font-medium"
                             />
+                          )}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unit` as const}
+                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
+                          render={({ field }) => (
+                            <>
+                              <Input
+                                list={`unit-options-${index}`}
+                                {...field}
+                                className="text-center w-full text-sm"
+                                placeholder="Unit"
+                              />
+                              <datalist id={`unit-options-${index}`}>
+                                <option value="Nos" />
+                                <option value="Pcs" />
+                                <option value="Kgs" />
+                                <option value="Gms" />
+                                <option value="Ltrs" />
+                                <option value="Mtrs" />
+                                <option value="Hrs" />
+                                <option value="Days" />
+                                <option value="Box" />
+                                <option value="Set" />
+                              </datalist>
+                            </>
                           )}
                         />
                       </td>
@@ -659,6 +690,7 @@ export function QuotationForm({
           <div className="space-y-4 lg:hidden">
             {fields.map((field, index) => {
               const item = watchItems?.[index];
+              const product = item?.productId ? products.find(p => p.id === item.productId) : null;
               const quantity = Number(item?.quantity) || 0;
               const unitPrice = Number(item?.unitPrice) || 0;
               const discount = Number(item?.discount) || 0;
@@ -698,7 +730,7 @@ export function QuotationForm({
                       </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Quantity</Label>
                         <Controller
@@ -715,6 +747,36 @@ export function QuotationForm({
                               onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
                               className="text-center text-lg font-semibold"
                             />
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Unit</Label>
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unit` as const}
+                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
+                          render={({ field }) => (
+                            <>
+                              <Input
+                                list={`unit-options-mobile-${index}`}
+                                {...field}
+                                className="text-center text-lg font-semibold"
+                                placeholder="Unit"
+                              />
+                              <datalist id={`unit-options-mobile-${index}`}>
+                                <option value="Nos" />
+                                <option value="Pcs" />
+                                <option value="Kgs" />
+                                <option value="Gms" />
+                                <option value="Ltrs" />
+                                <option value="Mtrs" />
+                                <option value="Hrs" />
+                                <option value="Days" />
+                                <option value="Box" />
+                                <option value="Set" />
+                              </datalist>
+                            </>
                           )}
                         />
                       </div>

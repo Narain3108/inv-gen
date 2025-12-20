@@ -203,6 +203,7 @@ export function InvoiceForm({
     if (product) {
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
+      setValue(`items.${index}.unit`, product.unit);
       
       // Fetch fresh product data to ensure serial numbers list is up to date (no auto-fill)
       try {
@@ -288,7 +289,7 @@ export function InvoiceForm({
         productDescription: product.description || '',
         hsn: product.hsn,
         quantity,
-        unit: product.unit,
+        unit: item.unit || product.unit,
         unitPrice,
         discount,
         gstRate: product.gstRate,
@@ -706,6 +707,7 @@ export function InvoiceForm({
                   <th className="p-2 text-left">Product/Service</th>
                   <th className="p-2 text-center w-24">Item Code</th>
                   <th className="p-2 text-center w-32">Quantity</th>
+                  <th className="p-2 text-center w-24">Unit</th>
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
                   <th className="p-2 text-right w-36">Amount</th>
@@ -789,6 +791,34 @@ export function InvoiceForm({
                             />
                           )}
                         />
+                      </td>
+                      <td className="p-2">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unit` as const}
+                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
+                          render={({ field }) => (
+                            <Input
+                              list={`unit-options-${index}`}
+                              {...field}
+                              value={field.value ?? ''}
+                              className="text-center w-full text-sm"
+                              placeholder="Unit"
+                            />
+                          )}
+                        />
+                        <datalist id={`unit-options-${index}`}>
+                          <option value="Nos" />
+                          <option value="Pcs" />
+                          <option value="Kgs" />
+                          <option value="Gms" />
+                          <option value="Ltrs" />
+                          <option value="Mtrs" />
+                          <option value="Hrs" />
+                          <option value="Days" />
+                          <option value="Box" />
+                          <option value="Set" />
+                        </datalist>
                       </td>
                       <td className="p-2">
                         <Controller
