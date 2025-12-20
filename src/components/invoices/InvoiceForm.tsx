@@ -183,7 +183,7 @@ export function InvoiceForm({
       const client = clients.find(c => c.id === watchClientId);
       setSelectedClient(client || null);
       // Reset shipping address selection
-      setShippingAddressMode('default');
+      setShippingAddressMode('none');
       setSelectedAddressIndex('default');
       setNewShippingAddress({
         street: '',
@@ -473,124 +473,124 @@ export function InvoiceForm({
           <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Invoice Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pb-4 pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Invoice Number */}
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number</Label>
-              <Input
-                id="invoiceNumber"
-                {...register('invoiceNumber')}
-                placeholder={generateInvoiceNumberPreview()}
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-filled, editable
-              </p>
-              {errors.invoiceNumber && (
-                <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>
-              )}
+          <div className="space-y-4">
+            {/* Row 1: Client, Invoice Number, Invoice Date */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <SearchableClientDropdown
+                  clients={clients}
+                  selectedClientId={watch('clientId') || ''}
+                  onClientSelect={(clientId) => setValue('clientId', clientId)}
+                  onClientAdded={(newClient) => {
+                    setValue('clientId', newClient.id);
+                    clearErrors('clientId');
+                    onClientAdded?.(newClient);
+                  }}
+                  label="Client"
+                  required
+                  error={errors.clientId?.message}
+                  companyId={companyId}
+                  placeholder="Search or select client..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invoiceNumber">Invoice Number</Label>
+                <Input
+                  id="invoiceNumber"
+                  {...register('invoiceNumber')}
+                  placeholder={generateInvoiceNumberPreview()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Auto-filled, editable
+                </p>
+                {errors.invoiceNumber && (
+                  <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Invoice Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  {...register('date')}
+                />
+                {errors.date && (
+                  <p className="text-sm text-red-500">{errors.date.message}</p>
+                )}
+              </div>
             </div>
 
-            {/* PO Number */}
-            <div className="space-y-2">
-              <Label htmlFor="poNumber">PO Number</Label>
-              <Input
-                id="poNumber"
-                {...register('poNumber')}
-                placeholder="Optional"
-              />
-              <p className="text-xs text-muted-foreground">
-                Purchase Order Number (if any)
-              </p>
+            {/* Row 2: PO Number, PO Date, E-way Number, Reference Number */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="poNumber">PO Number</Label>
+                <Input
+                  id="poNumber"
+                  {...register('poNumber')}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Purchase Order Number (if any)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="poDate">PO Date</Label>
+                <Input
+                  id="poDate"
+                  type="date"
+                  {...register('poDate')}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Purchase Order Date (if any)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ewayNumber">E-way Number</Label>
+                <Input
+                  id="ewayNumber"
+                  {...register('ewayNumber')}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-muted-foreground">
+                  E-way bill number (if any)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="referenceNumber">Reference Number</Label>
+                <Input
+                  id="referenceNumber"
+                  {...register('referenceNumber')}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional reference
+                </p>
+              </div>
             </div>
 
-            {/* PO Date */}
-            <div className="space-y-2">
-              <Label htmlFor="poDate">PO Date</Label>
-              <Input
-                id="poDate"
-                type="date"
-                {...register('poDate')}
-              />
-              <p className="text-xs text-muted-foreground">
-                Purchase Order Date (if any)
-              </p>
-            </div>
-
-            {/* E-way Number */}
-            <div className="space-y-2">
-              <Label htmlFor="ewayNumber">E-way Number</Label>
-              <Input
-                id="ewayNumber"
-                {...register('ewayNumber')}
-                placeholder="Optional"
-              />
-              <p className="text-xs text-muted-foreground">
-                E-way bill number (if any)
-              </p>
-            </div>
-
-            {/* Reference Number */}
-            <div className="space-y-2">
-              <Label htmlFor="referenceNumber">Reference Number</Label>
-              <Input
-                id="referenceNumber"
-                {...register('referenceNumber')}
-                placeholder="Optional"
-              />
-              <p className="text-xs text-muted-foreground">
-                Optional reference
-              </p>
-            </div>
-
-            {/* Client Selection */}
-            <div className="col-span-2">
-              <SearchableClientDropdown
-                clients={clients}
-                selectedClientId={watch('clientId') || ''}
-                onClientSelect={(clientId) => setValue('clientId', clientId)}
-                onClientAdded={(newClient) => {
-                  // Set the newly created client as selected
-                  setValue('clientId', newClient.id);
-                  // Clear any validation errors
-                  clearErrors('clientId');
-                  // Call parent callback to refresh clients list
-                  onClientAdded?.(newClient);
-                }}
-                label="Client"
-                required
-                error={errors.clientId?.message}
-                companyId={companyId}
-                placeholder="Search or select client..."
-              />
-            </div>
-
-            {/* Shipping Address Selection (opt-in) */}
+            {/* Row 3: Shipping Address (opt-in) */}
             {selectedClient && (
-              <div className="col-span-1 md:col-span-2 space-y-3 border rounded-md p-3 bg-muted/20">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
                   <Label className="text-sm font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> Shipping Address
+                    <MapPin className="h-4 w-4" /> Include Shipping Address
                   </Label>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">Include</span>
-                    <Switch
-                      checked={shippingAddressMode !== 'none'}
-                      onCheckedChange={(v: boolean) => setShippingAddressMode(v ? 'default' : 'none')}
-                      aria-label="Include Shipping Address"
-                    />
-                  </div>
+                  <Switch
+                    checked={shippingAddressMode !== 'none'}
+                    onCheckedChange={(v: boolean) => setShippingAddressMode(v ? 'default' : 'none')}
+                    aria-label="Include Shipping Address"
+                  />
                 </div>
 
-                {shippingAddressMode === 'none' && (
-                  <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
-                    <p className="italic">Shipping address will not be included in this invoice.</p>
-                  </div>
-                )}
-
                 {shippingAddressMode !== 'none' && (
-                  <>
+                  <div className="space-y-3 border rounded-md p-3 bg-muted/20">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Mode</Label>
+                      <Label className="text-sm font-medium">Shipping Address</Label>
                       <Select
                         value={shippingAddressMode}
                         onValueChange={(val: any) => setShippingAddressMode(val)}
@@ -670,25 +670,10 @@ export function InvoiceForm({
                         />
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {/* Invoice Date */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Invoice Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                {...register('date')}
-              />
-              {errors.date && (
-                <p className="text-sm text-red-500">{errors.date.message}</p>
-              )}
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -701,17 +686,17 @@ export function InvoiceForm({
         <CardContent className="space-y-3 pb-4 pt-4">
           {/* Desktop View - Hidden on Mobile */}
           <div className="hidden lg:block">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="border-b">
                 <tr className="text-sm text-muted-foreground">
-                  <th className="p-2 text-left">Product/Service</th>
+                  <th className="p-2 text-left w-64">Product/Service</th>
                   <th className="p-2 text-center w-24">Item Code</th>
-                  <th className="p-2 text-center w-32">Quantity</th>
-                  <th className="p-2 text-center w-24">Unit</th>
-                  <th className="p-2 text-right w-36">Unit Price</th>
-                  <th className="p-2 text-center w-32">Discount %</th>
-                  <th className="p-2 text-right w-36">Amount</th>
-                  <th className="p-2 w-16"></th>
+                  <th className="p-2 text-center w-16">Qty</th>
+                  <th className="p-2 text-center w-28">Unit</th>
+                  <th className="p-2 text-right w-28">Unit Price</th>
+                  <th className="p-2 text-center w-20">Discount %</th>
+                  <th className="p-2 text-right w-32">Amount</th>
+                  <th className="p-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -725,8 +710,8 @@ export function InvoiceForm({
 
                   return (
                     <React.Fragment key={field.id}>
-                    <tr className="border-b">
-                      <td className="p-2">
+                    <tr className="border-b align-middle">
+                      <td className="p-2 w-64 align-top">
                         <Select
                           value={item?.productId || ''}
                           onValueChange={(value) => {
@@ -734,8 +719,8 @@ export function InvoiceForm({
                             setActiveRowIndex(index);
                           }}
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
+                          <SelectTrigger className="w-full truncate">
+                            <SelectValue placeholder="Select product" className="truncate" />
                           </SelectTrigger>
                           <SelectContent>
                             {localProducts.map((product) => {
@@ -764,7 +749,7 @@ export function InvoiceForm({
                           </div>
                         )}
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 text-center w-24">
                         {product?.itemCode ? (
                           <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
                             {product.itemCode}
@@ -773,7 +758,7 @@ export function InvoiceForm({
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 w-16">
                         <Controller
                           control={control}
                           name={`items.${index}.quantity` as const}
@@ -792,7 +777,7 @@ export function InvoiceForm({
                           )}
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 w-28">
                         <Controller
                           control={control}
                           name={`items.${index}.unit` as const}
@@ -820,7 +805,7 @@ export function InvoiceForm({
                           <option value="Set" />
                         </datalist>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 w-28">
                         <Controller
                           control={control}
                           name={`items.${index}.unitPrice` as const}
@@ -839,7 +824,7 @@ export function InvoiceForm({
                           )}
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 w-20">
                         <Controller
                           control={control}
                           name={`items.${index}.discount` as const}
@@ -858,10 +843,10 @@ export function InvoiceForm({
                           )}
                         />
                       </td>
-                      <td className="p-2 text-right font-medium text-base">
+                      <td className="p-2 w-32 text-right font-medium text-base">
                         {formatCurrency(amount)}
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 w-10">
                         <Button
                           type="button"
                           variant="ghost"
