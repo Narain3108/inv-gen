@@ -42,6 +42,11 @@ function DialogOverlay({
         className
       )}
       {...props}
+      onPointerDown={(event: any) => {
+        if ((props as any).onPointerDown) return (props as any).onPointerDown(event);
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     />
   )
 }
