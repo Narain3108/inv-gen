@@ -28,6 +28,16 @@ export const authApi = {
     return apiClient.post<LoginResponse>('/auth/google', { token });
   },
 
+  /**
+   * Get CSRF token for current user
+   */
+  getCsrfToken: async (): Promise<{ csrf_token: string; user_id: string }> => {
+    return apiClient.post<{ csrf_token: string; user_id: string }>('/auth/csrf-token');
+  },
+
+  /**
+   * Logout user
+   */
   logout: async (): Promise<void> => {
     return apiClient.post<void>('/auth/logout');
   },

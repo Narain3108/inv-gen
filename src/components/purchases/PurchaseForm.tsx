@@ -191,6 +191,31 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
     setValue('totalAmount', total);
   }, [watchItems, setValue]);
 
+  // Auto-open serial modal when quantity changes for products with serial numbers
+  useEffect(() => {
+    const items = Array.isArray(watchItems) ? watchItems : [];
+    
+    // Find items that need serial numbers but don't have them
+    const itemsNeedingSerials = items.map((item, index) => ({
+      index,
+      item,
+      needsSerials: item?.hasSerialNumber && 
+                   item?.quantity > 0 && 
+                   (item?.serialNumbers || []).filter(Boolean).length !== Number(item.quantity)
+    })).filter(x => x.needsSerials);
+
+    // Auto-open modal for the first item that needs serials (if no modal is currently open)
+    if (itemsNeedingSerials.length > 0 && purchaseSerialModalIndex === null) {
+      const firstItemNeedingSerials = itemsNeedingSerials[0];
+      // Add a small delay to avoid conflicts with form updates
+      setTimeout(() => {
+        if (purchaseSerialModalIndex === null) { // Double check modal is still closed
+          setPurchaseSerialModalIndex(firstItemNeedingSerials.index);
+        }
+      }, 500);
+    }
+  }, [watchItems, purchaseSerialModalIndex]);
+
   // Keep each item's `amount` field in sync so zod sees a numeric value for validation
   useEffect(() => {
     const items = Array.isArray(watchItems) ? watchItems : [];
@@ -226,6 +251,15 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
       setValue(`items.${index}.hasSerialNumber`, product.hasSerialNumber || false);
       setValue(`items.${index}.categoryId`, product.categoryId ?? undefined);
       setValue(`items.${index}.itemCode`, product.itemCode ?? undefined);
+      
+      // If product has serial numbers and quantity > 0, auto-open serial modal
+      const currentQuantity = watchItems?.[index]?.quantity || 1;
+      if (product.hasSerialNumber && currentQuantity > 0) {
+        setTimeout(() => {
+          setPurchaseSerialModalIndex(index);
+        }, 300);
+      }
+      
       toast.success(`Auto-filled details for ${product.productName}`);
     } else {
       // Reset ID if new product name typed
@@ -233,6 +267,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
       setValue(`items.${index}.hsn`, undefined);
       setValue(`items.${index}.categoryId`, undefined);
       setValue(`items.${index}.itemCode`, undefined);
+      setValue(`items.${index}.hasSerialNumber`, false);
     }
   };
 
@@ -241,19 +276,53 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   // Purchase serial modal now delegated to shared SerialManager component
 
   const onSubmit = async (data: PurchaseFormData) => {
-    // Validate serial numbers
+    // Validate serial numbers BEFORE any other processing
+    const serialValidationErrors: string[] = [];
+    
     for (let i = 0; i < data.items.length; i++) {
       const item = data.items[i];
       if (item.hasSerialNumber) {
-        if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
-          toast.error(`Item ${i + 1} (${item.productName}): Please enter all ${item.quantity} serial numbers`);
-          return;
+        const serialNumbers = item.serialNumbers || [];
+        const filledSerials = serialNumbers.filter(s => s && s.trim());
+        const requiredQuantity = Number(item.quantity) || 0;
+        
+        if (filledSerials.length !== requiredQuantity) {
+          serialValidationErrors.push(
+            `Item ${i + 1} (${item.productName}): Expected ${requiredQuantity} serial numbers, but got ${filledSerials.length}`
+          );
         }
-        if (item.serialNumbers.some(s => !s.trim())) {
-          toast.error(`Item ${i + 1}: Serial numbers cannot be empty`);
-          return;
+        
+        // Check for empty serial numbers
+        if (serialNumbers.some(s => s && !s.trim())) {
+          serialValidationErrors.push(
+            `Item ${i + 1} (${item.productName}): Serial numbers cannot be empty`
+          );
+        }
+        
+        // Check for duplicate serial numbers within the same item
+        const duplicates = filledSerials.filter((s, idx) => filledSerials.indexOf(s) !== idx);
+        if (duplicates.length > 0) {
+          serialValidationErrors.push(
+            `Item ${i + 1} (${item.productName}): Duplicate serial numbers found: ${duplicates.join(', ')}`
+          );
         }
       }
+    }
+    
+    // If there are serial validation errors, show them and stop
+    if (serialValidationErrors.length > 0) {
+      toast.error(
+        <div>
+          <div className="font-semibold mb-2">Serial Number Validation Failed:</div>
+          <ul className="list-disc list-inside space-y-1">
+            {serialValidationErrors.map((error, idx) => (
+              <li key={idx} className="text-sm">{error}</li>
+            ))}
+          </ul>
+        </div>,
+        { duration: 8000 }
+      );
+      return;
     }
 
     setIsLoading(true);
@@ -270,6 +339,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         return {
           ...it,
           amount: base + tax + cessAmount,
+          // Ensure serial numbers are properly formatted
+          serialNumbers: it.hasSerialNumber ? (it.serialNumbers || []).filter(s => s && s.trim()) : [],
         };
       });
 
@@ -460,9 +531,9 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                 </Button>
 
                 <div className="space-y-3">
-                  {/* First Row: Product Name + Serial Button */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-3 space-y-1.5">
+                  {/* First Row: Product Name */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1.5">
                       <SearchableProductDropdown
                         products={products}
                         selectedProductName={item.productName}
@@ -481,13 +552,6 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                         className="w-full"
                       />
                     </div>
-                    {hasSerial && (
-                      <div className="space-y-1.5 flex flex-col justify-end">
-                        <Button type="button" size="sm" variant="outline" onClick={() => setPurchaseSerialModalIndex(index)} className="h-9">
-                          Serials ({(item.serialNumbers || []).filter(Boolean).length})
-                        </Button>
-                      </div>
-                    )}
                   </div>
 
                   {/* Second Row: HSN, Qty, Unit, Price, GST, Amount */}
@@ -506,6 +570,37 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                         min="1" 
                         className="h-9 w-full"
                         {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
+                        onChange={(e) => {
+                          const newQuantity = parseInt(e.target.value) || 0;
+                          setValue(`items.${index}.quantity`, newQuantity);
+                          
+                          // If product has serial numbers, adjust serial number array
+                          if (item.hasSerialNumber && newQuantity > 0) {
+                            const currentSerials = item.serialNumbers || [];
+                            const newSerials = [...currentSerials];
+                            
+                            // Adjust array length to match quantity
+                            if (newSerials.length < newQuantity) {
+                              // Add empty slots
+                              while (newSerials.length < newQuantity) {
+                                newSerials.push('');
+                              }
+                            } else if (newSerials.length > newQuantity) {
+                              // Trim excess slots
+                              newSerials.splice(newQuantity);
+                            }
+                            
+                            setValue(`items.${index}.serialNumbers`, newSerials);
+                            
+                            // Auto-open serial modal if needed
+                            const filledSerials = newSerials.filter(s => s && s.trim()).length;
+                            if (filledSerials !== newQuantity) {
+                              setTimeout(() => {
+                                setPurchaseSerialModalIndex(index);
+                              }, 300);
+                            }
+                          }
+                        }}
                       />
                     </div>
 
@@ -572,49 +667,113 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                   </div>
                 </div>
 
-                {/* Serial Number Toggle & Section - Only show if this row is active */}
-                {activeRowIndex === index && (
-                <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row sm:items-start gap-3">
-                    <div className="flex items-center gap-2 min-w-fit">
-                        <Label className="text-xs font-medium">Has Serial No?</Label>
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                                <input 
-                                    type="radio" 
-                                    checked={hasSerial} 
-                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, true)}
-                                    className="w-3.5 h-3.5 accent-primary"
-                                /> Yes
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                                <input 
-                                    type="radio" 
-                                    checked={!hasSerial} 
-                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, false)}
-                                    className="w-3.5 h-3.5 accent-primary"
-                                /> No
-                            </label>
+                {/* Serial Number Section - Always show if product has serial numbers */}
+                {hasSerial && (
+                <div className="mt-3 pt-3 border-t bg-blue-50/30 p-3 rounded-md">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                        <Label className="text-sm font-semibold text-blue-900">
+                            Serial Numbers Required ({quantity} needed)
+                        </Label>
+                        <div className="flex gap-2">
+                            <Button 
+                                type="button" 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => setPurchaseSerialModalIndex(index)}
+                                className="bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                                Manage Serials ({(item.serialNumbers || []).filter(Boolean).length}/{quantity})
+                            </Button>
                         </div>
                     </div>
-
-                    {hasSerial && (
-                        <div className="flex-1 bg-blue-50/50 p-3 rounded-md border border-blue-100/50">
-                            <Label className="text-xs text-blue-900 mb-2 block font-medium">
-                                Enter Serial Numbers ({quantity})
-                            </Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                {Array.from({ length: quantity }).map((_, sIdx) => (
-                                    <Input
-                                        key={sIdx}
-                                        placeholder={`Serial #${sIdx + 1}`}
-                                  className="h-8 text-sm bg-white w-full"
-                                        value={item.serialNumbers?.[sIdx] || ''}
-                                        onChange={(e) => {
-                                            const newSerials = [...(item.serialNumbers || [])];
-                                            newSerials[sIdx] = e.target.value;
-                                            setValue(`items.${index}.serialNumbers`, newSerials);
-                                        }}
-                                    />
+                    
+                    {/* Inline Serial Number Inputs */}
+                    <div className="bg-white p-3 rounded border">
+                        <Label className="text-xs text-muted-foreground mb-2 block">
+                            Enter Serial Numbers (Required: {quantity})
+                        </Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                            {Array.from({ length: quantity }).map((_, sIdx) => (
+                                <Input
+                                    key={sIdx}
+                                    placeholder={`Serial #${sIdx + 1}`}
+                                    className="h-8 text-sm bg-white w-full"
+                                    value={item.serialNumbers?.[sIdx] || ''}
+                                    onChange={(e) => {
+                                        const newSerials = [...(item.serialNumbers || [])];
+                                        // Ensure array is the right length
+                                        while (newSerials.length < quantity) {
+                                            newSerials.push('');
+                                        }
+                                        newSerials[sIdx] = e.target.value;
+                                        setValue(`items.${index}.serialNumbers`, newSerials);
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        
+                        {/* Validation Status */}
+                        <div className="mt-2 flex items-center justify-between">
+                            <div className="text-xs">
+                                {(() => {
+                                    const filledSerials = (item.serialNumbers || []).filter(s => s && s.trim()).length;
+                                    const isEmpty = filledSerials === 0;
+                                    const isComplete = filledSerials === quantity;
+                                    const isPartial = filledSerials > 0 && filledSerials < quantity;
+                                    
+                                    if (isEmpty) {
+                                        return <span className="text-red-600">⚠️ No serial numbers entered</span>;
+                                    } else if (isComplete) {
+                                        return <span className="text-green-600">✅ All serial numbers entered</span>;
+                                    } else if (isPartial) {
+                                        return <span className="text-yellow-600">⚠️ {quantity - filledSerials} more needed</span>;
+                                    }
+                                })()}
+                            </div>
+                            
+                            {/* Quick Actions */}
+                            <div className="flex gap-1">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        // Clear all serials
+                                        const newSerials = Array(quantity).fill('');
+                                        setValue(`items.${index}.serialNumbers`, newSerials);
+                                    }}
+                                    className="text-xs px-2 py-1 h-6"
+                                >
+                                    Clear
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        // Auto-generate serial numbers (example format)
+                                        const newSerials = Array.from({ length: quantity }, (_, i) => 
+                                            `${item.productName?.substring(0, 3).toUpperCase() || 'PRD'}-${Date.now()}-${i + 1}`
+                                        );
+                                        setValue(`items.${index}.serialNumbers`, newSerials);
+                                    }}
+                                    className="text-xs px-2 py-1 h-6"
+                                >
+                                    Auto-Gen
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Show current serial numbers as chips if any */}
+                    {(item.serialNumbers || []).filter(Boolean).length > 0 && (
+                        <div className="mt-2 bg-gray-50 p-2 rounded border">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Current Serial Numbers:</Label>
+                            <div className="flex flex-wrap gap-1">
+                                {(item.serialNumbers || []).filter(Boolean).map((serial, idx) => (
+                                    <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-mono">
+                                        {serial}
+                                    </span>
                                 ))}
                             </div>
                         </div>

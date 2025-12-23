@@ -52,7 +52,7 @@ function QuotationsContent() {
   const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, loading: companiesLoading, loadCompanies } = useCompanies();
-  
+
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -79,7 +79,7 @@ function QuotationsContent() {
       const validDate = typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil) : quotation.validUntil;
       const now = new Date();
       const daysUntilExpiry = Math.ceil((validDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (value === 'valid') return daysUntilExpiry > 0;
       if (value === 'expired') return daysUntilExpiry <= 0;
       if (value === 'expiring-soon') return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
@@ -116,14 +116,14 @@ function QuotationsContent() {
   // Generate auto quotation number
   const generateQuotationNumberAuto = async (): Promise<string> => {
     if (!selectedCompany || !company) return 'QUO0001';
-    
+
     return generateQuotationNumber(company);
   };
 
   // Reload fresh company data from API
   const reloadCompanyData = React.useCallback(async () => {
     if (!selectedCompany?.id) return;
-    
+
     try {
       const freshCompanyData = await companiesApi.getById(selectedCompany.id);
       console.log('🔄 Reloaded company data:', freshCompanyData.quotationNumbering);
@@ -143,7 +143,7 @@ function QuotationsContent() {
       // Fetch fresh company data to ensure we have latest details (address, etc)
       const freshCompany = await companiesApi.getById(selectedCompany.id);
       setCompany(freshCompany);
-      
+
       // Update global store if stale
       if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
         console.log('🔄 Updating stale selected company in store');
@@ -152,7 +152,7 @@ function QuotationsContent() {
 
       // Load quotations using API
       const quotationsData = await quotationsApi.getAll({ company_id: selectedCompany.id });
-      
+
       // Sort by createdAt date
       quotationsData.sort((a, b) => {
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -198,7 +198,7 @@ function QuotationsContent() {
     if (selectedCompany && companies.length > 0) {
       // Validate company access before loading to prevent 403s
       const isValidCompany = companies.find(c => c.id === selectedCompany.id);
-      
+
       if (isValidCompany) {
         loadData();
       } else {
@@ -249,7 +249,7 @@ function QuotationsContent() {
         quotationNumber = generateQuotationNumber(company, quotationCount);
         console.log(`🔢 Auto-generated quotation number: ${quotationNumber} (based on ${quotationCount} existing quotations)`);
       }
-      
+
       // Clean up quotation items to remove undefined values
       const cleanedItems = data.items.map((item: any) => {
         const cleanItem = { ...item };
@@ -277,7 +277,7 @@ function QuotationsContent() {
         toast.success('Quotation updated successfully');
       } else {
         await quotationsApi.create(quotationData);
-        
+
         // Increment quotation counter in company if using auto-numbering
         if (!editingQuotation && !data.quotationNumber?.trim() && company.quotationNumbering) {
           const newNextNumber = quotations.length + 2; // +2 because we just added one
@@ -289,7 +289,7 @@ function QuotationsContent() {
           });
           console.log(`📈 Updated company quotation counter to: ${newNextNumber}`);
         }
-        
+
         toast.success('Quotation created successfully');
       }
 
@@ -325,16 +325,16 @@ function QuotationsContent() {
     // Get fresh company data from selectedCompany context
     const currentCompany = selectedCompany || company;
     if (!currentCompany) return;
-    
+
     const client = clients.find(c => c.id === quotation.clientId);
     if (client) {
       console.log('📥 Loading customization for quotation:', currentCompany.id);
       console.log('🖼️ Logo URL:', currentCompany.logoUrl);
       console.log('✍️ Signature URL:', currentCompany.signatureUrl);
-      
+
       // Load customization settings
       const customization = await loadCustomization(currentCompany.id, 'quotation');
-      
+
       console.log('📋 Loaded quotation customization:', {
         hasCustomization: !!customization,
         pageSize: customization?.pageSize,
@@ -343,7 +343,7 @@ function QuotationsContent() {
         termsText: customization?.footer?.termsText ? 'Yes' : 'No',
         thankYouText: customization?.footer?.thankYouText ? 'Yes' : 'No',
       });
-      
+
       await previewQuotationPDF({ quotation, company: currentCompany, client, customization });
     }
   };
@@ -352,18 +352,18 @@ function QuotationsContent() {
     // Get fresh company data from selectedCompany context
     const currentCompany = selectedCompany || company;
     if (!currentCompany) return;
-    
+
     const client = clients.find(c => c.id === quotation.clientId);
     if (client) {
       console.log('📥 Loading customization for quotation download:', currentCompany.id);
       console.log('🖼️ Logo URL:', currentCompany.logoUrl);
       console.log('✍️ Signature URL:', currentCompany.signatureUrl);
-      
+
       // Load customization settings
       const customization = await loadCustomization(currentCompany.id, 'quotation');
-      
+
       console.log('📋 Loaded quotation customization for download');
-      
+
       await generateQuotationPDF({ quotation, company: currentCompany, client, customization });
     }
   };
@@ -402,11 +402,11 @@ function QuotationsContent() {
 
     try {
       // Check if invoice number already exists using API
-      const existingInvoices = await invoicesApi.getAll({ 
+      const existingInvoices = await invoicesApi.getAll({
         company_id: selectedCompany.id,
         invoiceNumber: invoiceNumber.trim()
       });
-      
+
       if (existingInvoices.length > 0) {
         toast.error('Invoice number already exists');
         return;
@@ -448,7 +448,7 @@ function QuotationsContent() {
       setConvertingQuotation(null);
       setInvoiceNumber('');
       await loadData();
-      
+
       // Navigate to invoices page
       router.push('/invoices/invoices');
     } catch (error) {
@@ -510,7 +510,7 @@ function QuotationsContent() {
             onExportCSV={handleExportCSV}
             className="flex-1 sm:flex-none"
           />
-          <Button 
+          <Button
             variant="outline"
             onClick={() => setIsCustomizationDialogOpen(true)}
             className="flex-1 sm:flex-none"
@@ -518,8 +518,8 @@ function QuotationsContent() {
             <Settings className="mr-2 h-4 w-4" />
             <span className="whitespace-nowrap">Customize Bill</span>
           </Button>
-          <Button 
-            onClick={handleAddQuotation} 
+          <Button
+            onClick={handleAddQuotation}
             className="bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all flex-1 sm:flex-none"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -529,8 +529,8 @@ function QuotationsContent() {
       </div>
 
       {/* Filter Bar */}
-      <FilterBar 
-        activeFilterCount={activeFilterCount} 
+      <FilterBar
+        activeFilterCount={activeFilterCount}
         onClearFilters={clearFilters}
         resultsCount={filteredQuotations.length}
         totalCount={quotations.length}
@@ -585,6 +585,12 @@ function QuotationsContent() {
               setClients(prev => [...prev, newClient]);
               // Also refresh from server to ensure consistency
               refreshClients();
+            }}
+            onProductAdded={(newProduct) => {
+              // Add the new product to the local list immediately
+              setProducts(prev => [...prev, newProduct]);
+              // Also refresh from server to ensure consistency
+              refreshProducts();
             }}
           />
         </DialogContent>

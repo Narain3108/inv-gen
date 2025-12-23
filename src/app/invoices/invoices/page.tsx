@@ -603,6 +603,12 @@ function InvoicesContent() {
               invoiceCount={invoices.length}
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
+              onClientAdded={() => {
+                // Client will be refreshed automatically by the AppDataContext
+              }}
+              onProductAdded={() => {
+                // Product will be refreshed automatically by the AppDataContext
+              }}
             />
           )}
         </DialogContent>

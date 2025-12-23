@@ -18,11 +18,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, MapPin } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator, MapPin, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateInvoiceTotals, calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency, formatDate, formatClientDropdownLabel } from '@/utils/formatters';
-import { SearchableClientDropdown } from '@/components/shared';
+import { SearchableClientDropdown, SearchableProductDropdown } from '@/components/shared';
 import { PAYMENT_MODES } from '@/lib/constants';
 import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
@@ -52,6 +52,7 @@ interface InvoiceFormProps {
   onSubmit: (data: InvoiceFormData) => Promise<void>;
   onCancel?: () => void;
   onClientAdded?: (client: Client) => void;
+  onProductAdded?: (product: Product) => void;
 }
 
 export function InvoiceForm({
@@ -65,6 +66,7 @@ export function InvoiceForm({
   onSubmit,
   onCancel,
   onClientAdded,
+  onProductAdded,
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -189,12 +191,36 @@ export function InvoiceForm({
     }
   }, [watchClientId, clients]);
 
+  // Load initial serial numbers when editing an invoice
+  useEffect(() => {
+    if (invoice && invoice.items) {
+      const initialSerialNumbers: Record<number, string[]> = {};
+      invoice.items.forEach((item, index) => {
+        if (item.serialNumbers && item.serialNumbers.length > 0) {
+          initialSerialNumbers[index] = item.serialNumbers;
+        }
+      });
+      setSerialNumbers(initialSerialNumbers);
+    }
+  }, [invoice]);
+
   // Handle product selection for an item
   const handleProductSelect = async (index: number, productId: string) => {
     const product = localProducts.find(p => p.id === productId);
     if (product) {
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
+      
+      // If product has serial numbers and quantity > 0, auto-open serial modal
+      const currentQuantity = Number(watchItems?.[index]?.quantity) || 0;
+      if (product.hasSerialNumber && currentQuantity > 0) {
+        const currentSerials = serialNumbers[index] || [];
+        if (currentSerials.length !== currentQuantity) {
+          setTimeout(() => {
+            setSerialModalIndex(index);
+          }, 300);
+        }
+      }
       
       // Fetch fresh product data to ensure serial numbers list is up to date (no auto-fill)
       try {
@@ -207,6 +233,38 @@ export function InvoiceForm({
       }
     }
   };
+
+  // Auto-open serial modal when quantity changes for products with serial numbers
+  useEffect(() => {
+    if (!watchItems) return;
+    
+    // Find items that need serial numbers but don't have them
+    const itemsNeedingSerials = watchItems.map((item: any, index: number) => {
+      const product = localProducts.find(p => p.id === item?.productId);
+      const currentSerials = serialNumbers[index] || [];
+      const requiredQuantity = Number(item?.quantity) || 0;
+      
+      return {
+        index,
+        item,
+        product,
+        needsSerials: product?.hasSerialNumber && 
+                     requiredQuantity > 0 && 
+                     currentSerials.length !== requiredQuantity
+      };
+    }).filter(x => x.needsSerials);
+
+    // Auto-open modal for the first item that needs serials (if no modal is currently open)
+    if (itemsNeedingSerials.length > 0 && serialModalIndex === null) {
+      const firstItemNeedingSerials = itemsNeedingSerials[0];
+      // Add a small delay to avoid conflicts with form updates
+      setTimeout(() => {
+        if (serialModalIndex === null) { // Double check modal is still closed
+          setSerialModalIndex(firstItemNeedingSerials.index);
+        }
+      }, 500);
+    }
+  }, [watchItems, localProducts, serialNumbers, serialModalIndex]);
   
   const closeSerialModal = () => setSerialModalIndex(null);
 
@@ -358,30 +416,52 @@ export function InvoiceForm({
       return;
     }
 
-    // Validate serial numbers for products that require them
-    let hasSerialNumberError = false;
-    const newErrors: Record<number, string> = {};
+    // Validate serial numbers for products that require them - STRICT VALIDATION
+    const serialValidationErrors: string[] = [];
     
     watchItems.forEach((item: any, index: number) => {
       const product = localProducts.find(p => p.id === item.productId);
       if (product?.hasSerialNumber) {
         const itemSerialNumbers = serialNumbers[index] || [];
+        const filledSerials = itemSerialNumbers.filter(s => s && s.trim());
         const quantity = Number(item.quantity) || 0;
         
-        if (itemSerialNumbers.length !== quantity) {
-          newErrors[index] = `Please enter ${quantity} serial number(s) for ${product.productName}`;
-          hasSerialNumberError = true;
-        } else if (itemSerialNumbers.some(sn => !sn || sn.trim() === '')) {
-          newErrors[index] = `Serial numbers cannot be empty`;
-          hasSerialNumberError = true;
+        if (filledSerials.length !== quantity) {
+          serialValidationErrors.push(
+            `Item ${index + 1} (${product.productName}): Expected ${quantity} serial numbers, but got ${filledSerials.length}`
+          );
+        }
+        
+        // Check for empty serial numbers
+        if (itemSerialNumbers.some(s => s && !s.trim())) {
+          serialValidationErrors.push(
+            `Item ${index + 1} (${product.productName}): Serial numbers cannot be empty`
+          );
+        }
+        
+        // Check for duplicate serial numbers within the same item
+        const duplicates = filledSerials.filter((s, idx) => filledSerials.indexOf(s) !== idx);
+        if (duplicates.length > 0) {
+          serialValidationErrors.push(
+            `Item ${index + 1} (${product.productName}): Duplicate serial numbers found: ${duplicates.join(', ')}`
+          );
         }
       }
     });
     
-    setSerialNumberErrors(newErrors);
-    
-    if (hasSerialNumberError) {
-      toast.error('Please fill in all required serial numbers');
+    // If there are serial validation errors, show them and stop
+    if (serialValidationErrors.length > 0) {
+      toast.error(
+        <div>
+          <div className="font-semibold mb-2">Serial Number Validation Failed:</div>
+          <ul className="list-disc list-inside space-y-1">
+            {serialValidationErrors.map((error, idx) => (
+              <li key={idx} className="text-sm">{error}</li>
+            ))}
+          </ul>
+        </div>,
+        { duration: 8000 }
+      );
       return;
     }
 
@@ -675,40 +755,44 @@ export function InvoiceForm({
                     <React.Fragment key={field.id}>
                     <tr className="border-b">
                       <td className="p-2">
-                        <Select
-                          value={item?.productId || ''}
-                          onValueChange={(value) => {
-                            handleProductSelect(index, value);
+                        <SearchableProductDropdown
+                          products={localProducts}
+                          selectedProductId={item?.productId || ''}
+                          onProductSelect={(productId) => {
+                            handleProductSelect(index, productId);
                             setActiveRowIndex(index);
                           }}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {localProducts.map((product) => {
-                              const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
-                              return (
-                                <SelectItem 
-                                  key={product.id} 
-                                  value={product.id}
-                                  disabled={isOutOfStock}
-                                >
-                                  {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
+                          onProductAdded={(newProduct) => {
+                            // Add to local products list
+                            setLocalProducts(prev => [...prev, newProduct]);
+                            // Call parent callback to refresh products list
+                            onProductAdded?.(newProduct);
+                            // Auto-select the new product
+                            handleProductSelect(index, newProduct.id);
+                          }}
+                          companyId={companyId}
+                          placeholder="Search or select product..."
+                          className="min-w-[200px]"
+                        />
                         {/* Manage Serials Button */}
-                            {product?.hasSerialNumber && (
+                        {product?.hasSerialNumber && (
                           <div className="mt-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                              Manage Serials
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setSerialModalIndex(index)}
+                              disabled={!quantity || quantity <= 0}
+                              className="text-xs px-2 py-1"
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Manage Serial
+                              {(serialNumbers[index] || []).filter(Boolean).length > 0 && (
+                                <span className="ml-1 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs">
+                                  {(serialNumbers[index] || []).filter(Boolean).length}
+                                </span>
+                              )}
                             </Button>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {(serialNumbers[index] || []).filter(Boolean).length} selected
-                            </div>
                           </div>
                         )}
                       </td>
@@ -727,16 +811,42 @@ export function InvoiceForm({
                           name={`items.${index}.quantity` as const}
                           defaultValue={item?.quantity ?? ''}
                           render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
+                            <div className="space-y-1">
+                              <Input
+                                type="number"
+                                step="1"
+                                min="1"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  
+                                  // Stock validation for products
+                                  if (product && product.type === 'product' && typeof product.stock === 'number' && newQuantity > 0) {
+                                    if (newQuantity > product.stock) {
+                                      toast.error(`Insufficient stock for ${product.productName}. Available: ${product.stock}, Required: ${newQuantity}`);
+                                      return; // Don't update the field
+                                    }
+                                  }
+                                  
+                                  field.onChange(newQuantity);
+                                  
+                                  // Clear serial numbers when quantity changes
+                                  if (product?.hasSerialNumber && newQuantity > 0) {
+                                    setSerialNumbers(prev => ({
+                                      ...prev,
+                                      [index]: []
+                                    }));
+                                  }
+                                }}
+                                className="text-center w-full text-base font-medium"
+                              />
+                              {product && product.type === 'product' && typeof product.stock === 'number' && (
+                                <p className="text-xs text-muted-foreground text-center">
+                                  Stock: {product.stock}
+                                </p>
+                              )}
+                            </div>
                           )}
                         />
                       </td>
@@ -829,40 +939,43 @@ export function InvoiceForm({
 
                     {/* Product Selection */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Product/Service</Label>
-                      <Select
-                        value={item?.productId || ''}
-                        onValueChange={(value) => {
-                          handleProductSelect(index, value);
+                      <SearchableProductDropdown
+                        products={localProducts}
+                        selectedProductId={item?.productId || ''}
+                        onProductSelect={(productId) => {
+                          handleProductSelect(index, productId);
                           setActiveRowIndex(index);
                         }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {localProducts.map((product) => {
-                            const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
-                            return (
-                              <SelectItem 
-                                key={product.id} 
-                                value={product.id}
-                                disabled={isOutOfStock}
-                              >
-                                {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                        onProductAdded={(newProduct) => {
+                          // Add to local products list
+                          setLocalProducts(prev => [...prev, newProduct]);
+                          // Call parent callback to refresh products list
+                          onProductAdded?.(newProduct);
+                          // Auto-select the new product
+                          handleProductSelect(index, newProduct.id);
+                        }}
+                        companyId={companyId}
+                        label="Product/Service"
+                        placeholder="Search or select product..."
+                      />
                       {product?.hasSerialNumber && (
                         <div className="mt-2">
-                          <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                            Manage Serials
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setSerialModalIndex(index)}
+                            disabled={!quantity || quantity <= 0}
+                            className="w-full"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Serial Numbers
+                            {(serialNumbers[index] || []).filter(Boolean).length > 0 && (
+                              <span className="ml-2 bg-primary text-primary-foreground rounded-full px-2 py-1 text-xs">
+                                {(serialNumbers[index] || []).filter(Boolean).length} added
+                              </span>
+                            )}
                           </Button>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {(serialNumbers[index] || []).filter(Boolean).length} selected
-                          </div>
                         </div>
                       )}
                     </div>
@@ -876,16 +989,42 @@ export function InvoiceForm({
                           name={`items.${index}.quantity` as const}
                           defaultValue={item?.quantity ?? ''}
                           render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center text-lg font-semibold"
-                            />
+                            <div className="space-y-1">
+                              <Input
+                                type="number"
+                                step="1"
+                                min="1"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  
+                                  // Stock validation for products
+                                  if (product && product.type === 'product' && typeof product.stock === 'number' && newQuantity > 0) {
+                                    if (newQuantity > product.stock) {
+                                      toast.error(`Insufficient stock for ${product.productName}. Available: ${product.stock}, Required: ${newQuantity}`);
+                                      return; // Don't update the field
+                                    }
+                                  }
+                                  
+                                  field.onChange(newQuantity);
+                                  
+                                  // Clear serial numbers when quantity changes
+                                  if (product?.hasSerialNumber && newQuantity > 0) {
+                                    setSerialNumbers(prev => ({
+                                      ...prev,
+                                      [index]: []
+                                    }));
+                                  }
+                                }}
+                                className="text-center text-lg font-semibold"
+                              />
+                              {product && product.type === 'product' && typeof product.stock === 'number' && (
+                                <p className="text-xs text-muted-foreground text-center">
+                                  Stock: {product.stock}
+                                </p>
+                              )}
+                            </div>
                           )}
                         />
                       </div>

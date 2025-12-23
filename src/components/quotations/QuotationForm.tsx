@@ -16,10 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, FileText, MapPin } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator, FileText, MapPin, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatClientDropdownLabel } from '@/utils/formatters';
-import { SearchableClientDropdown } from '@/components/shared';
+import { SearchableClientDropdown, SearchableProductDropdown } from '@/components/shared';
+import SerialManager from '@/components/shared/SerialManager';
 import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
@@ -38,6 +39,7 @@ interface QuotationFormProps {
   onSubmit: (data: QuotationFormData) => Promise<void>;
   onCancel?: () => void;
   onClientAdded?: (client: Client) => void;
+  onProductAdded?: (product: Product) => void;
 }
 
 export function QuotationForm({
@@ -51,9 +53,33 @@ export function QuotationForm({
   onSubmit,
   onCancel,
   onClientAdded,
+  onProductAdded,
 }: QuotationFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  
+  // Serial number management state
+  const [serialModalIndex, setSerialModalIndex] = useState<number | null>(null);
+  const [itemSerialNumbers, setItemSerialNumbers] = useState<Record<number, string[]>>({});
+
+  // Sync localProducts with props.products
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
+  // Initialize serial numbers for existing quotation
+  useEffect(() => {
+    if (quotation?.items) {
+      const serialMap: Record<number, string[]> = {};
+      quotation.items.forEach((item, index) => {
+        if (item.serialNumbers && item.serialNumbers.length > 0) {
+          serialMap[index] = item.serialNumbers;
+        }
+      });
+      setItemSerialNumbers(serialMap);
+    }
+  }, [quotation]);
 
   // Shipping Address State
   // default behavior changed: do NOT include shipping address unless user opts in
@@ -143,11 +169,26 @@ export function QuotationForm({
 
   // Handle product selection for an item
   const handleProductSelect = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const product = localProducts.find(p => p.id === productId);
     if (product) {
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
+      
+      // Clear serial numbers when product changes
+      setItemSerialNumbers(prev => ({
+        ...prev,
+        [index]: []
+      }));
     }
+  };
+
+  // Handle serial number management
+  const handleSerialSave = async (index: number, serialNumbers: string[]) => {
+    setItemSerialNumbers(prev => ({
+      ...prev,
+      [index]: serialNumbers
+    }));
+    setSerialModalIndex(null);
   };
 
   // Calculate totals
@@ -165,9 +206,14 @@ export function QuotationForm({
 
     const isInterState = companyState !== selectedClient.address.state;
 
-    const processedItems: InvoiceItem[] = validItems.map((item: any) => {
-      const product = products.find(p => p.id === item.productId);
+    const processedItems: InvoiceItem[] = validItems.map((item: any, validIndex: number) => {
+      const product = localProducts.find(p => p.id === item.productId);
       if (!product) return null;
+
+      // Find the original index in watchItems
+      const originalIndex = watchItems.findIndex((watchItem: any, index: number) => 
+        watchItem === item
+      );
 
       const quantity = Number(item.quantity) || 0;
       const unitPrice = Number(item.unitPrice) || 0;
@@ -226,6 +272,11 @@ export function QuotationForm({
         quotationItem.itemCode = product.itemCode;
       }
 
+      // Add serial numbers if product requires them and they are provided
+      if (product.hasSerialNumber && originalIndex !== -1 && itemSerialNumbers[originalIndex]) {
+        quotationItem.serialNumbers = itemSerialNumbers[originalIndex];
+      }
+
       return quotationItem;
     }).filter(Boolean) as InvoiceItem[];
 
@@ -237,7 +288,7 @@ export function QuotationForm({
       validItems.map(item => ({
         amount: Number(item.unitPrice) || 0,
         quantity: Number(item.quantity) || 0,
-        gstRate: products.find(p => p.id === item.productId)?.gstRate || 0,
+        gstRate: localProducts.find(p => p.id === item.productId)?.gstRate || 0,
         discount: Number(item.discount) || 0,
       })),
       companyState,
@@ -262,6 +313,24 @@ export function QuotationForm({
     if (!totals || totals.items.length === 0) {
       toast.error('Please add valid items to the quotation');
       return;
+    }
+
+    // Validate serial numbers for products that require them
+    for (let i = 0; i < watchItems.length; i++) {
+      const item = watchItems[i];
+      if (!item.productId || !item.quantity || item.quantity <= 0 || !item.unitPrice || item.unitPrice < 0) {
+        continue; // Skip invalid items
+      }
+      
+      const product = localProducts.find(p => p.id === item.productId);
+      if (product?.hasSerialNumber) {
+        const serialNumbers = itemSerialNumbers[i] || [];
+        const quantity = Number(item.quantity) || 0;
+        if (serialNumbers.length !== quantity) {
+          toast.error(`Please provide exactly ${quantity} serial number(s) for ${product.productName}`);
+          return;
+        }
+      }
     }
 
     // Determine Shipping Address - only include when user opts in (shippingAddressMode !== 'none')
@@ -538,13 +607,14 @@ export function QuotationForm({
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
                   <th className="p-2 text-right w-36">Amount</th>
+                  <th className="p-2 text-center w-32">Serial</th>
                   <th className="p-2 w-16"></th>
                 </tr>
               </thead>
               <tbody>
                 {fields.map((field, index) => {
                   const item = watchItems?.[index];
-                  const product = item?.productId ? products.find(p => p.id === item.productId) : null;
+                  const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
                   const quantity = Number(item?.quantity) || 0;
                   const unitPrice = Number(item?.unitPrice) || 0;
                   const discount = Number(item?.discount) || 0;
@@ -553,21 +623,22 @@ export function QuotationForm({
                   return (
                     <tr key={field.id} className="border-b">
                       <td className="p-2">
-                        <Select
-                          value={item?.productId || ''}
-                          onValueChange={(value) => handleProductSelect(index, value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.productName} ({product.hsn})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableProductDropdown
+                          products={localProducts}
+                          selectedProductId={item?.productId || ''}
+                          onProductSelect={(productId) => handleProductSelect(index, productId)}
+                          onProductAdded={(newProduct) => {
+                            // Add to local products list
+                            setLocalProducts(prev => [...prev, newProduct]);
+                            // Call parent callback to refresh products list
+                            onProductAdded?.(newProduct);
+                            // Auto-select the new product
+                            handleProductSelect(index, newProduct.id);
+                          }}
+                          companyId={companyId}
+                          placeholder="Search or select product..."
+                          className="min-w-[200px]"
+                        />
                       </td>
                       <td className="p-2 text-center">
                         {product?.itemCode ? (
@@ -584,15 +655,46 @@ export function QuotationForm({
                           name={`items.${index}.quantity` as const}
                           defaultValue={item?.quantity ?? ''}
                           render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
+                            <div className="space-y-1">
+                              <Input
+                                type="number"
+                                step="1"
+                                min="1"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  if (newQuantity === '') {
+                                    field.onChange('');
+                                    return;
+                                  }
+                                  
+                                  // Check stock before setting quantity
+                                  if (product && product.type === 'product' && typeof product.stock === 'number') {
+                                    if (newQuantity > product.stock) {
+                                      toast.error(`Insufficient stock for ${product.productName}. Available: ${product.stock}, Required: ${newQuantity}`);
+                                      return; // Don't update the field
+                                    }
+                                  }
+                                  
+                                  field.onChange(newQuantity);
+                                  
+                                  // Clear serial numbers if quantity changes for products with serial numbers
+                                  if (product?.hasSerialNumber) {
+                                    setItemSerialNumbers(prev => ({
+                                      ...prev,
+                                      [index]: []
+                                    }));
+                                  }
+                                }}
+                                className="text-center w-full text-base font-medium"
+                              />
+                              {product && product.type === 'product' && typeof product.stock === 'number' && (
+                                <p className="text-xs text-muted-foreground text-center">
+                                  Stock: {product.stock}
+                                </p>
+                              )}
+                            </div>
                           )}
                         />
                       </td>
@@ -637,6 +739,28 @@ export function QuotationForm({
                       <td className="p-2 text-right font-medium text-base">
                         {formatCurrency(amount)}
                       </td>
+                      <td className="p-2 text-center">
+                        {product?.hasSerialNumber ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSerialModalIndex(index)}
+                            disabled={!product || !quantity || quantity <= 0}
+                            className="text-xs px-2 py-1"
+                          >
+                            <Settings className="h-3 w-3 mr-1" />
+                            Manage
+                            {itemSerialNumbers[index]?.length > 0 && (
+                              <span className="ml-1 bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs">
+                                {itemSerialNumbers[index].length}
+                              </span>
+                            )}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="p-2">
                         <Button
                           type="button"
@@ -680,22 +804,22 @@ export function QuotationForm({
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Product/Service</Label>
-                      <Select
-                        value={item?.productId || ''}
-                        onValueChange={(value) => handleProductSelect(index, value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.productName} ({product.hsn})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableProductDropdown
+                        products={localProducts}
+                        selectedProductId={item?.productId || ''}
+                        onProductSelect={(productId) => handleProductSelect(index, productId)}
+                        onProductAdded={(newProduct) => {
+                          // Add to local products list
+                          setLocalProducts(prev => [...prev, newProduct]);
+                          // Call parent callback to refresh products list
+                          onProductAdded?.(newProduct);
+                          // Auto-select the new product
+                          handleProductSelect(index, newProduct.id);
+                        }}
+                        companyId={companyId}
+                        label="Product/Service"
+                        placeholder="Search or select product..."
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -705,17 +829,51 @@ export function QuotationForm({
                           control={control}
                           name={`items.${index}.quantity` as const}
                           defaultValue={item?.quantity ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center text-lg font-semibold"
-                            />
-                          )}
+                          render={({ field }) => {
+                            const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+                            return (
+                              <div className="space-y-1">
+                                <Input
+                                  type="number"
+                                  step="1"
+                                  min="1"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                  onChange={(e) => {
+                                    const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                    if (newQuantity === '') {
+                                      field.onChange('');
+                                      return;
+                                    }
+                                    
+                                    // Check stock before setting quantity
+                                    if (product && product.type === 'product' && typeof product.stock === 'number') {
+                                      if (newQuantity > product.stock) {
+                                        toast.error(`Insufficient stock for ${product.productName}. Available: ${product.stock}, Required: ${newQuantity}`);
+                                        return; // Don't update the field
+                                      }
+                                    }
+                                    
+                                    field.onChange(newQuantity);
+                                    
+                                    // Clear serial numbers if quantity changes for products with serial numbers
+                                    if (product?.hasSerialNumber) {
+                                      setItemSerialNumbers(prev => ({
+                                        ...prev,
+                                        [index]: []
+                                      }));
+                                    }
+                                  }}
+                                  className="text-center text-lg font-semibold"
+                                />
+                                {product && product.type === 'product' && typeof product.stock === 'number' && (
+                                  <p className="text-xs text-muted-foreground text-center">
+                                    Stock: {product.stock}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -842,6 +1000,26 @@ export function QuotationForm({
           <span className="font-semibold">{quotation ? 'Update Quotation' : 'Create Quotation'}</span>
         </Button>
       </div>
+
+      {/* Serial Number Management Modal */}
+      {serialModalIndex !== null && (() => {
+        const item = watchItems?.[serialModalIndex];
+        const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+        const quantity = Number(item?.quantity) || 0;
+        
+        return (
+          <SerialManager
+            open={true}
+            onClose={() => setSerialModalIndex(null)}
+            productId={product?.id}
+            initialSelected={itemSerialNumbers[serialModalIndex] || []}
+            quantity={quantity}
+            fetchFromDb={false} // Don't fetch from DB for quotations
+            claimFromDb={false} // Don't claim from DB for quotations
+            onSave={(serialNumbers) => handleSerialSave(serialModalIndex, serialNumbers)}
+          />
+        );
+      })()}
     </form>
   );
 }

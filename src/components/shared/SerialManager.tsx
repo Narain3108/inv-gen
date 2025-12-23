@@ -26,8 +26,10 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setSelected(initialSelected || []);
-  }, [initialSelected]);
+    if (open) {
+      setSelected(initialSelected || []);
+    }
+  }, [open, initialSelected]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +61,12 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
     const s = (input || '').trim();
     if (!s) return;
     if (selected.includes(s)) {
-      toast.warning('Already added');
+      toast.warning('Serial number already added');
+      setInput('');
+      return;
+    }
+    if (quantity > 0 && selected.length >= quantity) {
+      toast.warning(`Maximum ${quantity} serial numbers allowed`);
       setInput('');
       return;
     }
@@ -71,7 +78,20 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
 
   const handleSave = async () => {
     if (quantity > 0 && selected.length !== quantity) {
-      toast.error(`Please add ${quantity} serial number(s)`);
+      toast.error(`Please add exactly ${quantity} serial number(s). Currently have ${selected.length}.`);
+      return;
+    }
+
+    // Check for empty serial numbers
+    if (selected.some(s => !s.trim())) {
+      toast.error('Serial numbers cannot be empty');
+      return;
+    }
+
+    // Check for duplicate serial numbers
+    const duplicates = selected.filter((s, i) => selected.indexOf(s) !== i);
+    if (duplicates.length > 0) {
+      toast.error(`Duplicate serial numbers found: ${duplicates.join(', ')}`);
       return;
     }
 
@@ -88,6 +108,7 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
       }
 
       await onSave(selected);
+      toast.success(`${selected.length} serial number(s) saved successfully`);
     } catch (err) {
       console.error('Failed to save serials', err);
       toast.error('Failed to save serials');
@@ -97,61 +118,75 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={(o) => { 
+      if (!o) {
+        // Reset state when closing without saving
+        setSelected(initialSelected || []);
+        setInput('');
+        onClose();
+      }
+    }}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Serial Numbers</DialogTitle>
-          <DialogDescription>Add serials manually or pick available ones.</DialogDescription>
+          <DialogTitle>Manage Serial Numbers</DialogTitle>
+          <DialogDescription>
+            {quantity > 0 ? `Add exactly ${quantity} serial number(s) for this product.` : 'Add serial numbers for this product.'}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 max-h-[56vh] overflow-y-auto">
-          {fetchFromDb && (
-            <div>
-              <Label className="text-sm font-medium">Available</Label>
-              {loading ? (
-                <p className="text-xs text-muted-foreground">Loading…</p>
-              ) : available.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No available serials</p>
-              ) : (
-                <div className="space-y-1 mt-2">
-                  {available.map(s => (
-                    <div key={s} className="flex items-center justify-between gap-3">
-                      <div className="font-mono text-sm truncate">{s}</div>
-                      <Button size="sm" type="button" variant="ghost" onClick={() => useAvailable(s)}>Use</Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
+        <div className="flex-1 overflow-y-auto space-y-4 py-2">
           <div>
-            <Label className="text-sm font-medium">Add Serial</Label>
+            <Label className="text-sm font-medium">Add Serial Number</Label>
             <div className="flex gap-2 mt-2">
-              <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Enter serial" />
-              <Button type="button" onClick={addManual}>Add</Button>
+              <Input 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                placeholder="Enter serial number" 
+                onKeyPress={(e) => e.key === 'Enter' && addManual()}
+                className="flex-1"
+              />
+              <Button type="button" onClick={addManual} disabled={!input.trim()}>
+                Add
+              </Button>
             </div>
+            {quantity > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {selected.length} of {quantity} serial numbers added
+              </p>
+            )}
           </div>
 
           <div>
-            <Label className="text-sm font-medium">Selected</Label>
-            {selected.length === 0 && <p className="text-xs text-muted-foreground">No serials selected</p>}
-            <div className="space-y-1 mt-2">
-              {selected.map(s => (
-                <div key={s} className="flex items-center justify-between gap-3">
-                  <div className="font-mono text-sm truncate">{s}</div>
-                  <Button size="sm" type="button" variant="ghost" onClick={() => removeSelected(s)}>Remove</Button>
-                </div>
-              ))}
-            </div>
+            <Label className="text-sm font-medium">Selected Serial Numbers</Label>
+            {selected.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">No serials selected</p>
+            ) : (
+              <div className="space-y-1 mt-2 max-h-40 overflow-y-auto border rounded p-2 bg-blue-50">
+                {selected.map((s, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3 py-1">
+                    <div className="font-mono text-sm truncate flex-1">{s}</div>
+                    <Button size="sm" type="button" variant="ghost" onClick={() => removeSelected(s)} className="text-xs px-2 py-1 h-6 text-red-600 hover:text-red-800">
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        <DialogFooter>
-          <div className="flex gap-2 w-full justify-end">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="button" onClick={handleSave}>Save</Button>
-          </div>
+        <DialogFooter className="flex gap-2 pt-4 border-t">
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button 
+            type="button" 
+            onClick={handleSave} 
+            disabled={quantity > 0 && selected.length !== quantity}
+            className="flex-1"
+          >
+            Save ({selected.length})
+          </Button>
         </DialogFooter>
         <DialogClose />
       </DialogContent>

@@ -25,8 +25,8 @@ type ProductFormData = z.infer<typeof productFormSchema>;
 
 interface SearchableProductDropdownProps {
   products: Product[];
-  selectedProductName?: string;
-  onProductSelect: (productName: string, product?: Product) => void;
+  selectedProductId?: string;
+  onProductSelect: (productId: string) => void;
   onProductAdded?: (product: Product) => void;
   placeholder?: string;
   label?: string;
@@ -34,11 +34,12 @@ interface SearchableProductDropdownProps {
   error?: string;
   companyId: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SearchableProductDropdown({
   products,
-  selectedProductName,
+  selectedProductId,
   onProductSelect,
   onProductAdded,
   placeholder = "Search or select product...",
@@ -46,7 +47,8 @@ export function SearchableProductDropdown({
   required = false,
   error,
   companyId,
-  className
+  className,
+  disabled = false
 }: SearchableProductDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,19 +58,25 @@ export function SearchableProductDropdown({
   const inputRef = useRef<HTMLInputElement>(null);
   const { refreshProducts } = useAppData();
 
-  const selectedProduct = products.find(p => p.productName === selectedProductName);
+  const selectedProduct = products.find(p => p.id === selectedProductId);
 
   // Filter products based on search term
-  const filteredProducts = products.filter(product =>
-    product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.hsn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.itemCode?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
+    if (isOutOfStock) return false; // Hide out of stock products
+    
+    return (
+      product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.hsn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || disabled) return;
 
       switch (e.key) {
         case 'ArrowDown':
@@ -100,7 +108,7 @@ export function SearchableProductDropdown({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, highlightedIndex, filteredProducts, searchTerm]);
+  }, [isOpen, highlightedIndex, filteredProducts, searchTerm, disabled]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -117,7 +125,7 @@ export function SearchableProductDropdown({
   }, []);
 
   const handleProductSelect = (product: Product) => {
-    onProductSelect(product.productName, product);
+    onProductSelect(product.id);
     setIsOpen(false);
     setSearchTerm('');
     setHighlightedIndex(-1);
@@ -125,29 +133,55 @@ export function SearchableProductDropdown({
 
   const handleAddProduct = async (data: ProductFormData) => {
     try {
-      const productData = {
+      const newProduct = await productsApi.create({
         ...data,
         companyId,
-      };
-      const newProduct = await productsApi.create(productData);
+      });
       
       toast.success('Product added successfully');
       // Refresh the global products list
       await refreshProducts();
       onProductAdded?.(newProduct);
-      onProductSelect(newProduct.productName, newProduct);
+      onProductSelect(newProduct.id);
       setIsAddProductOpen(false);
       setSearchTerm('');
     } catch (error) {
       console.error('Failed to add product:', error);
       toast.error('Failed to add product');
-      throw error;
     }
   };
 
+  const formatProductLabel = (product: Product) => {
+    const parts = [product.productName];
+    if (product.itemCode) parts.push(`(${product.itemCode})`);
+    if (product.hsn) parts.push(`HSN: ${product.hsn}`);
+    return parts.join(' ');
+  };
+
   const displayValue = selectedProduct 
-    ? selectedProduct.productName
-    : selectedProductName || '';
+    ? formatProductLabel(selectedProduct)
+    : '';
+
+  if (disabled) {
+    return (
+      <div className={cn("space-y-2", className)}>
+        {label && (
+          <Label>
+            {label} {required && <span className="text-red-500">*</span>}
+          </Label>
+        )}
+        <Input
+          value={displayValue}
+          placeholder={placeholder}
+          disabled
+          className="bg-muted"
+        />
+        {error && (
+          <p className="text-sm text-red-500">{error}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-2", className)} ref={dropdownRef}>
@@ -160,7 +194,7 @@ export function SearchableProductDropdown({
       <div className="relative">
         <div
           className={cn(
-            "flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer",
+            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer",
             "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
             error && "border-red-500"
           )}
@@ -177,10 +211,6 @@ export function SearchableProductDropdown({
               setSearchTerm(e.target.value);
               setHighlightedIndex(-1);
               if (!isOpen) setIsOpen(true);
-              // Allow typing custom product names
-              if (!isOpen) {
-                onProductSelect(e.target.value);
-              }
             }}
             onFocus={() => setIsOpen(true)}
             placeholder={placeholder}
@@ -207,20 +237,25 @@ export function SearchableProductDropdown({
                       className={cn(
                         "px-3 py-2 cursor-pointer text-sm hover:bg-accent hover:text-accent-foreground",
                         index === highlightedIndex && "bg-accent text-accent-foreground",
-                        selectedProductName === product.productName && "bg-primary/10"
+                        selectedProductId === product.id && "bg-primary/10"
                       )}
                       onClick={() => handleProductSelect(product)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-medium">{product.productName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {product.hsn} • ₹{product.price} • {product.unit}
-                            {product.itemCode && ` • ${product.itemCode}`}
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate font-medium">
+                            {product.productName}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {product.itemCode && `Code: ${product.itemCode} • `}
+                            HSN: {product.hsn} • ₹{product.price}
+                            {product.type === 'product' && typeof product.stock === 'number' && (
+                              ` • Stock: ${product.stock}`
+                            )}
                           </div>
                         </div>
-                        {selectedProductName === product.productName && (
-                          <Check className="h-4 w-4 text-primary" />
+                        {selectedProductId === product.id && (
+                          <Check className="h-4 w-4 text-primary ml-2 flex-shrink-0" />
                         )}
                       </div>
                     </div>
@@ -237,7 +272,7 @@ export function SearchableProductDropdown({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-start bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold"
+                  className="w-full justify-start"
                   onClick={() => {
                     setIsAddProductOpen(true);
                     setIsOpen(false);
@@ -259,11 +294,11 @@ export function SearchableProductDropdown({
 
       {/* Add Product Dialog */}
       <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Product</DialogTitle>
             <DialogDescription>
-              Create a new product to add to your catalog.
+              Create a new product to add to your inventory.
               {searchTerm.trim() && ` The product name will be pre-filled with "${searchTerm.trim()}".`}
             </DialogDescription>
           </DialogHeader>
@@ -275,7 +310,6 @@ export function SearchableProductDropdown({
               productName: searchTerm.trim(),
               type: 'product',
               unit: 'Nos',
-              price: 0,
               gstRate: 18,
               cessRate: 0,
               hasSerialNumber: false

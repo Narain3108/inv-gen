@@ -36,7 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       // Check for User Session only
       const storedUser = localStorage.getItem('userData');
-      if (storedUser) {
+      const storedToken = localStorage.getItem('userToken');
+      const storedUserId = localStorage.getItem('userId');
+      
+      if (storedUser && storedToken && storedUserId) {
         try {
           // Verify user session with backend
           try {
@@ -48,11 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn('User session invalid:', verifyError);
             localStorage.removeItem('userData');
             localStorage.removeItem('userToken');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('csrfToken');
+            localStorage.removeItem('csrfExpiry');
             setUser(null);
           }
         } catch (e) {
           localStorage.removeItem('userData');
           localStorage.removeItem('userToken');
+          localStorage.removeItem('userId');
+          localStorage.removeItem('csrfToken');
+          localStorage.removeItem('csrfExpiry');
         }
       }
 
@@ -77,7 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signupUser = async (data: any) => {
     try {
       const { username, name, email, password } = data;
-      await authApi.signup(email, password, name, username);
+      const signupResponse = await authApi.signup(email, password, name, username);
+
+      // After signup, login to get the token
+      const loginResponse = await authApi.login(email, password);
+      
+      // Store the token for fallback authentication
+      localStorage.setItem('userToken', loginResponse.token);
+      localStorage.setItem('userId', loginResponse.localId);
 
       // After signup, fetch current user
       const freshUser = await usersApi.getMe();
@@ -104,7 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginUser = async (email: string, password: string) => {
     try {
-      await authApi.login(email, password);
+      const loginResponse = await authApi.login(email, password);
+
+      // Store the token for fallback authentication
+      localStorage.setItem('userToken', loginResponse.token);
+      localStorage.setItem('userId', loginResponse.localId);
 
       // Fetch user profile
       const freshUser = await usersApi.getMe();
@@ -145,6 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         localStorage.removeItem('userData');
         localStorage.removeItem('userToken');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('csrfToken');
+        localStorage.removeItem('csrfExpiry');
         clearSelectedCompany();
         if (shouldRedirect) {
           router.push('/auth/login');

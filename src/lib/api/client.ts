@@ -107,8 +107,11 @@ class ApiClient {
           console.warn('[apiClient] 401 Unauthorized received. Clearing local session and redirecting to login.');
           localStorage.removeItem('userData');
           localStorage.removeItem('userToken');
+          localStorage.removeItem('userId');
           localStorage.removeItem('orgData');
           localStorage.removeItem('orgToken');
+          localStorage.removeItem('csrfToken');
+          localStorage.removeItem('csrfExpiry');
           // Give caller a chance to handle before redirecting in SPA environments
           setTimeout(() => {
             try {
@@ -137,7 +140,37 @@ class ApiClient {
     return response.json();
   }
 
-  private getHeaders(customHeaders?: HeadersInit): HeadersInit {
+  private async fetchCsrfToken(): Promise<string | null> {
+    try {
+      const userToken = localStorage.getItem('userToken');
+      
+      const response = await fetch(`${this.baseURL}/auth/csrf-token`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': userToken ? `Bearer ${userToken}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const csrfToken = data.csrf_token;
+        // Cache token for 1 hour
+        localStorage.setItem('csrfToken', csrfToken);
+        localStorage.setItem('csrfExpiry', (Date.now() + 3600000).toString());
+        return csrfToken;
+      } else {
+        console.warn('[apiClient] Failed to fetch CSRF token:', response.status, response.statusText);
+        return null;
+      }
+    } catch (e) {
+      console.warn('[apiClient] Failed to fetch CSRF token:', e);
+      return null;
+    }
+  }
+
+  private async getHeaders(customHeaders?: HeadersInit): Promise<HeadersInit> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -145,14 +178,40 @@ class ApiClient {
     // Add User ID if available (Fallback for non-cookie environments)
     if (typeof window !== 'undefined') {
       const userId = localStorage.getItem('userId');
+      const userToken = localStorage.getItem('userToken');
+      const userData = localStorage.getItem('userData');
+      
       if (userId) {
         headers['x-user-id'] = userId;
       }
       
       // Also send token in Authorization header as fallback if cookie fails
-      const userToken = localStorage.getItem('userToken');
       if (userToken) {
         headers['Authorization'] = `Bearer ${userToken}`;
+      }
+
+      // Add CSRF token for cookie-based authentication
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          
+          if (user.id) {
+            // Try to get cached CSRF token first
+            let csrfToken = localStorage.getItem('csrfToken');
+            const csrfExpiry = localStorage.getItem('csrfExpiry');
+            
+            // Check if token is expired or doesn't exist
+            if (!csrfToken || !csrfExpiry || Date.now() > parseInt(csrfExpiry)) {
+              csrfToken = await this.fetchCsrfToken();
+            }
+            
+            if (csrfToken) {
+              headers['X-CSRF-Token'] = csrfToken;
+            }
+          }
+        } catch (e) {
+          console.warn('[apiClient] Error parsing userData:', e);
+        }
       }
     }
 
@@ -187,9 +246,10 @@ class ApiClient {
 
     const promise = (async () => {
       try {
+        const headers = await this.getHeaders();
         const response = await fetch(key, {
           method: 'GET',
-          headers: this.getHeaders(),
+          headers,
           credentials: 'include', // Send cookies
           cache: 'no-store', // Prevent caching of API responses
         });
@@ -218,9 +278,10 @@ class ApiClient {
       console.debug('[apiClient] POST', url, bodyData);
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(url, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers,
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -240,9 +301,10 @@ class ApiClient {
       console.debug('[apiClient] PUT', url, bodyData);
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(url, {
       method: 'PUT',
-      headers: this.getHeaders(),
+      headers,
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -262,9 +324,10 @@ class ApiClient {
       console.debug('[apiClient] PATCH', url, bodyData);
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: this.getHeaders(),
+      headers,
       body: JSON.stringify(bodyData),
       credentials: 'include', // Send cookies
     });
@@ -283,9 +346,10 @@ class ApiClient {
       console.debug('[apiClient] DELETE', url);
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: this.getHeaders(),
+      headers,
       credentials: 'include', // Send cookies
     });
 

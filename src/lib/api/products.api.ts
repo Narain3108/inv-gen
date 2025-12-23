@@ -66,4 +66,16 @@ export const productsApi = {
       current_stock: quantity 
     });
   },
+
+  /**
+   * Check stock availability for a product
+   */
+  checkStock: async (id: string, quantity: number): Promise<{
+    available: boolean;
+    currentStock: number | null;
+    requestedQuantity: number;
+    message: string;
+  }> => {
+    return apiClient.post(`/products/${id}/check-stock`, { quantity });
+  },
 };
