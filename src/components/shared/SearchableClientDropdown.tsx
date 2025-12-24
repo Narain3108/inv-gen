@@ -196,11 +196,15 @@ export function SearchableClientDropdown({
             id="client-search"
             value={isOpen ? searchTerm : displayValue}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setHighlightedIndex(-1);
-              if (!isOpen) setIsOpen(true);
-            }}
-            onFocus={() => setIsOpen(true)}
+                const v = e.target.value;
+                setSearchTerm(v);
+                setHighlightedIndex(-1);
+                // Only open dropdown when user types a non-empty value
+                if (v && v.trim() !== '') setIsOpen(true);
+              }}
+              onFocus={() => {
+                // Do not auto-open on focus to avoid dropdown opening when form mounts
+              }}
             placeholder={placeholder}
             className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
             autoComplete="off"

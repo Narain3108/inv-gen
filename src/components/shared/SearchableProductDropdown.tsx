@@ -179,15 +179,19 @@ export function SearchableProductDropdown({
             id="product-search"
             value={isOpen ? searchTerm : displayValue}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
+              const v = e.target.value;
+              setSearchTerm(v);
               setHighlightedIndex(-1);
-              if (!isOpen) setIsOpen(true);
-              // Allow typing custom product names
-              if (!isOpen) {
-                onProductSelect(e.target.value);
+              // Only open dropdown when user types a non-empty value
+              if (v && v.trim() !== '') setIsOpen(true);
+              // If dropdown is closed and user is typing, allow passing the typed name upstream
+              if (!isOpen && v && v.trim() !== '') {
+                onProductSelect(v);
               }
             }}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => {
+              // Do not auto-open on focus to avoid opening when form mounts
+            }}
             placeholder={placeholder}
             className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
             autoComplete="off"
