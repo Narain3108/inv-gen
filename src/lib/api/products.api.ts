@@ -66,4 +66,18 @@ export const productsApi = {
       current_stock: quantity 
     });
   },
+
+  /**
+   * Get serial numbers for a product with optional status filter
+   */
+  getSerials: async (id: string, status?: 'used' | 'unused'): Promise<{
+    productId: string;
+    productName: string;
+    hasSerialNumber: boolean;
+    totalSerials: number;
+    serials: Record<string, any>;
+  }> => {
+    const params = status ? { status } : {};
+    return apiClient.get(`/products/${id}/serials`, params);
+  },
 };

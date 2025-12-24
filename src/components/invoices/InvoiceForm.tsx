@@ -69,8 +69,9 @@ export function InvoiceForm({
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [serialNumbers, setSerialNumbers] = useState<Record<number, string[]>>({});
-  const [serialNumberErrors, setSerialNumberErrors] = useState<Record<number, string>>({});
+  const [serialNumbers, setSerialNumbers] = useState<Record<string, string[]>>({});
+  const [serialNumberErrors, setSerialNumberErrors] = useState<Record<string, string>>({});
+  const [originalItems, setOriginalItems] = useState<Record<string, { productId: string; quantity: number }>>({});
   const [localProducts, setLocalProducts] = useState<Product[]>(products);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
@@ -93,20 +94,9 @@ export function InvoiceForm({
     setLocalProducts(products);
   }, [products]);
 
-  // If editing an existing invoice, load its serial numbers into local state so the SerialManager
+  // (moved) If editing an existing invoice, load its serial numbers into local state so the SerialManager
   // shows the already-saved serials for each item when editing.
-  useEffect(() => {
-    if (!invoice) return;
-    const map: Record<number, string[]> = {};
-    (invoice.items || []).forEach((it, idx) => {
-      if (it.serialNumbers && Array.isArray(it.serialNumbers) && it.serialNumbers.length > 0) {
-        map[idx] = it.serialNumbers as string[];
-      }
-    });
-    if (Object.keys(map).length > 0) {
-      setSerialNumbers(map);
-    }
-  }, [invoice]);
+  // This effect was moved below to run after `fields` is declared by useFieldArray.
   
   // Shipping Address State (opt-in)
   const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
@@ -126,6 +116,7 @@ export function InvoiceForm({
     watch,
     control,
     clearErrors,
+    setError,
     formState: { errors },
   } = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema) as any,
@@ -163,6 +154,33 @@ export function InvoiceForm({
     control,
     name: 'items',
   });
+
+  // If editing an existing invoice, load its serial numbers into local state so the SerialManager
+  // shows the already-saved serials for each item when editing.
+  // Use stable `fields` ids as keys so reorder/add/remove doesn't break mappings.
+  useEffect(() => {
+    if (!invoice || !fields || fields.length === 0) return;
+
+    const serialMap: Record<string, string[]> = {};
+    const origItems: Record<string, { productId: string; quantity: number }> = {};
+
+    // Map invoice items to current field ids by index
+    fields.forEach((field, idx) => {
+      const invItem = (invoice.items || [])[idx];
+      if (!invItem) return;
+      const product = localProducts.find((p) => p.id === invItem.productId);
+      if (product?.hasSerialNumber === true && Array.isArray(invItem.serialNumbers) && invItem.serialNumbers.length > 0) {
+        serialMap[field.id] = [...invItem.serialNumbers];
+      }
+      origItems[field.id] = {
+        productId: invItem.productId || '',
+        quantity: Number(invItem.quantity || 0)
+      };
+    });
+
+    if (Object.keys(serialMap).length > 0) setSerialNumbers((prev) => ({ ...prev, ...serialMap }));
+    setOriginalItems((prev) => ({ ...prev, ...origItems }));
+  }, [invoice, localProducts, fields]);
 
   const watchItems = watch('items');
   const watchClientId = watch('clientId');
@@ -254,21 +272,50 @@ export function InvoiceForm({
       return;
     }
 
-    // Check stock availability FIRST for physical products
-    if (product.type === 'product' && product.stock !== undefined && quantity > product.stock) {
-      setOutOfStockData({
-        product,
-        requestedQuantity: quantity,
-        availableStock: product.stock,
-        itemIndex: index,
-      });
-      setOutOfStockDialogOpen(true);
-      return; // Don't proceed to serial manager if out of stock
+    // If editing an existing invoice, perform delta-based validation
+    const isEdit = !!invoice;
+    const fieldId = fields?.[index]?.id;
+    
+    if (isEdit && product.type === 'product') {
+      // Logic: available_for_edit = s_db + q_old (if product matches)
+      const origItem = fieldId ? originalItems[fieldId] : null;
+      const q_old = (origItem && origItem.productId === product.id) ? origItem.quantity : 0;
+      const s_db = product.stock !== undefined ? product.stock : 0;
+      const available_for_edit = s_db + q_old;
+
+      if (quantity > available_for_edit) {
+        setError(`items.${index}.quantity` as any, {
+          type: 'manual',
+          message: `Insufficient stock for ${product.productName || 'product'}. Max available: ${available_for_edit} (Stock: ${s_db} + Original: ${q_old})`,
+        });
+        toast.error(`Insufficient stock for ${product.productName || 'product'}. Max available: ${available_for_edit}`);
+        return;
+      } else {
+        clearErrors(`items.${index}.quantity` as any);
+      }
+    } else if (!isEdit && product.type === 'product') {
+      // Non-edit (create) behavior: check absolute stock against requested quantity
+      if (product.stock !== undefined && quantity > product.stock) {
+        setOutOfStockData({
+          product,
+          requestedQuantity: quantity,
+          availableStock: product.stock,
+          itemIndex: index,
+        });
+        setOutOfStockDialogOpen(true);
+        return; // Don't proceed to serial manager if out of stock
+      }
     }
 
-    // Only if stock is available AND product has serial numbers
-    if (product.hasSerialNumber && quantity > 0) {
-      setSerialModalIndex(index);
+    // Update quantity in form
+    setValue(`items.${index}.quantity`, quantity);
+    
+    // If product has serial numbers, open serial manager if quantity increased
+    if (product.hasSerialNumber) {
+      const currentSerials = fieldId ? (serialNumbers[fieldId] || []) : [];
+      if (quantity > currentSerials.length) {
+        setSerialModalIndex(index);
+      }
     }
   };
 
@@ -378,9 +425,12 @@ export function InvoiceForm({
         invoiceItem.itemCode = product.itemCode;
       }
 
-      // Map serialNumbers using the original item index
-      if (product.hasSerialNumber && serialNumbers[index]) {
-        invoiceItem.serialNumbers = serialNumbers[index];
+      // ONLY include serial numbers if product has hasSerialNumber === true
+      if (product.hasSerialNumber === true) {
+        const key = fields?.[index]?.id;
+        if (key && serialNumbers[key]) {
+          invoiceItem.serialNumbers = serialNumbers[key];
+        }
       }
 
       return invoiceItem;
@@ -440,24 +490,26 @@ export function InvoiceForm({
 
     // Validate serial numbers for products that require them
     let hasSerialNumberError = false;
-    const newErrors: Record<number, string> = {};
-    
+    const newErrors: Record<string, string> = {};
+
     watchItems.forEach((item: any, index: number) => {
-      const product = localProducts.find(p => p.id === item.productId);
-      if (product?.hasSerialNumber) {
-        const itemSerialNumbers = serialNumbers[index] || [];
+      const product = localProducts.find((p) => p.id === item.productId);
+      // ONLY validate serials for products with hasSerialNumber explicitly set to true
+      if (product?.hasSerialNumber === true) {
+        const key = fields?.[index]?.id;
+        const itemSerialNumbers = key ? (serialNumbers[key] || []) : [];
         const quantity = Number(item.quantity) || 0;
-        
+
         if (itemSerialNumbers.length !== quantity) {
-          newErrors[index] = `Please enter ${quantity} serial number(s) for ${product.productName}`;
+          if (key) newErrors[key] = `Please enter ${quantity} serial number(s) for ${product.productName || 'product'}`;
           hasSerialNumberError = true;
-        } else if (itemSerialNumbers.some(sn => !sn || sn.trim() === '')) {
-          newErrors[index] = `Serial numbers cannot be empty`;
+        } else if (itemSerialNumbers.some((sn) => !sn || sn.trim() === '')) {
+          if (key) newErrors[key] = `Serial numbers cannot be empty`;
           hasSerialNumberError = true;
         }
       }
     });
-    
+
     setSerialNumberErrors(newErrors);
     
     if (hasSerialNumberError) {
@@ -525,12 +577,26 @@ export function InvoiceForm({
       toast.success(invoice ? 'Invoice updated successfully' : 'Invoice created successfully');
     } catch (error: any) {
       console.error('Error saving invoice:', error);
-      const errorMessage = error.response?.data?.detail 
-        ? (Array.isArray(error.response.data.detail) 
-            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
-            : error.response.data.detail)
-        : 'Failed to save invoice';
-      toast.error(errorMessage);
+      
+      // Handle 409 Conflict for serial number unavailability
+      if (error.response?.status === 409) {
+        const detail = error.response?.data?.detail || '';
+        if (detail.includes('Serial numbers no longer available')) {
+          toast.error(
+            `Some serial numbers are no longer available and may have been used in another invoice. Please refresh the product serial list and try again.`,
+            { duration: 6000 }
+          );
+        } else {
+          toast.error(detail || 'Conflict occurred while saving invoice');
+        }
+      } else {
+        const errorMessage = error.response?.data?.detail 
+          ? (Array.isArray(error.response.data.detail) 
+              ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
+              : error.response.data.detail)
+          : 'Failed to save invoice';
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -808,14 +874,14 @@ export function InvoiceForm({
                             })}
                           </SelectContent>
                         </Select>
-                        {/* Manage Serials Button */}
-                            {product?.hasSerialNumber && (
+                        {/* Manage Serials Button - Only for products with serial numbers */}
+                        {product?.hasSerialNumber === true && (
                           <div className="mt-2">
                             <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
                               Manage Serials
                             </Button>
                             <div className="text-xs text-muted-foreground mt-1">
-                              {(serialNumbers[index] || []).filter(Boolean).length} selected
+                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
                             </div>
                           </div>
                         )}
@@ -1006,14 +1072,15 @@ export function InvoiceForm({
                           })}
                         </SelectContent>
                       </Select>
-                      {product?.hasSerialNumber && (
+                      {/* Manage Serials Button - Only for products with serial numbers */}
+                      {product?.hasSerialNumber === true && (
                         <div className="mt-2">
                           <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
                             Manage Serials
                           </Button>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {(serialNumbers[index] || []).filter(Boolean).length} selected
-                          </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                            </div>
                         </div>
                       )}
                     </div>
@@ -1177,18 +1244,24 @@ export function InvoiceForm({
         open={serialModalIndex !== null}
         onClose={() => setSerialModalIndex(null)}
         productId={serialModalIndex !== null ? watchItems?.[serialModalIndex]?.productId : undefined}
-        initialSelected={serialModalIndex !== null ? serialNumbers[serialModalIndex] || [] : []}
+        initialSelected={
+          serialModalIndex !== null
+            ? (fields?.[serialModalIndex]?.id ? (serialNumbers[fields[serialModalIndex].id] || []) : [])
+            : []
+        }
         quantity={serialModalIndex !== null ? Number(watchItems?.[serialModalIndex]?.quantity) || 0 : 0}
         fetchFromDb={true}
         claimFromDb={true}
         onSave={async (selected) => {
           if (serialModalIndex === null) return;
-          setSerialNumbers(prev => ({ ...prev, [serialModalIndex]: selected }));
+          const key = fields?.[serialModalIndex]?.id;
+          if (!key) return;
+          setSerialNumbers((prev) => ({ ...prev, [key]: selected }));
           const productId = watchItems?.[serialModalIndex]?.productId;
           if (productId) {
             try {
               const fresh = await productsApi.getById(productId);
-              setLocalProducts(prev => prev.map(p => p.id === fresh.id ? fresh : p));
+              setLocalProducts((prev) => prev.map((p) => (p.id === fresh.id ? fresh : p)));
             } catch (err) {
               console.error('Failed to refresh product after claiming serials', err);
             }
@@ -1197,18 +1270,23 @@ export function InvoiceForm({
       />
 
       {/* Out of Stock Dialog */}
-      <OutOfStockDialog
-        isOpen={outOfStockDialogOpen}
-        onClose={() => {
-          setOutOfStockDialogOpen(false);
-          setOutOfStockData(null);
-        }}
-        product={outOfStockData?.product || {} as Product}
-        availableStock={outOfStockData?.availableStock || 0}
-        requestedQuantity={outOfStockData?.requestedQuantity || 0}
-        onProceedAnyway={handleOutOfStockProceed}
-        isInvoice={true}
-      />
+      {outOfStockData && (
+        <OutOfStockDialog
+          isOpen={outOfStockDialogOpen}
+          onClose={() => {
+            setOutOfStockDialogOpen(false);
+            setOutOfStockData(null);
+          }}
+          product={{
+            ...outOfStockData.product,
+            name: outOfStockData.product.productName,
+          }}
+          availableStock={outOfStockData.availableStock}
+          requestedQuantity={outOfStockData.requestedQuantity}
+          onProceedAnyway={handleOutOfStockProceed}
+          isInvoice={true}
+        />
+      )}
 
       <div className="flex justify-end gap-3 pt-3">
         {onCancel && (

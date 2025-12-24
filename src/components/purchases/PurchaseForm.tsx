@@ -266,7 +266,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
     setValue(`items.${index}.quantity`, quantity);
 
     // Handle serial number array for purchases
-    if (product.hasSerialNumber) {
+    // ONLY open serial modal if product has hasSerialNumber === true
+    if (product.hasSerialNumber === true) {
       const currentSerials = item.serialNumbers || [];
 
       // If existing serials are more than new quantity, truncate; do NOT auto-extend with empty strings
@@ -498,7 +499,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
           {fields.map((field, index) => {
             const item = watchItems[index];
             const quantity = Number(item.quantity) || 0;
-            const hasSerial = item.hasSerialNumber;
+            const hasSerial = item.hasSerialNumber === true;
 
             return (
               <div key={field.id} className="p-4 rounded-lg border bg-card text-card-foreground shadow-sm relative">
