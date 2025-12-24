@@ -85,9 +85,13 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   // Serial modal index for purchase items
   const [purchaseSerialModalIndex, setPurchaseSerialModalIndex] = useState<number | null>(null);
+  const [purchaseSerials, setPurchaseSerials] = useState<Record<number, string[]>>({});
 
   // App data context for real-time updates
   const { refreshProducts } = useAppData();
+
+  // Local products state for real-time updates
+  const [localProducts, setLocalProducts] = useState<Product[]>([]);
 
   // Load products and categories for autocomplete
   useEffect(() => {
@@ -98,6 +102,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
           categoriesApi.getAll()
         ]);
         setProducts(productsData);
+        setLocalProducts(productsData);
         setCategories(categoriesData);
       } catch (error) {
         console.error("Failed to load data", error);
@@ -161,6 +166,14 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
           serialNumbers: item.serialNumbers || [],
         }))
       });
+      // Initialize local serials map so modal shows existing serials by index
+      const map: Record<number, string[]> = {};
+      (initialData.items || []).forEach((it, idx) => {
+        if (it.serialNumbers && Array.isArray(it.serialNumbers) && it.serialNumbers.length > 0) {
+          map[idx] = it.serialNumbers as string[];
+        }
+      });
+      if (Object.keys(map).length > 0) setPurchaseSerials(map);
     }
   }, [initialData, reset]);
 
@@ -233,6 +246,43 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
       setValue(`items.${index}.hsn`, undefined);
       setValue(`items.${index}.categoryId`, undefined);
       setValue(`items.${index}.itemCode`, undefined);
+    }
+  };
+
+  /**
+   * Handle quantity change with immediate serial number management
+   * For PurchaseForm: No stock validation (we're adding stock)
+   * Auto-opens serial manager if serials are incomplete
+   */
+  const handleQuantityChange = (index: number, quantity: number) => {
+    const item = watchItems?.[index];
+    const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+    
+    if (!product || quantity <= 0 || isNaN(quantity)) {
+      return;
+    }
+
+    // Update quantity for PurchaseForm (do not auto-create empty serials)
+    setValue(`items.${index}.quantity`, quantity);
+
+    // Handle serial number array for purchases
+    if (product.hasSerialNumber) {
+      const currentSerials = item.serialNumbers || [];
+
+      // If existing serials are more than new quantity, truncate; do NOT auto-extend with empty strings
+      let adjustedSerials = [...currentSerials];
+      if (adjustedSerials.length > quantity) {
+        adjustedSerials.splice(quantity);
+        setValue(`items.${index}.serialNumbers`, adjustedSerials);
+      }
+
+      // Auto-open serial modal if serials are incomplete (filled count != quantity)
+      const filledSerials = (currentSerials || []).filter(s => s && s.trim()).length;
+      if (filledSerials !== quantity && quantity > 0) {
+        setTimeout(() => {
+          setPurchaseSerialModalIndex(index);
+        }, 300);
+      }
     }
   };
 
@@ -382,7 +432,7 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
         open={purchaseSerialModalIndex !== null}
         onClose={() => setPurchaseSerialModalIndex(null)}
         productId={purchaseSerialModalIndex !== null ? watchItems?.[purchaseSerialModalIndex]?.productId : undefined}
-        initialSelected={purchaseSerialModalIndex !== null ? watchItems?.[purchaseSerialModalIndex]?.serialNumbers || [] : []}
+        initialSelected={purchaseSerialModalIndex !== null ? (purchaseSerials[purchaseSerialModalIndex] || watchItems?.[purchaseSerialModalIndex]?.serialNumbers || []) : []}
         quantity={purchaseSerialModalIndex !== null ? Number(watchItems?.[purchaseSerialModalIndex]?.quantity) || 0 : 0}
         fetchFromDb={false}
         claimFromDb={false}
@@ -391,6 +441,8 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
           const idx = purchaseSerialModalIndex;
           // Save into the form field
           setValue(`items.${idx}.serialNumbers`, selected as any);
+          // Keep local map in sync so reopening modal shows latest values
+          setPurchaseSerials(prev => ({ ...prev, [idx]: selected }));
 
           // If productId exists, append these serials to product pool in DB
           const productId = watchItems?.[idx]?.productId;
@@ -483,8 +535,18 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                     </div>
                     {hasSerial && (
                       <div className="space-y-1.5 flex flex-col justify-end">
-                        <Button type="button" size="sm" variant="outline" onClick={() => setPurchaseSerialModalIndex(index)} className="h-9">
-                          Serials ({(item.serialNumbers || []).filter(Boolean).length})
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setPurchaseSerialModalIndex(index)} 
+                          className={`h-9 ${
+                            (item.serialNumbers || []).filter(Boolean).length === quantity && quantity > 0
+                              ? 'border-green-500 bg-green-50 hover:bg-green-100'
+                              : 'border-blue-500 bg-blue-50 hover:bg-blue-100'
+                          }`}
+                        >
+                          S# ({(item.serialNumbers || []).filter(Boolean).length}/{quantity})
                         </Button>
                       </div>
                     )}
@@ -504,8 +566,19 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
                       <Input 
                         type="number" 
                         min="1" 
-                        className="h-9 w-full"
+                        className={`h-9 w-full ${
+                          hasSerial && quantity > 0 && 
+                          (item.serialNumbers || []).filter(Boolean).length !== quantity 
+                            ? 'border-blue-500 ring-1 ring-blue-200' 
+                            : ''
+                        }`}
                         {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
+                        onChange={(e) => {
+                          const newQuantity = parseInt(e.target.value) || 0;
+                          if (newQuantity > 0) {
+                            handleQuantityChange(index, newQuantity);
+                          }
+                        }}
                       />
                     </div>
 

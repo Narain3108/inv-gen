@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
 import SerialManager from '@/components/shared/SerialManager';
+import { OutOfStockDialog } from '@/components/shared/OutOfStockDialog';
 import {
   Dialog,
   DialogContent,
@@ -76,12 +77,36 @@ export function InvoiceForm({
   // Modal index to open serial manager for a row
   const [serialModalIndex, setSerialModalIndex] = useState<number | null>(null);
 
+  // Out of Stock Dialog State
+  const [outOfStockDialogOpen, setOutOfStockDialogOpen] = useState(false);
+  const [outOfStockData, setOutOfStockData] = useState<{
+    product: Product;
+    requestedQuantity: number;
+    availableStock: number;
+    itemIndex: number;
+  } | null>(null);
+
   // Sync localProducts with props.products
   // We use localProducts to allow optimistic updates and refreshing of product data (e.g. serial numbers)
   // without waiting for the parent to re-fetch everything.
   useEffect(() => {
     setLocalProducts(products);
   }, [products]);
+
+  // If editing an existing invoice, load its serial numbers into local state so the SerialManager
+  // shows the already-saved serials for each item when editing.
+  useEffect(() => {
+    if (!invoice) return;
+    const map: Record<number, string[]> = {};
+    (invoice.items || []).forEach((it, idx) => {
+      if (it.serialNumbers && Array.isArray(it.serialNumbers) && it.serialNumbers.length > 0) {
+        map[idx] = it.serialNumbers as string[];
+      }
+    });
+    if (Object.keys(map).length > 0) {
+      setSerialNumbers(map);
+    }
+  }, [invoice]);
   
   // Shipping Address State (opt-in)
   const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
@@ -214,6 +239,52 @@ export function InvoiceForm({
       } catch (error) {
         console.error("Failed to refresh product details", error);
       }
+    }
+  };
+
+  /**
+   * Handle quantity change with stock validation and serial number management
+   * Immediate validation - triggers as soon as quantity is entered
+   */
+  const handleQuantityChange = (index: number, quantity: number) => {
+    const item = watchItems?.[index];
+    const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+    
+    if (!product || quantity <= 0 || isNaN(quantity)) {
+      return;
+    }
+
+    // Check stock availability FIRST for physical products
+    if (product.type === 'product' && product.stock !== undefined && quantity > product.stock) {
+      setOutOfStockData({
+        product,
+        requestedQuantity: quantity,
+        availableStock: product.stock,
+        itemIndex: index,
+      });
+      setOutOfStockDialogOpen(true);
+      return; // Don't proceed to serial manager if out of stock
+    }
+
+    // Only if stock is available AND product has serial numbers
+    if (product.hasSerialNumber && quantity > 0) {
+      setSerialModalIndex(index);
+    }
+  };
+
+  /**
+   * Handle out of stock proceed anyway
+   * User can proceed with insufficient stock, then manage serials if needed
+   */
+  const handleOutOfStockProceed = () => {
+    if (outOfStockData) {
+      // After user proceeds with out-of-stock quantity, check if serial numbers are needed
+      if (outOfStockData.product.hasSerialNumber) {
+        setSerialModalIndex(outOfStockData.itemIndex);
+      }
+      // Close the dialog and reset state
+      setOutOfStockDialogOpen(false);
+      setOutOfStockData(null);
     }
   };
   
@@ -771,8 +842,23 @@ export function InvoiceForm({
                               max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
                               {...field}
                               value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center w-full text-base font-medium"
+                              onChange={(e) => {
+                                const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                field.onChange(newQuantity);
+                                // Call handleQuantityChange immediately for any valid number
+                                if (newQuantity && !isNaN(newQuantity) && newQuantity > 0) {
+                                  handleQuantityChange(index, newQuantity);
+                                }
+                              }}
+                              className={`text-center w-full text-base font-medium ${
+                                product?.type === 'product' && 
+                                typeof product.stock === 'number' && 
+                                field.value && 
+                                !isNaN(field.value as number) && 
+                                (field.value as number) > product.stock 
+                                  ? 'border-red-500' 
+                                  : ''
+                              }`}
                             />
                           )}
                         />
@@ -948,8 +1034,22 @@ export function InvoiceForm({
                               max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
                               {...field}
                               value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center text-lg font-semibold"
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? '' : parseInt(e.target.value);
+                                field.onChange(value);
+                                if (value && !isNaN(value as number) && (value as number) > 0) {
+                                  handleQuantityChange(index, value as number);
+                                }
+                              }}
+                              className={`text-center text-lg font-semibold ${
+                                product?.type === 'product' && 
+                                typeof product.stock === 'number' && 
+                                field.value && 
+                                !isNaN(field.value as number) && 
+                                (field.value as number) > product.stock 
+                                  ? 'border-red-500' 
+                                  : ''
+                              }`}
                             />
                           )}
                         />
@@ -1095,6 +1195,21 @@ export function InvoiceForm({
           }
         }}
       />
+
+      {/* Out of Stock Dialog */}
+      <OutOfStockDialog
+        isOpen={outOfStockDialogOpen}
+        onClose={() => {
+          setOutOfStockDialogOpen(false);
+          setOutOfStockData(null);
+        }}
+        product={outOfStockData?.product || {} as Product}
+        availableStock={outOfStockData?.availableStock || 0}
+        requestedQuantity={outOfStockData?.requestedQuantity || 0}
+        onProceedAnyway={handleOutOfStockProceed}
+        isInvoice={true}
+      />
+
       <div className="flex justify-end gap-3 pt-3">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} className="hover:scale-105 transition-transform">

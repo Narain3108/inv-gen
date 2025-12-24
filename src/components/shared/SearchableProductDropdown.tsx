@@ -208,7 +208,7 @@ export function SearchableProductDropdown({
                 <div className="py-1">
                   {filteredProducts.map((product, index) => (
                     <div
-                      key={product.id}
+                      key={product.id || `product-${index}-${product.productName}`}
                       className={cn(
                         "px-3 py-2 cursor-pointer text-sm hover:bg-accent hover:text-accent-foreground",
                         index === highlightedIndex && "bg-accent text-accent-foreground",
