@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogD
 import { productsApi } from '@/lib/api/products.api';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 
 interface SerialWithStatus {
   serial: string;
@@ -32,10 +33,18 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
   const [selected, setSelected] = useState<string[]>(initialSelected || []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setSelected(initialSelected || []);
   }, [initialSelected]);
+
+  // Reset saving state only when modal opens
+  useEffect(() => {
+    if (open) {
+      setIsSaving(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -96,13 +105,16 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
     }
 
     try {
+      setIsSaving(true);
       // Backend now handles serial claiming transactionally, no need for client-side updates
       await onSave(selected);
+      toast.success('Serial numbers updated');
+      onClose();
     } catch (err) {
       console.error('Failed to save serials', err);
       toast.error('Failed to save serials');
     } finally {
-      onClose();
+      setIsSaving(false);
     }
   };
 
@@ -169,8 +181,17 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
 
         <DialogFooter>
           <div className="flex gap-2 w-full justify-end">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="button" onClick={handleSave}>Save</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
+            <Button type="button" onClick={handleSave} disabled={isSaving} className="min-w-[80px]">
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
           </div>
         </DialogFooter>
         <DialogClose />
