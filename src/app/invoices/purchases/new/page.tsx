@@ -9,12 +9,14 @@ import { PurchaseForm } from '@/components/purchases/PurchaseForm';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout';
+import { purchasesApi } from '@/lib/api/purchases.api';
+import { toast } from 'sonner';
 
 export default function NewPurchasePage() {
   const router = useRouter();
   const { user } = useAuth();
   const { selectedCompany } = useCompany();
-  const { refreshProducts } = useAppData();
+  const { products, clients, refreshProducts } = useAppData();
 
   if (!user) {
     return null;
@@ -33,11 +35,16 @@ export default function NewPurchasePage() {
     );
   }
 
-  const handleSuccess = async () => {
-    // Refresh products to update stock quantities
-    await refreshProducts();
-    // Navigate back to purchases list
-    router.push('/invoices/purchases');
+  const handleSubmit = async (data: any) => {
+    try {
+      await purchasesApi.create(data);
+      // Refresh products to update stock quantities
+      await refreshProducts();
+      router.push('/invoices/purchases');
+    } catch (error) {
+      console.error('Failed to create purchase', error);
+      throw error; // Re-throw to let form handle error display if needed
+    }
   };
 
   return (
@@ -53,7 +60,11 @@ export default function NewPurchasePage() {
 
           <PurchaseForm
             companyId={selectedCompany.id}
-            onSuccess={handleSuccess}
+            company={selectedCompany}
+            products={products}
+            clients={clients}
+            companyState={selectedCompany.address?.state || ''}
+            onSubmit={handleSubmit}
             onCancel={() => router.back()}
           />
         </div>

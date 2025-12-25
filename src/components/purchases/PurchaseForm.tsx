@@ -1,259 +1,221 @@
 /**
  * Purchase Form Component
- * Form for adding products via purchase bills
+ * Comprehensive form for creating/editing purchase bills
+ * Modeled after InvoiceForm for consistency
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Product, ProductCategory } from '@/types';
+import { PurchaseBill, PurchaseItem, purchasesApi } from '@/lib/api/purchases.api';
+import { Product, Client, Company, Address } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, Search } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, Plus, Trash2, Calculator, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency } from '@/utils/formatters';
-import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
-import { purchasesApi, PurchaseBill } from '@/lib/api/purchases.api';
+import { SearchableClientDropdown } from '@/components/shared';
 import { productsApi } from '@/lib/api/products.api';
-import { categoriesApi } from '@/lib/api/categories.api';
+import { clientsApi } from '@/lib/api/clients.api';
 import SerialManager from '@/components/shared/SerialManager';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
-import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ProductForm } from '@/components/products/ProductForm';
-import { SearchableProductDropdown } from '@/components/shared/SearchableProductDropdown';
-import { useAppData } from '@/contexts/AppDataContext';
 
-// Schema Definition
+// Schema Definition (Inline for now to match backend)
 const purchaseItemSchema = z.object({
-  productName: z.string().min(1, "Product name is required"),
-  productId: z.string().optional(), // Optional because it might be a new product
-  hsn: z.string().optional(),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
+  productId: z.string().optional(),
+  productName: z.string().optional(),
+  description: z.string().min(1, "Description is required"),
+  hsn: z.string().min(1, "HSN is required"),
+  quantity: z.coerce.number().min(0.001, "Quantity must be greater than 0"),
   unit: z.string().min(1, "Unit is required"),
   unitPrice: z.coerce.number().min(0, "Price must be non-negative"),
+  discount: z.coerce.number().min(0).default(0),
   gstRate: z.coerce.number().min(0),
   cessRate: z.coerce.number().min(0).optional(),
-  amount: z.coerce.number().optional(),
-  hasSerialNumber: z.boolean(),
-  serialNumbers: z.array(z.string()).optional(),
-  description: z.string().nullable().optional(),
-  categoryId: z.string().nullable().optional(),
-  itemCode: z.string().nullable().optional(),
-}).strict();
-
+  itemCode: z.string().optional(),
+});
 
 const purchaseFormSchema = z.object({
-  billDate: z.string().min(1, "Bill date is required"),
-  billNumber: z.string().min(1, "Bill number is required"),
-  vendorName: z.string().optional(),
+  invoiceNumber: z.string().min(1, "Bill number is required"), // Mapped to billNumber
+  referenceNumber: z.string().optional(),
+  poNumber: z.string().optional(),
+  poDate: z.string().optional(),
+  ewayNumber: z.string().optional(),
+  date: z.string().min(1, "Date is required"),
+  clientId: z.string().min(1, "Vendor is required"),
   items: z.array(purchaseItemSchema).min(1, "At least one item is required"),
-  totalAmount: z.preprocess((val) => {
-    if (val === '' || val === null || val === undefined) return undefined;
-    return Number(val);
-  }, z.number().optional()),
-  notes: z.string().optional(),
   attachmentUrl: z.string().optional(),
 });
 
 type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
 
 interface PurchaseFormProps {
+  purchase?: PurchaseBill;
   companyId: string;
-  onSuccess: () => void;
-  onCancel: () => void;
-  initialData?: PurchaseBill;
-  purchaseId?: string;
+  company?: Company;
+  products: Product[];
+  clients: Client[]; // Vendors
+  companyState: string;
+  onSubmit: (data: any) => Promise<void>; // Using any to avoid strict type mismatch during transition
+  onCancel?: () => void;
+  onClientAdded?: (client: Client) => void;
 }
 
-export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purchaseId }: PurchaseFormProps) {
+export function PurchaseForm({
+  purchase,
+  companyId,
+  company,
+  products,
+  clients,
+  companyState,
+  onSubmit,
+  onCancel,
+  onClientAdded,
+}: PurchaseFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(
-    (initialData as any)?.attachmentUrl
-  );
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
-
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [serialNumbers, setSerialNumbers] = useState<Record<string, string[]>>({});
+  const [serialNumberErrors, setSerialNumberErrors] = useState<Record<string, string>>({});
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
-  // Serial modal index for purchase items
-  const [purchaseSerialModalIndex, setPurchaseSerialModalIndex] = useState<number | null>(null);
-  const [purchaseSerials, setPurchaseSerials] = useState<Record<number, string[]>>({});
+  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(purchase?.attachmentUrl);
 
-  // App data context for real-time updates
-  const { refreshProducts } = useAppData();
+  // Modal index to open serial manager for a row
+  const [serialModalIndex, setSerialModalIndex] = useState<number | null>(null);
 
-  // Local products state for real-time updates
-  const [localProducts, setLocalProducts] = useState<Product[]>([]);
-
-  // Load products and categories for autocomplete
+  // Sync localProducts with props.products
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [productsData, categoriesData] = await Promise.all([
-          productsApi.getAll({ company_id: companyId }),
-          categoriesApi.getAll()
-        ]);
-        setProducts(productsData);
-        setLocalProducts(productsData);
-        setCategories(categoriesData);
-      } catch (error) {
-        console.error("Failed to load data", error);
-        toast.error("Failed to load products/categories");
-      }
-    };
-    loadData();
-  }, [companyId]);
+    setLocalProducts(products);
+  }, [products]);
+
+  // Shipping Address State (opt-in)
+  const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
+  const [newShippingAddress, setNewShippingAddress] = useState<Address>({
+    street: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
+  });
 
   const {
     register,
     handleSubmit,
-    control,
     setValue,
     watch,
-    reset,
+    control,
+    clearErrors,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(purchaseFormSchema),
-    defaultValues: {
-      billDate: new Date().toISOString().split('T')[0],
-      billNumber: '',
-      vendorName: '',
-      items: [{ 
-        productName: '', 
-        quantity: 1, 
-        unit: 'Nos', 
-        unitPrice: 0, 
-        gstRate: 18, 
-        cessRate: 0, 
-        amount: 0, 
-        hasSerialNumber: false, 
-        serialNumbers: [],
-        productId: undefined,
-        hsn: undefined,
-        description: undefined,
-        categoryId: undefined,
-        itemCode: undefined,
-      }],
-      totalAmount: 0,
-      notes: '',
+  } = useForm<PurchaseFormData>({
+    resolver: zodResolver(purchaseFormSchema) as unknown as Resolver<PurchaseFormData>,
+    defaultValues: purchase ? {
+      invoiceNumber: purchase.invoiceNumber,
+      referenceNumber: purchase.referenceNumber || '',
+      poNumber: purchase.poNumber || '',
+      poDate: purchase.poDate ? (typeof purchase.poDate === 'string' ? purchase.poDate.split('T')[0] : '') : '',
+      ewayNumber: purchase.ewayNumber || '',
+      clientId: purchase.clientId,
+      date: purchase.date ? (typeof purchase.date === 'string' ? purchase.date.split('T')[0] : '') : new Date().toISOString().split('T')[0],
+      items: purchase.items.map((item) => ({
+        productId: item.productId || '',
+        productName: item.productName || '',
+        description: item.description || '',
+        hsn: item.hsn || '',
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        discount: item.discount || 0,
+        gstRate: item.gstRate,
+        cessRate: item.cessRate || 0,
+        itemCode: item.itemCode || '',
+      })),
+      attachmentUrl: purchase.attachmentUrl,
+    } : {
+      date: new Date().toISOString().split('T')[0],
+      items: [{ productId: '', quantity: 1, unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 }],
     },
   });
-
-  // Load initial data if editing
-  useEffect(() => {
-    if (initialData) {
-      reset({
-        ...initialData,
-        billDate: initialData.billDate ? initialData.billDate.split('T')[0] : new Date().toISOString().split('T')[0],
-        attachmentUrl: (initialData as any)?.attachmentUrl,
-        // Ensure items are mapped correctly if needed, though PurchaseBill and PurchaseFormData are similar
-        items: initialData.items.map(item => ({
-          ...item,
-          productId: item.productId,
-          description: item.description,
-          categoryId: item.categoryId ?? undefined,
-          itemCode: item.itemCode ?? undefined,
-          // Ensure defaults for optional fields
-          hsn: item.hsn,
-          serialNumbers: item.serialNumbers || [],
-        }))
-      });
-      // Initialize local serials map so modal shows existing serials by index
-      const map: Record<number, string[]> = {};
-      (initialData.items || []).forEach((it, idx) => {
-        if (it.serialNumbers && Array.isArray(it.serialNumbers) && it.serialNumbers.length > 0) {
-          map[idx] = it.serialNumbers as string[];
-        }
-      });
-      if (Object.keys(map).length > 0) setPurchaseSerials(map);
-    }
-  }, [initialData, reset]);
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'items',
   });
 
-  const watchItems = watch('items');
-  const totalAmount = useWatch({ control, name: 'totalAmount' });
-
-  // Calculate totals whenever items change (guard against undefined watch)
+  // Load existing serials if editing
   useEffect(() => {
-    const items = Array.isArray(watchItems) ? watchItems : [];
-    const total = items.reduce((sum, item) => {
-      const qty = Number(item?.quantity) || 0;
-      const price = Number(item?.unitPrice) || 0;
-      const gst = Number(item?.gstRate) || 0;
-      const cess = Number(item?.cessRate) || 0;
+    if (!purchase || !fields || fields.length === 0) return;
 
-      const base = qty * price;
-      const tax = base * (gst / 100);
-      const cessAmount = base * (cess / 100);
-
-      return sum + base + tax + cessAmount;
-    }, 0);
-
-    setValue('totalAmount', total);
-  }, [watchItems, setValue]);
-
-  // Keep each item's `amount` field in sync so zod sees a numeric value for validation
-  useEffect(() => {
-    const items = Array.isArray(watchItems) ? watchItems : [];
-    items.forEach((item, idx) => {
-      const qty = Number(item?.quantity) || 0;
-      const price = Number(item?.unitPrice) || 0;
-      const gst = Number(item?.gstRate) || 0;
-      const cess = Number(item?.cessRate) || 0;
-
-      const base = qty * price;
-      const tax = base * (gst / 100);
-      const cessAmount = base * (cess / 100);
-      const amount = base + tax + cessAmount;
-
-      // Only update if different to avoid extra renders
-      const current = item?.amount;
-      if (typeof current !== 'number' || Number(current) !== Number(amount)) {
-        setValue(`items.${idx}.amount`, amount);
+    const serialMap: Record<string, string[]> = {};
+    fields.forEach((field, idx) => {
+      const purItem = (purchase.items || [])[idx];
+      if (!purItem) return;
+      const product = localProducts.find((p) => p.id === purItem.productId);
+      if (product?.hasSerialNumber === true && Array.isArray(purItem.serialNumbers) && purItem.serialNumbers.length > 0) {
+        serialMap[field.id] = [...purItem.serialNumbers];
       }
     });
-  }, [watchItems, setValue]);
 
-  const handleProductSelect = (index: number, productName: string, product?: Product) => {
-    setValue(`items.${index}.productName`, productName);
-    
+    if (Object.keys(serialMap).length > 0) setSerialNumbers((prev) => ({ ...prev, ...serialMap }));
+  }, [purchase, localProducts, fields]);
+
+  const watchItems = watch('items');
+  const watchClientId = watch('clientId');
+
+  // Update selected client when client ID changes
+  useEffect(() => {
+    if (watchClientId) {
+      const client = clients.find(c => c.id === watchClientId);
+      setSelectedClient(client || null);
+      // Reset shipping address selection
+      setShippingAddressMode('none');
+      setSelectedAddressIndex('default');
+      setNewShippingAddress({
+        street: '',
+        city: '',
+        state: '',
+        pincode: '',
+        country: 'India',
+      });
+    } else {
+      setSelectedClient(null);
+    }
+  }, [watchClientId, clients]);
+
+  // Handle product selection for an item
+  const handleProductSelect = async (index: number, productId: string) => {
+    const product = localProducts.find(p => p.id === productId);
     if (product) {
-      setValue(`items.${index}.productId`, product.id);
+      setValue(`items.${index}.productId`, productId);
+      setValue(`items.${index}.productName`, product.productName);
+      setValue(`items.${index}.description`, product.description || product.productName);
       setValue(`items.${index}.hsn`, product.hsn);
       setValue(`items.${index}.unit`, product.unit);
       setValue(`items.${index}.unitPrice`, product.price); // Default to selling price, user can change
       setValue(`items.${index}.gstRate`, product.gstRate);
       setValue(`items.${index}.cessRate`, product.cessRate || 0);
-      setValue(`items.${index}.hasSerialNumber`, product.hasSerialNumber || false);
-      setValue(`items.${index}.categoryId`, product.categoryId ?? undefined);
-      setValue(`items.${index}.itemCode`, product.itemCode ?? undefined);
-      toast.success(`Auto-filled details for ${product.productName}`);
-    } else {
-      // Reset ID if new product name typed
-      setValue(`items.${index}.productId`, undefined);
-      setValue(`items.${index}.hsn`, undefined);
-      setValue(`items.${index}.categoryId`, undefined);
-      setValue(`items.${index}.itemCode`, undefined);
+      setValue(`items.${index}.itemCode`, product.itemCode || '');
+      
+      // Fetch fresh product data
+      try {
+        const freshProduct = await productsApi.getById(productId);
+        if (freshProduct) {
+            setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
+        }
+      } catch (error) {
+        console.error("Failed to refresh product details", error);
+      }
     }
   };
 
-  /**
-   * Handle quantity change with immediate serial number management
-   * For PurchaseForm: No stock validation (we're adding stock)
-   * Auto-opens serial manager if serials are incomplete
-   */
   const handleQuantityChange = (index: number, quantity: number) => {
     const item = watchItems?.[index];
     const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
@@ -262,489 +224,807 @@ export function PurchaseForm({ companyId, onSuccess, onCancel, initialData, purc
       return;
     }
 
-    // Update quantity for PurchaseForm (do not auto-create empty serials)
     setValue(`items.${index}.quantity`, quantity);
-
-    // Handle serial number array for purchases
-    // ONLY open serial modal if product has hasSerialNumber === true
-    if (product.hasSerialNumber === true) {
-      const currentSerials = item.serialNumbers || [];
-
-      // If existing serials are more than new quantity, truncate; do NOT auto-extend with empty strings
-      let adjustedSerials = [...currentSerials];
-      if (adjustedSerials.length > quantity) {
-        adjustedSerials.splice(quantity);
-        setValue(`items.${index}.serialNumbers`, adjustedSerials);
-      }
-
-      // Auto-open serial modal if serials are incomplete (filled count != quantity)
-      const filledSerials = (currentSerials || []).filter(s => s && s.trim()).length;
-      if (filledSerials !== quantity && quantity > 0) {
-        setTimeout(() => {
-          setPurchaseSerialModalIndex(index);
-        }, 300);
+    
+    // If product has serial numbers, open serial manager if quantity increased
+    if (product.hasSerialNumber) {
+      const fieldId = fields?.[index]?.id;
+      const currentSerials = fieldId ? (serialNumbers[fieldId] || []) : [];
+      if (quantity > currentSerials.length) {
+        setSerialModalIndex(index);
       }
     }
   };
 
+  // Calculate totals
+  const calculateTotals = () => {
+    if (!watchItems) return null;
 
+    const validItems = watchItems.reduce((acc: Array<{ item: any; index: number }>, item: any, idx: number) => {
+      if (item.productId && item.quantity > 0 && item.unitPrice >= 0) {
+        acc.push({ item, index: idx });
+      }
+      return acc;
+    }, []);
 
-  // Purchase serial modal now delegated to shared SerialManager component
+    if (validItems.length === 0) return null;
 
-  const onSubmit = async (data: PurchaseFormData) => {
-    // Validate serial numbers
-    for (let i = 0; i < data.items.length; i++) {
-      const item = data.items[i];
-      if (item.hasSerialNumber) {
-        if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
-          toast.error(`Item ${i + 1} (${item.productName}): Please enter all ${item.quantity} serial numbers`);
-          return;
+    let subtotal = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+    let totalCess = 0;
+    let totalTaxableAmount = 0;
+
+    const clientState = selectedClient?.address?.state || (purchase && purchase.shippingAddress?.state) || '';
+    const isInterState = companyState !== clientState;
+
+    const processedItems: PurchaseItem[] = validItems.map(({ item, index }) => {
+      const product = localProducts.find(p => p.id === item.productId);
+      if (!product) return null;
+
+      const quantity = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unitPrice) || 0;
+      const discount = Number(item.discount) || 0;
+      const gstRate = Number(item.gstRate) || 0;
+      const cessRate = Number(item.cessRate) || 0;
+
+      const baseAmount = quantity * unitPrice;
+      const discountAmount = (baseAmount * discount) / 100;
+      const taxableAmount = baseAmount - discountAmount;
+
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+      let cess = 0;
+
+      if (isInterState) {
+        igst = (taxableAmount * gstRate) / 100;
+      } else {
+        const halfRate = gstRate / 2;
+        cgst = (taxableAmount * halfRate) / 100;
+        sgst = (taxableAmount * halfRate) / 100;
+      }
+
+      if (cessRate) {
+        cess = (taxableAmount * cessRate) / 100;
+      }
+
+      const lineTotal = taxableAmount + cgst + sgst + igst + cess;
+
+      subtotal += baseAmount;
+      totalTaxableAmount += taxableAmount;
+      totalCgst += cgst;
+      totalSgst += sgst;
+      totalIgst += igst;
+      totalCess += cess;
+
+      const purchaseItem: any = {
+        product_id: product.id,
+        product_name: product.productName,
+        description: item.description,
+        hsn: item.hsn,
+        quantity,
+        unit: item.unit,
+        unit_price: unitPrice,
+        discount,
+        gst_rate: gstRate,
+        cess_rate: cessRate || 0,
+        taxable_amount: taxableAmount,
+        cgst,
+        sgst,
+        igst,
+        cess,
+        line_total: lineTotal,
+        item_code: item.itemCode,
+      };
+
+      if (product.hasSerialNumber === true) {
+        const key = fields?.[index]?.id;
+        if (key && serialNumbers[key]) {
+          purchaseItem.serial_numbers = serialNumbers[key];
         }
-        if (item.serialNumbers.some(s => !s.trim())) {
-          toast.error(`Item ${i + 1}: Serial numbers cannot be empty`);
-          return;
+      }
+
+      return purchaseItem;
+    }).filter(Boolean) as PurchaseItem[];
+
+    const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
+    const grandTotal = totalTaxableAmount + totalTax;
+
+    const taxBreakdown = calculateTaxBreakdown(
+      validItems.map(({ item }) => ({
+        amount: Number(item.unitPrice) || 0,
+        quantity: Number(item.quantity) || 0,
+        gstRate: Number(item.gstRate) || 0,
+        discount: Number(item.discount) || 0,
+      })),
+      companyState,
+      clientState
+    );
+
+    return {
+      items: processedItems,
+      taxableAmount: totalTaxableAmount,
+      cgst: totalCgst,
+      sgst: totalSgst,
+      igst: totalIgst,
+      totalAmount: grandTotal,
+      totalAmountInWords: '', 
+      taxBreakdown,
+    };
+  };
+
+  const totals = calculateTotals();
+
+  const handleFormSubmit = async (data: PurchaseFormData) => {
+    if (!totals || totals.items.length === 0) {
+      toast.error('Please add valid items to the purchase bill');
+      return;
+    }
+
+    // Validate serial numbers
+    let hasSerialNumberError = false;
+    const newErrors: Record<string, string> = {};
+
+    watchItems.forEach((item: any, index: number) => {
+      const product = localProducts.find((p) => p.id === item.productId);
+      if (product?.hasSerialNumber === true) {
+        const key = fields?.[index]?.id;
+        const itemSerialNumbers = key ? (serialNumbers[key] || []) : [];
+        const quantity = Number(item.quantity) || 0;
+
+        if (itemSerialNumbers.length !== quantity) {
+          if (key) newErrors[key] = `Please enter ${quantity} serial number(s) for ${product.productName || 'product'}`;
+          hasSerialNumberError = true;
+        } else if (itemSerialNumbers.some((sn) => !sn || sn.trim() === '')) {
+          if (key) newErrors[key] = `Serial numbers cannot be empty`;
+          hasSerialNumberError = true;
+        }
+      }
+    });
+
+    setSerialNumberErrors(newErrors);
+    
+    if (hasSerialNumberError) {
+      toast.error('Please fill in all required serial numbers');
+      return;
+    }
+
+    // Determine Shipping Address
+    let finalShippingAddress: Address | undefined = undefined;
+
+    if (shippingAddressMode === 'default') {
+      finalShippingAddress = selectedClient?.shippingAddress || selectedClient?.address;
+    } else if (shippingAddressMode === 'select' && selectedClient?.shippingAddresses) {
+      const index = parseInt(selectedAddressIndex);
+      if (!isNaN(index) && selectedClient.shippingAddresses[index]) {
+        finalShippingAddress = selectedClient.shippingAddresses[index];
+      }
+    } else if (shippingAddressMode === 'new') {
+      if (!newShippingAddress.street || !newShippingAddress.city || !newShippingAddress.state || !newShippingAddress.pincode) {
+        toast.error('Please fill in all shipping address fields');
+        return;
+      }
+      finalShippingAddress = newShippingAddress;
+      
+      if (selectedClient) {
+        try {
+          const updatedAddresses = [...(selectedClient.shippingAddresses || []), newShippingAddress];
+          await clientsApi.update(selectedClient.id, { shippingAddresses: updatedAddresses });
+        } catch (err) {
+          console.error('Failed to update client shipping addresses', err);
         }
       }
     }
 
     setIsLoading(true);
     try {
-      // Compute per-item amount server expects (base + tax + cess)
-      const itemsWithAmounts = (data.items || []).map((it) => {
-        const qty = Number(it.quantity) || 0;
-        const price = Number(it.unitPrice) || 0;
-        const gst = Number(it.gstRate) || 0;
-        const cess = Number(it.cessRate) || 0;
-        const base = qty * price;
-        const tax = base * (gst / 100);
-        const cessAmount = base * (cess / 100);
-        return {
-          ...it,
-          amount: base + tax + cessAmount,
-        };
-      });
+      const purchaseData = {
+        invoiceNumber: data.invoiceNumber,
+        reference_number: data.referenceNumber || null,
+        po_number: data.poNumber || null,
+        po_date: data.poDate ? new Date(data.poDate).toISOString() : null,
+        eway_number: data.ewayNumber || null,
+        client_id: data.clientId,
+        date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+        company_id: companyId,
+        shipping_address: shippingAddressMode === 'none' ? null : finalShippingAddress,
+        items: totals.items,
+        taxable_amount: totals.taxableAmount,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        total_amount: totals.totalAmount,
+        total_amount_in_words: totals.totalAmountInWords,
+        tax_breakdown: totals.taxBreakdown,
+        status: 'draft',
+        payment_status: 'unpaid',
+        attachment_url: attachmentUrl,
+      };
 
-      const payload = {
-        ...data,
-        companyId,
-        items: itemsWithAmounts,
-        totalAmount: itemsWithAmounts.reduce((s, it) => s + Number(it.amount || 0), 0),
-        attachmentUrl: attachmentUrl, // Include client-uploaded attachment URL
-      } as any;
-
-      // Save purchase with the attachment URL (no server-side upload needed)
-      if (purchaseId) {
-        await purchasesApi.update(purchaseId, payload);
-        toast.success("Purchase bill updated successfully");
-      } else {
-        await purchasesApi.create(payload);
-        toast.success("Purchase bill created successfully");
-      }
-
-      // Set flag for purchase list to refresh
-      localStorage.setItem('purchase-created', 'true');
-      
-      onSuccess();
-    } catch (error) {
-      console.error("Error saving purchase:", error);
-      toast.error("Failed to save purchase bill");
+      await onSubmit(purchaseData);
+      toast.success(purchase ? 'Purchase updated successfully' : 'Purchase created successfully');
+    } catch (error: any) {
+      console.error('Error saving purchase:', error);
+      toast.error(error.response?.data?.detail || 'Failed to save purchase');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const onError = (errs: any) => {
-    try {
-      console.error('Validation errors', errs);
-      
-      // Safely extract error messages without JSON.stringify to avoid circular structure
-      const extractErrorMessage = (errorObj: any): string => {
-        if (typeof errorObj === 'string') return errorObj;
-        if (errorObj?.message) return errorObj.message;
-        if (Array.isArray(errorObj)) {
-          const firstError = errorObj.find(e => e && typeof e === 'object');
-          if (firstError) return extractErrorMessage(firstError);
-        }
-        if (typeof errorObj === 'object' && errorObj !== null) {
-          const keys = Object.keys(errorObj);
-          if (keys.length > 0) {
-            return extractErrorMessage(errorObj[keys[0]]);
-          }
-        }
-        return 'Validation error';
-      };
-
-      // Try to surface the first error path and message
-      const firstKey = Object.keys(errs)[0];
-      if (firstKey) {
-        const firstErr = (errs as any)[firstKey];
-        const msg = extractErrorMessage(firstErr);
-        toast.error(msg || 'Please fix validation errors in the form');
-      } else {
-        toast.error('Please fix validation errors in the form');
-      }
-    } catch (e) {
-      console.error('Failed to process validation errors', e);
-      toast.error('Please fix validation errors in the form');
-    }
-  };
-
   return (
-    <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6 w-full max-w-none sm:max-w-6xl mx-auto px-2 sm:px-6 py-6 min-h-screen">
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle>Bill Details</CardTitle>
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3 animate-fade-in">
+      {/* Purchase Details */}
+      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
+        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Purchase Details</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="billNumber">Bill Number *</Label>
-            <Input id="billNumber" {...register('billNumber')} placeholder="e.g. INV-001" />
-            {errors.billNumber && <p className="text-sm text-red-500">{errors.billNumber.message}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="billDate">Bill Date *</Label>
-            <Input id="billDate" type="date" {...register('billDate')} />
-            {errors.billDate && <p className="text-sm text-red-500">{errors.billDate.message}</p>}
-          </div>
-          <div className="space-y-2 sm:col-span-2 md:col-span-1">
-            <Label htmlFor="vendorName">Vendor Name</Label>
-            <Input id="vendorName" {...register('vendorName')} placeholder="Supplier Name" />
-          </div>
-          <div className="sm:col-span-2 md:col-span-3">
-            <DocumentUpload
-              label="Purchase Bill Attachment (Optional)"
-              currentDocumentUrl={attachmentUrl}
-              onDocumentUploaded={(url) => {
-                setAttachmentUrl(url);
-                setValue('attachmentUrl', url);
-              }}
-              onDocumentRemoved={() => {
-                setAttachmentUrl(undefined);
-                setValue('attachmentUrl', undefined);
-              }}
-              folder="purchase-bills"
-              maxSize={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <CardContent className="space-y-3 pb-4 pt-4">
+          <div className="space-y-4">
+            {/* Row 1: Vendor, Bill Number, Date */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <SearchableClientDropdown
+                  clients={clients}
+                  selectedClientId={watch('clientId') || ''}
+                  onClientSelect={(clientId) => setValue('clientId', clientId)}
+                  onClientAdded={(newClient) => {
+                    setValue('clientId', newClient.id);
+                    clearErrors('clientId');
+                    onClientAdded?.(newClient);
+                  }}
+                  label="Vendor"
+                  required
+                  error={errors.clientId?.message}
+                  companyId={companyId}
+                  placeholder="Search or select vendor..."
+                />
+              </div>
 
-      <SerialManager
-        open={purchaseSerialModalIndex !== null}
-        onClose={() => setPurchaseSerialModalIndex(null)}
-        productId={purchaseSerialModalIndex !== null ? watchItems?.[purchaseSerialModalIndex]?.productId : undefined}
-        initialSelected={purchaseSerialModalIndex !== null ? (purchaseSerials[purchaseSerialModalIndex] || watchItems?.[purchaseSerialModalIndex]?.serialNumbers || []) : []}
-        quantity={purchaseSerialModalIndex !== null ? Number(watchItems?.[purchaseSerialModalIndex]?.quantity) || 0 : 0}
-        fetchFromDb={false}
-        claimFromDb={false}
-        onSave={async (selected) => {
-          if (purchaseSerialModalIndex === null) return;
-          const idx = purchaseSerialModalIndex;
-          // Save into the form field
-          setValue(`items.${idx}.serialNumbers`, selected as any);
-          // Keep local map in sync so reopening modal shows latest values
-          setPurchaseSerials(prev => ({ ...prev, [idx]: selected }));
+              <div className="space-y-2">
+                <Label htmlFor="invoiceNumber">Bill Number *</Label>
+                <Input
+                  id="invoiceNumber"
+                  {...register('invoiceNumber')}
+                  placeholder="Enter Bill Number"
+                />
+                {errors.invoiceNumber && (
+                  <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>
+                )}
+              </div>
 
-          // If productId exists, append these serials to product pool in DB
-          const productId = watchItems?.[idx]?.productId;
-          if (productId) {
-            try {
-              const prod = await productsApi.getById(productId);
-              const existingPool = prod.serialNumbers || [];
-              const toAdd = selected.filter((s) => !existingPool.includes(s));
-              if (toAdd.length > 0) {
-                const updated = [...existingPool, ...toAdd];
-                await productsApi.update(productId, { serialNumbers: updated });
-              }
-              toast.success('Serials saved to product and purchase item');
-            } catch (err) {
-              console.error('Failed to update product serials', err);
-              toast.warning('Saved to purchase item but failed to update product serial pool');
-            }
-          } else {
-            toast.success('Serials saved to purchase item');
-          }
-        }}
-      />
+              <div className="space-y-2">
+                <Label htmlFor="date">Bill Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  {...register('date')}
+                />
+                {errors.date && (
+                  <p className="text-sm text-red-500">{errors.date.message}</p>
+                )}
+              </div>
+            </div>
 
-      <Card>
-        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
-          <div className="space-y-1">
-            <CardTitle>Items</CardTitle>
-            <CardDescription className="hidden sm:block">Add products from the bill.</CardDescription>
-          </div>
-          <Button type="button" size="sm" variant="outline" onClick={() => {
-            append({ 
-              productName: '', 
-              quantity: 1, 
-              unit: 'Nos', 
-              unitPrice: 0, 
-              gstRate: 18, 
-              cessRate: 0, 
-              amount: 0, 
-              hasSerialNumber: false, 
-              serialNumbers: [],
-              productId: undefined,
-              hsn: undefined,
-              description: undefined,
-              categoryId: undefined,
-              itemCode: undefined,
-            });
-            setActiveRowIndex(fields.length); // Set the newly added row as active
-          }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Item
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {fields.map((field, index) => {
-            const item = watchItems[index];
-            const quantity = Number(item.quantity) || 0;
-            const hasSerial = item.hasSerialNumber === true;
+            {/* Row 2: PO Number, PO Date, E-way Number, Reference Number */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="poNumber">PO Number</Label>
+                <Input
+                  id="poNumber"
+                  {...register('poNumber')}
+                  placeholder="Optional"
+                />
+              </div>
 
-            return (
-              <div key={field.id} className="p-4 rounded-lg border bg-card text-card-foreground shadow-sm relative">
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => remove(index)}
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="poDate">PO Date</Label>
+                <Input
+                  id="poDate"
+                  type="date"
+                  {...register('poDate')}
+                />
+              </div>
 
-                <div className="space-y-3">
-                  {/* First Row: Product Name + Serial Button */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-3 space-y-1.5">
-                      <SearchableProductDropdown
-                        products={products}
-                        selectedProductName={item.productName}
-                        onProductSelect={(productName, product) => {
-                          handleProductSelect(index, productName, product);
-                          setActiveRowIndex(index);
-                        }}
-                        onProductAdded={(newProduct) => {
-                          // Update local products list
-                          setProducts(prev => [...prev, newProduct]);
-                        }}
-                        placeholder="Search or type product name..."
-                        label="Product Name"
-                        required
-                        companyId={companyId}
-                        className="w-full"
-                      />
-                    </div>
-                    {hasSerial && (
-                      <div className="space-y-1.5 flex flex-col justify-end">
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => setPurchaseSerialModalIndex(index)} 
-                          className={`h-9 ${
-                            (item.serialNumbers || []).filter(Boolean).length === quantity && quantity > 0
-                              ? 'border-green-500 bg-green-50 hover:bg-green-100'
-                              : 'border-blue-500 bg-blue-50 hover:bg-blue-100'
-                          }`}
-                        >
-                          S# ({(item.serialNumbers || []).filter(Boolean).length}/{quantity})
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="ewayNumber">E-way Number</Label>
+                <Input
+                  id="ewayNumber"
+                  {...register('ewayNumber')}
+                  placeholder="Optional"
+                />
+              </div>
 
-                  {/* Second Row: HSN, Qty, Unit, Price, GST, Amount */}
-                  <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 sm:gap-3">
-                    {/* HSN */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">HSN</Label>
-                      <Input className="h-9 w-full" {...register(`items.${index}.hsn`)} placeholder="HSN" />
-                    </div>
+              <div className="space-y-2">
+                <Label htmlFor="referenceNumber">Reference Number</Label>
+                <Input
+                  id="referenceNumber"
+                  {...register('referenceNumber')}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
 
-                    {/* Quantity */}
-                    <div className="sm:col-span-1 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Qty</Label>
-                      <Input 
-                        type="number" 
-                        min="1" 
-                        className={`h-9 w-full ${
-                          hasSerial && quantity > 0 && 
-                          (item.serialNumbers || []).filter(Boolean).length !== quantity 
-                            ? 'border-blue-500 ring-1 ring-blue-200' 
-                            : ''
-                        }`}
-                        {...register(`items.${index}.quantity`, { valueAsNumber: true })} 
-                        onChange={(e) => {
-                          const newQuantity = parseInt(e.target.value) || 0;
-                          if (newQuantity > 0) {
-                            handleQuantityChange(index, newQuantity);
-                          }
-                        }}
-                      />
-                    </div>
+            {/* Row 3: Shipping Address (opt-in) */}
+            {selectedClient && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Include Shipping Address
+                  </Label>
+                  <Switch
+                    checked={shippingAddressMode !== 'none'}
+                    onCheckedChange={(v: boolean) => setShippingAddressMode(v ? 'default' : 'none')}
+                  />
+                </div>
 
-                    {/* Unit */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <Controller
-                        control={control}
-                        name={`items.${index}.unit` as const}
-                        defaultValue={item?.unit ?? 'Nos'}
-                        render={({ field }) => (
-                          <>
-                            <Input
-                              list={`unit-options-${index}`}
-                              {...field}
-                              className="h-9 w-full"
-                              placeholder="Unit"
-                            />
-                            <datalist id={`unit-options-${index}`}>
-                              <option value="Nos" />
-                              <option value="Pcs" />
-                              <option value="Kgs" />
-                              <option value="Gms" />
-                              <option value="Ltrs" />
-                              <option value="Mtrs" />
-                              <option value="Hrs" />
-                              <option value="Days" />
-                              <option value="Box" />
-                              <option value="Set" />
-                            </datalist>
-                          </>
-                        )}
-                      />
-                    </div>
-
-                    {/* Price */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Price</Label>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        className="h-9 w-full"
-                        {...register(`items.${index}.unitPrice`, { valueAsNumber: true })} 
-                      />
-                    </div>
-
-                    {/* GST */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">GST %</Label>
+                {shippingAddressMode !== 'none' && (
+                  <div className="space-y-3 border rounded-md p-3 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Shipping Address</Label>
                       <Select
-                        value={item.gstRate !== undefined ? String(item.gstRate) : "18"}
-                        onValueChange={(val) => setValue(`items.${index}.gstRate`, Number(val))}
+                        value={shippingAddressMode}
+                        onValueChange={(val: any) => setShippingAddressMode(val)}
                       >
-                        <SelectTrigger className="h-9 w-full">
+                        <SelectTrigger className="w-[180px] h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {GST_RATES.map(r => <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>)}
+                          <SelectItem value="default">Default Address</SelectItem>
+                          {selectedClient.shippingAddresses && selectedClient.shippingAddresses.length > 0 && (
+                            <SelectItem value="select">Select Saved Address</SelectItem>
+                          )}
+                          <SelectItem value="new">Add New Address</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Amount */}
-                    <div className="col-span-2 sm:col-span-3 space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Amount</Label>
-                      <div className="h-9 flex items-center justify-end px-3 rounded-md border bg-muted/50 text-sm font-medium w-full">
-                        {(() => {
-                          const qty = Number(item?.quantity) || 0;
-                          const price = Number(item?.unitPrice) || 0;
-                          const gst = Number(item?.gstRate) || 0;
-                          const cess = Number(item?.cessRate) || 0;
-                          const base = qty * price;
-                          const tax = base * (gst / 100);
-                          const cessAmount = base * (cess / 100);
-                          const amt = base + tax + cessAmount;
-                          return formatCurrency(amt);
-                        })()}
+                    {shippingAddressMode === 'default' && (
+                      <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
+                        {selectedClient.shippingAddress ? (
+                          <>
+                            <p>{selectedClient.shippingAddress.street}</p>
+                            <p>{selectedClient.shippingAddress.city}, {selectedClient.shippingAddress.state} - {selectedClient.shippingAddress.pincode}</p>
+                            <p>{selectedClient.shippingAddress.country}</p>
+                          </>
+                        ) : (
+                          <p className="italic">Using billing address as shipping address</p>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Serial Number Toggle & Section - Only show if this row is active */}
-                {activeRowIndex === index && (
-                <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row sm:items-start gap-3">
-                    <div className="flex items-center gap-2 min-w-fit">
-                        <Label className="text-xs font-medium">Has Serial No?</Label>
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                                <input 
-                                    type="radio" 
-                                    checked={hasSerial} 
-                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, true)}
-                                    className="w-3.5 h-3.5 accent-primary"
-                                /> Yes
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                                <input 
-                                    type="radio" 
-                                    checked={!hasSerial} 
-                                    onChange={() => setValue(`items.${index}.hasSerialNumber`, false)}
-                                    className="w-3.5 h-3.5 accent-primary"
-                                /> No
-                            </label>
-                        </div>
-                    </div>
-
-                    {hasSerial && (
-                        <div className="flex-1 bg-blue-50/50 p-3 rounded-md border border-blue-100/50">
-                            <Label className="text-xs text-blue-900 mb-2 block font-medium">
-                                Enter Serial Numbers ({quantity})
-                            </Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                {Array.from({ length: quantity }).map((_, sIdx) => (
-                                    <Input
-                                        key={sIdx}
-                                        placeholder={`Serial #${sIdx + 1}`}
-                                  className="h-8 text-sm bg-white w-full"
-                                        value={item.serialNumbers?.[sIdx] || ''}
-                                        onChange={(e) => {
-                                            const newSerials = [...(item.serialNumbers || [])];
-                                            newSerials[sIdx] = e.target.value;
-                                            setValue(`items.${index}.serialNumbers`, newSerials);
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
                     )}
-                </div>
+
+                    {shippingAddressMode === 'select' && selectedClient.shippingAddresses && (
+                      <Select
+                        value={selectedAddressIndex}
+                        onValueChange={setSelectedAddressIndex}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an address" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedClient.shippingAddresses.map((addr, idx) => (
+                            <SelectItem key={idx} value={idx.toString()}>
+                              {addr.street}, {addr.city}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {shippingAddressMode === 'new' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Input 
+                          placeholder="Street" 
+                          value={newShippingAddress.street}
+                          onChange={(e) => setNewShippingAddress({...newShippingAddress, street: e.target.value})}
+                          className="col-span-2"
+                        />
+                        <Input 
+                          placeholder="City" 
+                          value={newShippingAddress.city}
+                          onChange={(e) => setNewShippingAddress({...newShippingAddress, city: e.target.value})}
+                        />
+                        <Input 
+                          placeholder="State" 
+                          value={newShippingAddress.state}
+                          onChange={(e) => setNewShippingAddress({...newShippingAddress, state: e.target.value})}
+                        />
+                        <Input 
+                          placeholder="Pincode" 
+                          value={newShippingAddress.pincode}
+                          onChange={(e) => setNewShippingAddress({...newShippingAddress, pincode: e.target.value})}
+                        />
+                        <Input 
+                          placeholder="Country" 
+                          value={newShippingAddress.country}
+                          onChange={(e) => setNewShippingAddress({...newShippingAddress, country: e.target.value})}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            );
-          })}
-          
-          {fields.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-              <p>No items added yet</p>
-              <Button type="button" variant="link" onClick={() => append({ 
-                productName: '', quantity: 1, unit: 'Nos', unitPrice: 0, gstRate: 18, cessRate: 0, amount: 0, hasSerialNumber: false, serialNumbers: []
-              })}>
-                Add your first item
-              </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 left-0 right-0 p-4 bg-background border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 z-10">
-        <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 max-w-4xl mx-auto">
-            <div className="flex justify-between w-full sm:w-auto sm:block text-right">
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(Number(totalAmount) || 0)}</p>
+      {/* Document Upload */}
+      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
+        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Bill Document</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pb-4 pt-4">
+          <DocumentUpload
+            label="Bill Document"
+            currentDocumentUrl={attachmentUrl}
+            onDocumentUploaded={setAttachmentUrl}
+            onDocumentRemoved={() => setAttachmentUrl(undefined)}
+            className="mb-6"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Purchase Items */}
+      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
+        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
+          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Purchase Items</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pb-4 pt-4">
+          {/* Desktop View */}
+          <div className="hidden lg:block">
+            <table className="w-full table-fixed">
+              <thead className="border-b">
+                <tr className="text-sm text-muted-foreground">
+                  <th className="p-2 text-left w-64">Product/Service</th>
+                  <th className="p-2 text-center w-24">Item Code</th>
+                  <th className="p-2 text-center w-16">Qty</th>
+                  <th className="p-2 text-center w-28">Unit</th>
+                  <th className="p-2 text-right w-28">Unit Price</th>
+                  <th className="p-2 text-center w-20">Discount %</th>
+                  <th className="p-2 text-right w-32">Amount</th>
+                  <th className="p-2 w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fields.map((field, index) => {
+                  const item = watchItems?.[index];
+                  const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+                  const quantity = Number(item?.quantity) || 0;
+                  const unitPrice = Number(item?.unitPrice) || 0;
+                  const discount = Number(item?.discount) || 0;
+                  const amount = quantity * unitPrice * (1 - discount / 100);
+
+                  return (
+                    <React.Fragment key={field.id}>
+                    <tr className="border-b align-middle">
+                      <td className="p-2 w-64 align-top">
+                        <Select
+                          value={item?.productId || ''}
+                          onValueChange={(value) => {
+                            handleProductSelect(index, value);
+                            setActiveRowIndex(index);
+                          }}
+                        >
+                          <SelectTrigger className="w-full truncate">
+                            <SelectValue placeholder="Select product" className="truncate" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {localProducts.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.productName} ({product.hsn})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {product?.hasSerialNumber === true && (
+                          <div className="mt-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                              Manage Serials
+                            </Button>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2 text-center w-24">
+                        <span className="text-xs text-muted-foreground">{product?.itemCode || '—'}</span>
+                      </td>
+                      <td className="p-2 w-16">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.quantity` as const}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="1"
+                              min="1"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                field.onChange(val);
+                                if (val && !isNaN(val as number) && val > 0) {
+                                  handleQuantityChange(index, val as number);
+                                }
+                              }}
+                              className="text-center w-full text-base font-medium"
+                            />
+                          )}
+                        />
+                      </td>
+                      <td className="p-2 w-28">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unit` as const}
+                          render={({ field }) => (
+                            <Input
+                              list={`unit-options-${index}`}
+                              {...field}
+                              className="text-center w-full text-sm"
+                            />
+                          )}
+                        />
+                        <datalist id={`unit-options-${index}`}>
+                          <option value="Nos" />
+                          <option value="Pcs" />
+                          <option value="Kgs" />
+                        </datalist>
+                      </td>
+                      <td className="p-2 w-28">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unitPrice` as const}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-right w-full text-base font-medium"
+                            />
+                          )}
+                        />
+                      </td>
+                      <td className="p-2 w-20">
+                        <Controller
+                          control={control}
+                          name={`items.${index}.discount` as const}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-center w-full text-base font-medium"
+                            />
+                          )}
+                        />
+                      </td>
+                      <td className="p-2 w-32 text-right font-medium text-base">
+                        {formatCurrency(amount)}
+                      </td>
+                      <td className="p-2 w-10">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          disabled={fields.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </td>
+                    </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View */}
+          <div className="space-y-4 lg:hidden">
+            {fields.map((field, index) => {
+              const item = watchItems?.[index];
+              const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
+              const quantity = Number(item?.quantity) || 0;
+              const unitPrice = Number(item?.unitPrice) || 0;
+              const discount = Number(item?.discount) || 0;
+              const amount = quantity * unitPrice * (1 - discount / 100);
+
+              return (
+                <Card key={field.id} className="relative">
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="absolute top-2 right-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        disabled={fields.length <= 1}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Product/Service</Label>
+                      <Select
+                        value={item?.productId || ''}
+                        onValueChange={(value) => {
+                          handleProductSelect(index, value);
+                          setActiveRowIndex(index);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {localProducts.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.productName} ({product.hsn})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {product?.hasSerialNumber === true && (
+                        <div className="mt-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                            Manage Serials
+                          </Button>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font medium">Quantity</Label>
+                        <Controller
+                          control={control}
+                          name={`items.${index}.quantity` as const}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="1"
+                              min="1"
+                              {...field}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                field.onChange(val);
+                                if (val && !isNaN(val as number) && val > 0) {
+                                  handleQuantityChange(index, val as number);
+                                }
+                              }}
+                              className="text-center text-lg font-semibold"
+                            />
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font medium">Unit Price</Label>
+                        <Controller
+                          control={control}
+                          name={`items.${index}.unitPrice` as const}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                              className="text-right text-lg font-semibold"
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              append({ productId: '', quantity: 1, unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 } as any);
+              setActiveRowIndex(fields.length);
+            }}
+            className="w-full"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Tax Summary */}
+      {totals && (
+        <Card className="border-primary/30 shadow-md hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-white to-primary/5">
+          <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary to-accent border-b">
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
+              <div className="p-1.5 rounded-lg bg-white/20">
+                <Calculator className="h-5 w-5" />
+              </div>
+              Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 pt-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Taxable Amount:</span>
+                <span className="font-medium">{formatCurrency(totals.taxableAmount)}</span>
+              </div>
+              {totals.cgst > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span>CGST:</span>
+                    <span className="font-medium">{formatCurrency(totals.cgst)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>SGST:</span>
+                    <span className="font-medium">{formatCurrency(totals.sgst)}</span>
+                  </div>
+                </>
+              )}
+              {totals.igst > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>IGST:</span>
+                  <span className="font-medium">{formatCurrency(totals.igst)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Grand Total:</span>
+                <span>{formatCurrency(totals.totalAmount)}</span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:flex w-full sm:w-auto gap-3">
-              <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancel</Button>
-              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Bill
-              </Button>
-            </div>
-        </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Form Actions */}
+      <SerialManager
+        open={serialModalIndex !== null}
+        onClose={() => setSerialModalIndex(null)}
+        productId={serialModalIndex !== null ? watchItems?.[serialModalIndex]?.productId : undefined}
+        initialSelected={
+          serialModalIndex !== null
+            ? (fields?.[serialModalIndex]?.id ? (serialNumbers[fields[serialModalIndex].id] || []) : [])
+            : []
+        }
+        quantity={serialModalIndex !== null ? Number(watchItems?.[serialModalIndex]?.quantity) || 0 : 0}
+        fetchFromDb={false} // Important: We are adding new serials, not fetching existing ones
+        claimFromDb={false}
+        onSave={async (selected) => {
+          if (serialModalIndex === null) return;
+          const key = fields?.[serialModalIndex]?.id;
+          if (!key) return;
+          setSerialNumbers((prev) => ({ ...prev, [key]: selected }));
+        }}
+      />
+
+      <div className="flex justify-end gap-3 pt-3">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel} className="hover:scale-105 transition-transform">
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={isLoading || !totals} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200">
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <span className="font-semibold">{purchase ? 'Update Purchase' : 'Create Purchase'}</span>
+        </Button>
       </div>
-
-
     </form>
   );
 }
+
+export default PurchaseForm;

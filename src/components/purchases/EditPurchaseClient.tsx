@@ -17,7 +17,7 @@ export default function EditPurchaseClient() {
   const params = useParams();
   const { user } = useAuth();
   const { selectedCompany } = useCompany();
-  const { refreshProducts } = useAppData();
+  const { products, clients, refreshProducts } = useAppData();
   const [isLoading, setIsLoading] = useState(true);
   const [purchase, setPurchase] = useState<PurchaseBill | null>(null);
 
@@ -25,9 +25,9 @@ export default function EditPurchaseClient() {
 
   useEffect(() => {
     const loadPurchase = async () => {
-      if (!purchaseId) return;
+      if (!purchaseId || !selectedCompany) return;
       try {
-        const data = await purchasesApi.getById(purchaseId);
+        const data = await purchasesApi.getById(purchaseId, selectedCompany.id);
         setPurchase(data);
       } catch (error) {
         console.error("Failed to load purchase", error);
@@ -38,7 +38,7 @@ export default function EditPurchaseClient() {
       }
     };
     loadPurchase();
-  }, [purchaseId, router]);
+  }, [purchaseId, selectedCompany, router]);
 
   if (!user) return null;
 
@@ -65,9 +65,15 @@ export default function EditPurchaseClient() {
     );
   }
 
-  const handleSuccess = async () => {
-    await refreshProducts();
-    router.push('/invoices/purchases');
+  const handleSubmit = async (data: any) => {
+    try {
+      await purchasesApi.update(purchaseId, data);
+      await refreshProducts();
+      router.push('/invoices/purchases');
+    } catch (error) {
+      console.error('Failed to update purchase', error);
+      throw error;
+    }
   };
 
   return (
@@ -83,11 +89,14 @@ export default function EditPurchaseClient() {
 
           {purchase && (
             <PurchaseForm
+              purchase={purchase}
               companyId={selectedCompany.id}
-              onSuccess={handleSuccess}
+              company={selectedCompany}
+              products={products}
+              clients={clients}
+              companyState={selectedCompany.address?.state || ''}
+              onSubmit={handleSubmit}
               onCancel={() => router.back()}
-              initialData={purchase}
-              purchaseId={purchaseId}
             />
           )}
         </div>

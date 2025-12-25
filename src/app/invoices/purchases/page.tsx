@@ -43,7 +43,7 @@ export default function PurchaseHistoryPage() {
     if (selectedCompany) {
       setIsLoading(true);
       try {
-        const data = await purchasesApi.getAll({ company_id: selectedCompany.id });
+        const data = await purchasesApi.getAll(selectedCompany.id);
         setPurchases(data);
       } catch (error) {
         console.error("Failed to load purchases", error);
@@ -147,17 +147,20 @@ export default function PurchaseHistoryPage() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {purchases.map((bill) => (
+            {purchases.map((bill) => {
+              const displayNumber = (bill as any).invoiceNumber || (bill as any).billNumber || (bill as any).invoice_number || '-';
+              const displayDate = (bill as any).billDate || (bill as any).date || (bill as any).bill_date || '';
+              return (
               <Card key={bill.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBill(bill)}>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                          <span className="font-bold text-lg">{bill.billNumber}</span>
-                          {bill.vendorName && <span className="text-muted-foreground text-sm">from {bill.vendorName}</span>}
+                            <span className="font-bold text-lg">{displayNumber}</span>
+                            {((bill as any).vendorName || (bill as any).vendor_name) && <span className="text-muted-foreground text-sm">from {(bill as any).vendorName || (bill as any).vendor_name}</span>}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(bill.billDate)}</span>
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(displayDate)}</span>
                           <span className="flex items-center gap-1"><Package className="h-3 w-3" /> {bill.items.length} Items</span>
                       </div>
                     </div>
@@ -169,12 +172,12 @@ export default function PurchaseHistoryPage() {
                   
                   {/* Preview Items */}
                   <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                      {bill.items.slice(0, 3).map((item, idx) => (
+                        {bill.items.slice(0, 3).map((item, idx) => (
                           <div key={idx} className="flex justify-between bg-muted/30 p-2 rounded">
-                              <span>{item.productName}</span>
-                              <span className="font-medium">x{item.quantity}</span>
+                            <span>{(item as any).productName || (item as any).product_name || (item as any).description || 'Item'}</span>
+                            <span className="font-medium">x{(item as any).quantity || (item as any).qty || 0}</span>
                           </div>
-                      ))}
+                        ))}
                       {bill.items.length > 3 && (
                           <div className="text-muted-foreground p-2 text-xs flex items-center">
                               +{bill.items.length - 3} more items
@@ -183,7 +186,8 @@ export default function PurchaseHistoryPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -191,27 +195,35 @@ export default function PurchaseHistoryPage() {
         <Dialog open={!!selectedBill} onOpenChange={(open) => !open && setSelectedBill(null)}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Purchase Bill: {selectedBill?.billNumber}</DialogTitle>
+              <DialogTitle>Purchase Bill: {(selectedBill as any)?.invoiceNumber || (selectedBill as any)?.billNumber || (selectedBill as any)?.invoice_number || ''}</DialogTitle>
             </DialogHeader>
-            {selectedBill && (
+            {selectedBill && (() => {
+              const bill = selectedBill as any;
+              const displayNumber = bill.invoiceNumber || bill.billNumber || bill.invoice_number || '-';
+              const displayDate = bill.billDate || bill.date || bill.bill_date || '';
+              const vendor = bill.vendorName || bill.vendor_name || (bill.client && bill.client.name) || 'N/A';
+              const creator = bill.createdByName || bill.createdBy || bill.created_by || 'N/A';
+              const total = bill.totalAmount || bill.total_amount || bill.total || 0;
+
+              return (
               <div className="space-y-6">
                 {/* Bill Header Info */}
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-sm text-muted-foreground">Bill Date</p>
-                    <p className="font-semibold text-base">{formatDate(selectedBill.billDate)}</p>
+                    <p className="font-semibold text-base">{formatDate(displayDate)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Vendor</p>
-                    <p className="font-semibold text-base">{selectedBill.vendorName || 'N/A'}</p>
+                    <p className="font-semibold text-base">{vendor}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Created By</p>
-                    <p className="font-semibold text-base">{selectedBill.createdByName || selectedBill.createdBy || 'N/A'}</p>
+                    <p className="font-semibold text-base">{creator}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Amount</p>
-                    <p className="font-semibold text-base text-primary">{formatCurrency(selectedBill.totalAmount)}</p>
+                    <p className="font-semibold text-base text-primary">{formatCurrency(total)}</p>
                   </div>
                 </div>
 
@@ -219,16 +231,16 @@ export default function PurchaseHistoryPage() {
                 <div>
                   <h4 className="font-semibold mb-3">Items ({selectedBill.items.length})</h4>
                   <div className="space-y-3">
-                    {selectedBill.items.map((item, idx) => (
+                    {bill.items.map((item: any, idx: number) => (
                       <div key={idx} className="border rounded-lg p-4 bg-muted/30">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-medium">{item.productName}</p>
-                            {item.hsn && <p className="text-sm text-muted-foreground">HSN: {item.hsn}</p>}
+                            <p className="font-medium">{item.productName || item.product_name || item.description || 'Item'}</p>
+                            {(item.hsn || item.hsn) && <p className="text-sm text-muted-foreground">HSN: {item.hsn || item.hsn}</p>}
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">{formatCurrency(item.amount || 0)}</p>
-                            <p className="text-sm text-muted-foreground">Qty: {item.quantity} {item.unit}</p>
+                            <p className="font-medium">{formatCurrency(item.amount || item.lineTotal || item.line_total || 0)}</p>
+                            <p className="text-sm text-muted-foreground">Qty: {item.quantity || item.qty || 0} {item.unit || ''}</p>
                           </div>
                         </div>
                         {item.gstRate && <p className="text-sm text-muted-foreground">GST: {item.gstRate}%</p>}
@@ -236,7 +248,7 @@ export default function PurchaseHistoryPage() {
                           <div className="mt-3 pt-3 border-t">
                             <p className="text-sm font-medium mb-2">Serial Numbers:</p>
                             <div className="flex flex-wrap gap-2">
-                              {item.serialNumbers.map((sn, snIdx) => (
+                              {item.serialNumbers.map((sn: string, snIdx: number) => (
                                 <span key={snIdx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
                                   {sn}
                                 </span>
@@ -258,24 +270,24 @@ export default function PurchaseHistoryPage() {
                 )}
 
                 {/* Attachment Section */}
-                {selectedBill.attachmentUrl && (
+                {bill.attachmentUrl && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Attached Document</p>
                     <div className="p-3 bg-muted/20 rounded flex items-start gap-4">
                       {(
-                        selectedBill.attachmentUrl.includes('.pdf') || selectedBill.attachmentUrl.includes('resource_type/raw')
+                        bill.attachmentUrl.includes('.pdf') || bill.attachmentUrl.includes('resource_type/raw')
                       ) ? (
                         <div className="h-16 w-16 rounded-lg bg-red-100 flex items-center justify-center">
                           <FileText className="h-8 w-8 text-red-600" />
                         </div>
                       ) : (
                         <div className="h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
-                          <img src={selectedBill.attachmentUrl} alt="attachment" className="h-full w-full object-cover" />
+                          <img src={bill.attachmentUrl} alt="attachment" className="h-full w-full object-cover" />
                         </div>
                       )}
 
                       <div className="flex-1">
-                        <p className="font-medium text-sm truncate">{selectedBill.attachmentUrl.split('/').slice(-1)[0]}</p>
+                        <p className="font-medium text-sm truncate">{bill.attachmentUrl.split('/').slice(-1)[0]}</p>
                         <p className="text-xs text-muted-foreground mt-1">Uploaded document</p>
 
                         <div className="flex gap-2 mt-3">
@@ -283,7 +295,7 @@ export default function PurchaseHistoryPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(selectedBill.attachmentUrl, '_blank')}
+                            onClick={() => window.open(bill.attachmentUrl, '_blank')}
                             className="flex items-center gap-2"
                           >
                             <Eye className="h-4 w-4" />
@@ -295,7 +307,7 @@ export default function PurchaseHistoryPage() {
                             size="sm"
                             onClick={() => {
                               const link = document.createElement('a');
-                              link.href = selectedBill.attachmentUrl as string;
+                              link.href = bill.attachmentUrl as string;
                               link.download = '';
                               link.target = '_blank';
                               document.body.appendChild(link);
@@ -333,7 +345,8 @@ export default function PurchaseHistoryPage() {
                   </DialogFooter>
                 )}
               </div>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
 
