@@ -270,14 +270,23 @@ class ApiClient {
     return transformCase ? snakeToCamel(result) : result;
   }
 
-  async put<T>(endpoint: string, data?: any, transformCase = false): Promise<T> {
+  async put<T>(endpoint: string, data?: any, transformCase = false, params?: Record<string, any>): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
-    const url = buildUrl(this.baseURL, endpoint);
+    const url = new URL(buildUrl(this.baseURL, endpoint));
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+    
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
-      console.debug('[apiClient] PUT', url, bodyData);
+      console.debug('[apiClient] PUT', url.toString(), bodyData);
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: 'PUT',
       headers: await this.getHeaders(),
       body: JSON.stringify(bodyData),
@@ -286,7 +295,7 @@ class ApiClient {
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
-      console.debug('[apiClient] PUT response', url, result);
+      console.debug('[apiClient] PUT response', url.toString(), result);
     }
 
     return transformCase ? snakeToCamel(result) : result;
@@ -314,13 +323,22 @@ class ApiClient {
     return transformCase ? snakeToCamel(result) : result;
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
-    const url = buildUrl(this.baseURL, endpoint);
+  async delete<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+    const url = new URL(buildUrl(this.baseURL, endpoint));
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+    
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
-      console.debug('[apiClient] DELETE', url);
+      console.debug('[apiClient] DELETE', url.toString());
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: 'DELETE',
       headers: await this.getHeaders(),
       credentials: 'include', // Send cookies
@@ -328,7 +346,7 @@ class ApiClient {
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
-      console.debug('[apiClient] DELETE response', url, result);
+      console.debug('[apiClient] DELETE response', url.toString(), result);
     }
 
     return result;

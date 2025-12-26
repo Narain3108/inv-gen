@@ -91,9 +91,9 @@ export default function PurchaseHistoryPage() {
   const canEdit = user.role === 'super_admin' || user.role === 'admin';
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !selectedCompany) return;
     try {
-      await purchasesApi.delete(deleteId);
+      await purchasesApi.delete(deleteId, selectedCompany.id);
       toast.success('Purchase bill deleted');
       setPurchases(prev => prev.filter(p => p.id !== deleteId));
       setSelectedBill(null);

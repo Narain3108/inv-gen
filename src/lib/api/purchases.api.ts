@@ -91,17 +91,21 @@ export const purchasesApi = {
   /**
    * Update a purchase bill
    */
-  update: async (id: string, data: Partial<PurchaseBill>) => {
-    // Backend might not support update yet, but let's add it
-    const response = await apiClient.put<PurchaseBill>(`/purchases/${id}`, data, true);
+  update: async (id: string, data: Partial<PurchaseBill>, companyId?: string) => {
+    const company = companyId || data.companyId;
+    if (!company) {
+      throw new Error('Company ID is required for update');
+    }
+    const response = await apiClient.put<PurchaseBill>(`/purchases/${id}`, data, true, { companyId: company });
     return response;
   },
 
   /**
    * Delete a purchase bill
    */
-  delete: async (id: string) => {
-    await apiClient.delete(`/purchases/${id}`);
+  delete: async (id: string, companyId: string) => {
+    console.log('[purchases.api] Deleting purchase:', id, 'companyId:', companyId);
+    await apiClient.delete(`/purchases/${id}`, { companyId });
   },
 };
 

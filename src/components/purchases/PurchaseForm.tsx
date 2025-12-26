@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, MapPin } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { formatCurrency } from '@/utils/formatters';
@@ -34,7 +34,7 @@ const purchaseItemSchema = z.object({
   productName: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   hsn: z.string().min(1, "HSN is required"),
-  quantity: z.coerce.number().min(0.001, "Quantity must be greater than 0"),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   unit: z.string().min(1, "Unit is required"),
   unitPrice: z.coerce.number().min(0, "Price must be non-negative"),
   discount: z.coerce.number().min(0).default(0),
@@ -95,17 +95,6 @@ export function PurchaseForm({
   useEffect(() => {
     setLocalProducts(products);
   }, [products]);
-
-  // Shipping Address State (opt-in)
-  const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
-  const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
-  const [newShippingAddress, setNewShippingAddress] = useState<Address>({
-    street: '',
-    city: '',
-    state: '',
-    pincode: '',
-    country: 'India',
-  });
 
   const {
     register,
@@ -175,16 +164,6 @@ export function PurchaseForm({
     if (watchClientId) {
       const client = clients.find(c => c.id === watchClientId);
       setSelectedClient(client || null);
-      // Reset shipping address selection
-      setShippingAddressMode('none');
-      setSelectedAddressIndex('default');
-      setNewShippingAddress({
-        street: '',
-        city: '',
-        state: '',
-        pincode: '',
-        country: 'India',
-      });
     } else {
       setSelectedClient(null);
     }
@@ -256,7 +235,7 @@ export function PurchaseForm({
     let totalCess = 0;
     let totalTaxableAmount = 0;
 
-    const clientState = selectedClient?.address?.state || (purchase && purchase.shippingAddress?.state) || '';
+    const clientState = selectedClient?.address?.state || '';
     const isInterState = companyState !== clientState;
 
     const processedItems: PurchaseItem[] = validItems.map(({ item, index }) => {
@@ -391,37 +370,10 @@ export function PurchaseForm({
       return;
     }
 
-    // Determine Shipping Address
-    let finalShippingAddress: Address | undefined = undefined;
-
-    if (shippingAddressMode === 'default') {
-      finalShippingAddress = selectedClient?.shippingAddress || selectedClient?.address;
-    } else if (shippingAddressMode === 'select' && selectedClient?.shippingAddresses) {
-      const index = parseInt(selectedAddressIndex);
-      if (!isNaN(index) && selectedClient.shippingAddresses[index]) {
-        finalShippingAddress = selectedClient.shippingAddresses[index];
-      }
-    } else if (shippingAddressMode === 'new') {
-      if (!newShippingAddress.street || !newShippingAddress.city || !newShippingAddress.state || !newShippingAddress.pincode) {
-        toast.error('Please fill in all shipping address fields');
-        return;
-      }
-      finalShippingAddress = newShippingAddress;
-      
-      if (selectedClient) {
-        try {
-          const updatedAddresses = [...(selectedClient.shippingAddresses || []), newShippingAddress];
-          await clientsApi.update(selectedClient.id, { shippingAddresses: updatedAddresses });
-        } catch (err) {
-          console.error('Failed to update client shipping addresses', err);
-        }
-      }
-    }
-
     setIsLoading(true);
     try {
       const purchaseData = {
-        invoiceNumber: data.invoiceNumber,
+        bill_number: data.invoiceNumber,
         reference_number: data.referenceNumber || null,
         po_number: data.poNumber || null,
         po_date: data.poDate ? new Date(data.poDate).toISOString() : null,
@@ -429,7 +381,6 @@ export function PurchaseForm({
         client_id: data.clientId,
         date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
         company_id: companyId,
-        shipping_address: shippingAddressMode === 'none' ? null : finalShippingAddress,
         items: totals.items,
         taxable_amount: totals.taxableAmount,
         cgst: totals.cgst,
@@ -545,107 +496,6 @@ export function PurchaseForm({
                 />
               </div>
             </div>
-
-            {/* Row 3: Shipping Address (opt-in) */}
-            {selectedClient && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> Include Shipping Address
-                  </Label>
-                  <Switch
-                    checked={shippingAddressMode !== 'none'}
-                    onCheckedChange={(v: boolean) => setShippingAddressMode(v ? 'default' : 'none')}
-                  />
-                </div>
-
-                {shippingAddressMode !== 'none' && (
-                  <div className="space-y-3 border rounded-md p-3 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Shipping Address</Label>
-                      <Select
-                        value={shippingAddressMode}
-                        onValueChange={(val: any) => setShippingAddressMode(val)}
-                      >
-                        <SelectTrigger className="w-[180px] h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default Address</SelectItem>
-                          {selectedClient.shippingAddresses && selectedClient.shippingAddresses.length > 0 && (
-                            <SelectItem value="select">Select Saved Address</SelectItem>
-                          )}
-                          <SelectItem value="new">Add New Address</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {shippingAddressMode === 'default' && (
-                      <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
-                        {selectedClient.shippingAddress ? (
-                          <>
-                            <p>{selectedClient.shippingAddress.street}</p>
-                            <p>{selectedClient.shippingAddress.city}, {selectedClient.shippingAddress.state} - {selectedClient.shippingAddress.pincode}</p>
-                            <p>{selectedClient.shippingAddress.country}</p>
-                          </>
-                        ) : (
-                          <p className="italic">Using billing address as shipping address</p>
-                        )}
-                      </div>
-                    )}
-
-                    {shippingAddressMode === 'select' && selectedClient.shippingAddresses && (
-                      <Select
-                        value={selectedAddressIndex}
-                        onValueChange={setSelectedAddressIndex}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an address" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {selectedClient.shippingAddresses.map((addr, idx) => (
-                            <SelectItem key={idx} value={idx.toString()}>
-                              {addr.street}, {addr.city}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    {shippingAddressMode === 'new' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Input 
-                          placeholder="Street" 
-                          value={newShippingAddress.street}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, street: e.target.value})}
-                          className="col-span-2"
-                        />
-                        <Input 
-                          placeholder="City" 
-                          value={newShippingAddress.city}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, city: e.target.value})}
-                        />
-                        <Input 
-                          placeholder="State" 
-                          value={newShippingAddress.state}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, state: e.target.value})}
-                        />
-                        <Input 
-                          placeholder="Pincode" 
-                          value={newShippingAddress.pincode}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, pincode: e.target.value})}
-                        />
-                        <Input 
-                          placeholder="Country" 
-                          value={newShippingAddress.country}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, country: e.target.value})}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

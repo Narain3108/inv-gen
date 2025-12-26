@@ -67,7 +67,7 @@ export default function EditPurchaseClient() {
 
   const handleSubmit = async (data: any) => {
     try {
-      await purchasesApi.update(purchaseId, data);
+      await purchasesApi.update(purchaseId, data, selectedCompany?.id);
       await refreshProducts();
       router.push('/invoices/purchases');
     } catch (error) {
