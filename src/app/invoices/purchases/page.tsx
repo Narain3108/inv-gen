@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { purchasesApi, PurchaseBill } from '@/lib/api/purchases.api';
+import { clientsApi } from '@/lib/api/clients.api';
+import type { Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, FileText, Calendar, Package, Pencil, Trash2, Eye, Download } from 'lucide-react';
@@ -35,6 +37,7 @@ export default function PurchaseHistoryPage() {
   const { user } = useAuth();
   const { selectedCompany } = useCompany();
   const [purchases, setPurchases] = useState<PurchaseBill[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBill, setSelectedBill] = useState<PurchaseBill | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -43,8 +46,12 @@ export default function PurchaseHistoryPage() {
     if (selectedCompany) {
       setIsLoading(true);
       try {
-        const data = await purchasesApi.getAll(selectedCompany.id);
-        setPurchases(data);
+        const [purchasesData, clientsData] = await Promise.all([
+          purchasesApi.getAll(selectedCompany.id),
+          clientsApi.getAll({ company_id: selectedCompany.id })
+        ]);
+        setPurchases(purchasesData);
+        setClients(clientsData);
       } catch (error) {
         console.error("Failed to load purchases", error);
       } finally {
@@ -148,41 +155,88 @@ export default function PurchaseHistoryPage() {
         ) : (
           <div className="grid gap-4">
             {purchases.map((bill) => {
-              const displayNumber = (bill as any).invoiceNumber || (bill as any).billNumber || (bill as any).invoice_number || '-';
+              const displayNumber = (bill as any).invoiceNumber || (bill as any).billNumber || (bill as any).invoice_number || (bill as any).bill_number || '-';
               const displayDate = (bill as any).billDate || (bill as any).date || (bill as any).bill_date || '';
+              const clientId = (bill as any).clientId || (bill as any).client_id;
+              const vendor = clients.find(c => c.id === clientId);
+              const vendorName = vendor ? (vendor as any).name || (vendor as any).companyName || 'Vendor Not Specified' : 'Vendor Not Specified';
+              const refNumber = (bill as any).referenceNumber || (bill as any).reference_number || (bill as any).ref_number;
+              const poNumber = (bill as any).poNumber || (bill as any).po_number;
+              const cgst = (bill as any).cgst || 0;
+              const sgst = (bill as any).sgst || 0;
+              const igst = (bill as any).igst || 0;
+              const taxableAmount = (bill as any).taxableAmount || (bill as any).taxable_amount || 0;
+              const totalTax = cgst + sgst + igst;
+              
               return (
-              <Card key={bill.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBill(bill)}>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                            <span className="font-bold text-lg">{displayNumber}</span>
-                            {((bill as any).vendorName || (bill as any).vendor_name) && <span className="text-muted-foreground text-sm">from {(bill as any).vendorName || (bill as any).vendor_name}</span>}
+              <Card key={bill.id} className="hover:shadow-lg transition-all cursor-pointer border-l-4 border-l-primary" onClick={() => setSelectedBill(bill)}>
+                <CardContent className="p-4 sm:p-6">
+                  {/* Header Section */}
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 mb-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-lg text-primary">{displayNumber}</span>
+                        {poNumber && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">PO: {poNumber}</span>
+                        )}
+                        {refNumber && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Ref: {refNumber}</span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(displayDate)}</span>
-                          <span className="flex items-center gap-1"><Package className="h-3 w-3" /> {bill.items.length} Items</span>
+                      
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Package className="h-4 w-4" />
+                          <span className="font-medium text-foreground">{vendorName}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(displayDate)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {bill.items.length} Items
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    
+                    {/* Amount Section */}
+                    <div className="text-right sm:text-left space-y-1">
                       <p className="text-2xl font-bold text-primary">{formatCurrency(bill.totalAmount)}</p>
-                      <p className="text-xs text-muted-foreground">Total Amount</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>Taxable: {formatCurrency(taxableAmount)}</p>
+                        {totalTax > 0 && <p>Tax: {formatCurrency(totalTax)}</p>}
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Preview Items */}
-                  <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                        {bill.items.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="flex justify-between bg-muted/30 p-2 rounded">
-                            <span>{(item as any).productName || (item as any).product_name || (item as any).description || 'Item'}</span>
-                            <span className="font-medium">x{(item as any).quantity || (item as any).qty || 0}</span>
+                  {/* Items Preview */}
+                  <div className="border-t pt-3 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">Items</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {bill.items.slice(0, 3).map((item, idx) => {
+                        const itemName = (item as any).productName || (item as any).product_name || (item as any).description || 'Item';
+                        const itemQty = (item as any).quantity || (item as any).qty || 0;
+                        const itemPrice = (item as any).unitPrice || (item as any).unit_price || 0;
+                        return (
+                          <div key={idx} className="flex justify-between items-center bg-muted/40 p-2 rounded text-sm">
+                            <span className="truncate flex-1 mr-2">{itemName}</span>
+                            <div className="text-right">
+                              <span className="font-semibold">×{itemQty}</span>
+                              <span className="text-xs text-muted-foreground ml-1">@{formatCurrency(itemPrice)}</span>
+                            </div>
                           </div>
-                        ))}
-                      {bill.items.length > 3 && (
-                          <div className="text-muted-foreground p-2 text-xs flex items-center">
-                              +{bill.items.length - 3} more items
-                          </div>
-                      )}
+                        );
+                      })}
+                    </div>
+                    {bill.items.length > 3 && (
+                      <p className="text-xs text-center text-muted-foreground py-1">
+                        +{bill.items.length - 3} more items
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -199,57 +253,123 @@ export default function PurchaseHistoryPage() {
             </DialogHeader>
             {selectedBill && (() => {
               const bill = selectedBill as any;
-              const displayNumber = bill.invoiceNumber || bill.billNumber || bill.invoice_number || '-';
+              const displayNumber = bill.invoiceNumber || bill.billNumber || bill.invoice_number || bill.bill_number || '-';
               const displayDate = bill.billDate || bill.date || bill.bill_date || '';
-              const vendor = bill.vendorName || bill.vendor_name || (bill.client && bill.client.name) || 'N/A';
-              const creator = bill.createdByName || bill.createdBy || bill.created_by || 'N/A';
+              const clientId = bill.clientId || bill.client_id;
+              const clientObj = clients.find(c => c.id === clientId);
+              const vendor = clientObj ? (clientObj as any).name || (clientObj as any).companyName || 'Vendor Not Specified' : 'Vendor Not Specified';
+              const creator = bill.createdByName || bill.createdBy || bill.created_by || 'Unknown';
               const total = bill.totalAmount || bill.total_amount || bill.total || 0;
+              const taxableAmount = bill.taxableAmount || bill.taxable_amount || 0;
+              const cgst = bill.cgst || 0;
+              const sgst = bill.sgst || 0;
+              const igst = bill.igst || 0;
+              const refNumber = bill.referenceNumber || bill.reference_number;
+              const poNumber = bill.poNumber || bill.po_number;
+              const poDate = bill.poDate || bill.po_date;
+              const ewayNumber = bill.ewayNumber || bill.eway_number;
 
               return (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                {/* Header with badges */}
+                <div className="flex flex-wrap gap-2 pb-4 border-b">
+                  {poNumber && (
+                    <div className="bg-blue-50 border border-blue-200 rounded px-3 py-1">
+                      <span className="text-xs text-blue-600 font-semibold">PO: {poNumber}</span>
+                      {poDate && <span className="text-xs text-blue-500 ml-2">({formatDate(poDate)})</span>}
+                    </div>
+                  )}
+                  {refNumber && (
+                    <div className="bg-purple-50 border border-purple-200 rounded px-3 py-1">
+                      <span className="text-xs text-purple-600 font-semibold">Ref: {refNumber}</span>
+                    </div>
+                  )}
+                  {ewayNumber && (
+                    <div className="bg-green-50 border border-green-200 rounded px-3 py-1">
+                      <span className="text-xs text-green-600 font-semibold">E-way: {ewayNumber}</span>
+                    </div>
+                  )}
+                </div>
+                
                 {/* Bill Header Info */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Bill Date</p>
-                    <p className="font-semibold text-base">{formatDate(displayDate)}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Bill Date</p>
+                    <p className="font-semibold">{formatDate(displayDate)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Vendor</p>
-                    <p className="font-semibold text-base">{vendor}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Vendor</p>
+                    <p className="font-semibold text-primary">{vendor}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Created By</p>
-                    <p className="font-semibold text-base">{creator}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Created By</p>
+                    <p className="font-semibold">{creator}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Amount</p>
-                    <p className="font-semibold text-base text-primary">{formatCurrency(total)}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Taxable Amount</p>
+                    <p className="font-semibold">{formatCurrency(taxableAmount)}</p>
+                  </div>
+                  {cgst > 0 && (
+                    <>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">CGST</p>
+                        <p className="font-semibold text-orange-600">{formatCurrency(cgst)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">SGST</p>
+                        <p className="font-semibold text-orange-600">{formatCurrency(sgst)}</p>
+                      </div>
+                    </>
+                  )}
+                  {igst > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase">IGST</p>
+                      <p className="font-semibold text-orange-600">{formatCurrency(igst)}</p>
+                    </div>
+                  )}
+                  <div className="col-span-2 sm:col-span-1">
+                    <p className="text-xs text-muted-foreground uppercase">Total Amount</p>
+                    <p className="font-bold text-xl text-primary">{formatCurrency(total)}</p>
                   </div>
                 </div>
 
                 {/* Items Section */}
                 <div>
-                  <h4 className="font-semibold mb-3">Items ({selectedBill.items.length})</h4>
-                  <div className="space-y-3">
+                  <h4 className="font-semibold mb-3 text-sm uppercase text-muted-foreground">Items ({selectedBill.items.length})</h4>
+                  <div className="space-y-2">
                     {bill.items.map((item: any, idx: number) => (
-                      <div key={idx} className="border rounded-lg p-4 bg-muted/30">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">{item.productName || item.product_name || item.description || 'Item'}</p>
-                            {(item.hsn || item.hsn) && <p className="text-sm text-muted-foreground">HSN: {item.hsn || item.hsn}</p>}
+                      <div key={idx} className="border rounded-lg p-3 bg-muted/20 hover:bg-muted/30 transition-colors">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{item.productName || item.product_name || item.description || 'Item'}</p>
+                            <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
+                              {(item.hsn || item.hsn_code) && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded">HSN: {item.hsn || item.hsn_code}</span>
+                              )}
+                              {(item.itemCode || item.item_code) && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded">Code: {item.itemCode || item.item_code}</span>
+                              )}
+                              {item.gstRate && (
+                                <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded">GST: {item.gstRate}%</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(item.amount || item.lineTotal || item.line_total || 0)}</p>
-                            <p className="text-sm text-muted-foreground">Qty: {item.quantity || item.qty || 0} {item.unit || ''}</p>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-primary">{formatCurrency(item.amount || item.lineTotal || item.line_total || 0)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.quantity || item.qty || 0} {item.unit || 'Unit'} × {formatCurrency(item.unitPrice || item.unit_price || 0)}
+                            </p>
+                            {item.discount > 0 && (
+                              <p className="text-xs text-green-600">-{item.discount}% disc</p>
+                            )}
                           </div>
                         </div>
-                        {item.gstRate && <p className="text-sm text-muted-foreground">GST: {item.gstRate}%</p>}
                         {item.hasSerialNumber && item.serialNumbers && item.serialNumbers.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-sm font-medium mb-2">Serial Numbers:</p>
-                            <div className="flex flex-wrap gap-2">
+                          <div className="mt-2 pt-2 border-t">
+                            <p className="text-xs font-medium mb-1.5 text-muted-foreground">Serial Numbers:</p>
+                            <div className="flex flex-wrap gap-1.5">
                               {item.serialNumbers.map((sn: string, snIdx: number) => (
-                                <span key={snIdx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                                <span key={snIdx} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-mono">
                                   {sn}
                                 </span>
                               ))}
