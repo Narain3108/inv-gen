@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { purchasesApi } from '@/lib/api/purchases.api';
+import { useCompany } from '@/hooks/useCompany';
 import { clientsApi } from '@/lib/api/clients.api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,18 +16,19 @@ export default function PurchaseDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
+  const { selectedCompany } = useCompany();
   const [bill, setBill] = useState<any | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      if (!id) return;
+      if (!id || !selectedCompany) return;
       setIsLoading(true);
       try {
         const [b, cs] = await Promise.all([
-          purchasesApi.getById(id),
-          clientsApi.getAll()
+          purchasesApi.getById(id, selectedCompany.id),
+          clientsApi.getAll({ company_id: selectedCompany.id })
         ]);
         setBill(b);
         setClients(cs);
@@ -116,14 +118,4 @@ export default function PurchaseDetailPage() {
     </DashboardLayout>
   );
 }
-// Placeholder page for dynamic [id] route to satisfy static export requirements
-// Exports empty generateStaticParams for routes that nest dynamic segments
-
-export async function generateStaticParams() {
-  return [];
-}
-
-export default function Page() {
-  // This segment is only used to host nested routes like /edit
-  return null;
-}
+// (Removed server-only placeholder exports — this is a client-only page.)

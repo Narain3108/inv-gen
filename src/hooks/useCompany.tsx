@@ -40,6 +40,7 @@ export const useCompany = create<CompanyStore>()(
           getItem: (_: string) => null,
           setItem: (_: string, __: string) => {},
           removeItem: (_: string) => {},
+          clear: () => {},
           length: 0,
           key: (_: number) => null,
         };
