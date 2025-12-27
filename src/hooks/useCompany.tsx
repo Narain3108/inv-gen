@@ -6,7 +6,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Company } from '@/types';
 
 interface CompanyStore {
@@ -31,6 +31,20 @@ export const useCompany = create<CompanyStore>()(
     {
       name: 'selected-company-storage',
       skipHydration: false,
+      storage: createJSONStorage(() => {
+        if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+          return window.localStorage;
+        }
+        // Provide a no-op storage on the server to avoid "storage.getItem is not a function"
+        const noOpStorage: Storage = {
+          getItem: (_: string) => null,
+          setItem: (_: string, __: string) => {},
+          removeItem: (_: string) => {},
+          length: 0,
+          key: (_: number) => null,
+        };
+        return noOpStorage;
+      }),
       // Add onRehydrateStorage to log when state is restored
       onRehydrateStorage: () => {
         console.log('💾 [Zustand Persist] Starting hydration from localStorage...');

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, FileText, Calendar, Package, Pencil, Trash2, Eye, Download } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { resolveVendorName } from '@/utils/vendor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
@@ -132,9 +133,11 @@ export default function PurchaseHistoryPage() {
       <div className="w-full py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Purchase History</h1>
-          <Button onClick={() => router.push('/invoices/purchases/new')}>
-            <Plus className="mr-2 h-4 w-4" /> New Purchase Bill
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => router.push('/invoices/purchases/new')}>
+              <Plus className="mr-2 h-4 w-4" /> New Purchase Bill
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -157,9 +160,8 @@ export default function PurchaseHistoryPage() {
             {purchases.map((bill) => {
               const displayNumber = (bill as any).invoiceNumber || (bill as any).billNumber || (bill as any).invoice_number || (bill as any).bill_number || '-';
               const displayDate = (bill as any).billDate || (bill as any).date || (bill as any).bill_date || '';
-              const clientId = (bill as any).clientId || (bill as any).client_id;
-              const vendor = clients.find(c => c.id === clientId);
-              const vendorName = vendor ? (vendor as any).name || (vendor as any).companyName || 'Vendor Not Specified' : 'Vendor Not Specified';
+              const resolved = resolveVendorName(bill, clients, displayNumber);
+              const vendorName = resolved.vendorName;
               const refNumber = (bill as any).referenceNumber || (bill as any).reference_number || (bill as any).ref_number;
               const poNumber = (bill as any).poNumber || (bill as any).po_number;
               const cgst = (bill as any).cgst || 0;
@@ -189,6 +191,9 @@ export default function PurchaseHistoryPage() {
                           <Package className="h-4 w-4" />
                           <span className="font-medium text-foreground">{vendorName}</span>
                         </div>
+                        {resolved.source !== 'client' && (
+                          <span className="text-xs ml-2 px-2 py-0.5 rounded bg-yellow-50 text-yellow-700">{resolved.source}</span>
+                        )}
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -255,9 +260,8 @@ export default function PurchaseHistoryPage() {
               const bill = selectedBill as any;
               const displayNumber = bill.invoiceNumber || bill.billNumber || bill.invoice_number || bill.bill_number || '-';
               const displayDate = bill.billDate || bill.date || bill.bill_date || '';
-              const clientId = bill.clientId || bill.client_id;
-              const clientObj = clients.find(c => c.id === clientId);
-              const vendor = clientObj ? (clientObj as any).name || (clientObj as any).companyName || 'Vendor Not Specified' : 'Vendor Not Specified';
+              const resolved = resolveVendorName(bill, clients, displayNumber);
+              const vendor = resolved.vendorName;
               const creator = bill.createdByName || bill.createdBy || bill.created_by || 'Unknown';
               const total = bill.totalAmount || bill.total_amount || bill.total || 0;
               const taxableAmount = bill.taxableAmount || bill.taxable_amount || 0;
