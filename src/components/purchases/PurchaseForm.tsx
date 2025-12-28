@@ -130,8 +130,8 @@ export function PurchaseForm({
       attachmentUrl: purchase.attachmentUrl,
     } : {
       date: new Date().toISOString().split('T')[0],
-      items: [{ productId: '', quantity: 1, unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 }],
-    },
+      items: [{ productId: '', quantity: '', unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 }],
+    } as any,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -786,7 +786,7 @@ export function PurchaseForm({
             type="button"
             variant="outline"
             onClick={() => {
-              append({ productId: '', quantity: 1, unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 } as any);
+              append({ productId: '', quantity: '', unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 } as any);
               setActiveRowIndex(fields.length);
             }}
             className="w-full"

@@ -17,22 +17,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Force light mode for now (temporarily disable dark mode)
     setMounted(true);
-    const stored = localStorage.getItem('theme') as Theme;
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const initialTheme = stored || systemTheme;
-    setThemeState(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+    setThemeState('light');
+    try {
+      localStorage.setItem('theme', 'light');
+    } catch (e) {}
+    document.documentElement.classList.remove('dark');
   }, []);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  const setTheme = (_newTheme: Theme) => {
+    // Ignore requests to set dark mode while disabled; keep light
+    setThemeState('light');
+    try {
+      localStorage.setItem('theme', 'light');
+    } catch (e) {}
+    document.documentElement.classList.remove('dark');
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    // No-op while dark mode is disabled
+    setTheme('light');
   };
 
   // Always provide context, even during SSR

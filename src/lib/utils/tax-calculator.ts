@@ -36,7 +36,7 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
   const {
     amount,
     gstRate,
-    quantity = 1,
+    quantity = 0,
     discount = 0,
     companyStateCode,
     clientStateCode,
