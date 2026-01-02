@@ -65,6 +65,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
     handleSubmit,
     setValue,
     watch,
+    trigger,
     formState: { errors },
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientFormSchema) as any,
@@ -127,6 +128,32 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
     }
   };
 
+  const tabsOrder = ['basic', 'contact', 'address', 'bank'] as const;
+  type TabKey = typeof tabsOrder[number];
+  const [activeTab, setActiveTab] = useState<TabKey>('basic');
+
+  const goToNext = async () => {
+    // Validate fields relevant to the current tab before moving
+    const fieldsForTab: Record<TabKey, string[]> = {
+      basic: ['clientName', 'gstin', 'pan'],
+      contact: ['contact.phone', 'contact.email', 'contact.website'],
+      address: ['address.street', 'address.city', 'address.state', 'address.pincode'],
+      bank: ['bankDetails.bankName', 'bankDetails.accountNumber', 'bankDetails.ifscCode'],
+    };
+
+    const toValidate = fieldsForTab[activeTab] || [];
+    const valid = await trigger(toValidate as any);
+    if (!valid) {
+      toast.error('Please fix errors on this tab before proceeding');
+      return;
+    }
+
+    const idx = tabsOrder.indexOf(activeTab);
+    if (idx >= 0 && idx < tabsOrder.length - 1) {
+      setActiveTab(tabsOrder[idx + 1]);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* Debug: Show all validation errors */}
@@ -152,7 +179,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
         </div>
       )}
       
-      <Tabs defaultValue="basic">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
         <TabsList>
           <TabsTrigger value="basic">Basic</TabsTrigger>
           <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -447,10 +474,16 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {client ? 'Update Client' : 'Create Client'}
-        </Button>
+        {activeTab !== 'bank' ? (
+          <Button type="button" onClick={goToNext} className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary">
+            Next
+          </Button>
+        ) : (
+          <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {client ? 'Update Client' : 'Create Client'}
+          </Button>
+        )}
       </div>
     </form>
   );
