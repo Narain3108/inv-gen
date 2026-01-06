@@ -32,9 +32,11 @@ export const usersApi = {
   },
   update: async (id: string, data: Partial<User>): Promise<User> => {
     return apiClient.put<User>(`/auth/users/${id}`, data);
-  }
-  ,
+  },
   delete: async (id: string): Promise<void> => {
     return apiClient.delete<void>(`/auth/users/${id}`);
+  },
+  changePassword: async (userId: string, newPassword: string): Promise<{ message: string; userId: string }> => {
+    return apiClient.put<{ message: string; userId: string }>(`/users/${userId}/password`, { newPassword });
   }
 };

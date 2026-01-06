@@ -75,7 +75,7 @@ interface DashboardStats {
 function DashboardContent() {
   const { selectedCompany } = useCompany();
   const { clients, products, companies, companiesInitialized } = useAppData();
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ function DashboardContent() {
   const loadData = async () => {
     // Ensure company is selected and valid
     if (!selectedCompany) return;
-    
+
     // If companies are initialized, verify the selected company exists in the user's company list
     // This prevents "Failed to load dashboard data" errors when switching users
     if (companiesInitialized) {
@@ -108,8 +108,64 @@ function DashboardContent() {
         quotationsApi.getByCompanyId(selectedCompany.id)
       ]);
 
-      setInvoices(invoicesData || []);
-      setQuotations(quotationsData || []);
+      // Normalize invoice objects to a consistent frontend shape so downstream
+      // dashboard calculations don't get zeros due to differing field names.
+      const normalizeInvoice = (inv: any) => {
+        const total = inv?.totalAmount ?? inv?.total ?? inv?.total_amount ?? inv?.grand_total ?? 0;
+        const amountPaid = inv?.amountPaid ?? inv?.amount_paid ?? inv?.paidAmount ?? 0;
+        const createdAt = inv?.createdAt ?? inv?.created_at ?? inv?.date ?? null;
+        const paidAt = inv?.paidAt ?? inv?.paid_at ?? null;
+        const clientId = inv?.clientId ?? inv?.client_id ?? inv?.client ?? null;
+        // Payment status is the key field for dashboard calculations
+        const paymentStatus = inv?.paymentStatus ?? inv?.payment_status ?? 'pending';
+        const invoiceStatus = inv?.status ?? inv?.invoice_status ?? 'draft';
+        // Tax fields
+        const taxableAmount = inv?.taxableAmount ?? inv?.taxable_amount ?? 0;
+        const cgst = inv?.cgst ?? 0;
+        const sgst = inv?.sgst ?? 0;
+        const igst = inv?.igst ?? 0;
+
+        return {
+          ...inv,
+          // canonical numeric fields
+          total: Number(total) || 0,
+          totalAmount: Number(total) || 0,
+          amountPaid: Number(amountPaid) || 0,
+          amountPending: Math.max(0, (Number(total) || 0) - (Number(amountPaid) || 0)),
+          // canonical date fields (leave Firestore Timestamp as-is so getFilteredData handles it)
+          createdAt: createdAt,
+          paidAt: paidAt,
+          date: createdAt,
+          // canonical ids/status - IMPORTANT: set BOTH status and paymentStatus
+          clientId,
+          status: invoiceStatus,
+          paymentStatus: paymentStatus,
+          // Tax fields for GST summary
+          taxableAmount: Number(taxableAmount) || 0,
+          cgst: Number(cgst) || 0,
+          sgst: Number(sgst) || 0,
+          igst: Number(igst) || 0,
+        } as any;
+      };
+
+      const normalizedInvoices = (invoicesData || []).map(normalizeInvoice);
+      const normalizedQuotations = (quotationsData || []).map((q: any) => ({ ...q }));
+
+      setInvoices(normalizedInvoices);
+      setQuotations(normalizedQuotations);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Dashboard] Normalized sample invoice:', normalizedInvoices[0] || null);
+      }
+
+      // Debugging: log counts and sample invoice to help diagnose zero-values
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Dashboard] Loaded invoices count:', (invoicesData || []).length);
+        console.debug('[Dashboard] Loaded quotations count:', (quotationsData || []).length);
+        if (invoicesData && invoicesData.length > 0) {
+          console.debug('[Dashboard] Sample invoice:', invoicesData[0]);
+        }
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       setInvoices([]);
@@ -135,7 +191,7 @@ function DashboardContent() {
 
   const handleExportReport = async () => {
     if (!selectedCompany) return false;
-    
+
     try {
       await generateDashboardPDFReport({
         company: selectedCompany,
@@ -146,7 +202,7 @@ function DashboardContent() {
         products,
         timeFilter,
       });
-      
+
       toast.success('Dashboard report generated successfully');
       return true;
     } catch (error) {
@@ -158,7 +214,7 @@ function DashboardContent() {
 
   const handlePreviewReport = async () => {
     if (!selectedCompany) return;
-    
+
     try {
       await previewDashboardPDFReport({
         company: selectedCompany,
@@ -176,19 +232,23 @@ function DashboardContent() {
   };
 
   // Filter data based on time period
-  const getFilteredData = (data: any[], dateField: string = 'date') => {
+  const getFilteredData = (data: any[], dateField: string = 'createdAt') => {
     const now = new Date();
-    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    // Create fresh Date objects to avoid mutation issues
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     return data.filter((item) => {
-      if (!item[dateField]) return false;
-      
-      const itemDate = item[dateField].toDate ? item[dateField].toDate() : new Date(item[dateField]);
-      
+      // Try multiple date fields for compatibility
+      const rawDate = item[dateField] || item.createdAt || item.date || item.created_at;
+      if (!rawDate) return false;
+
+      const itemDate = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
+
       switch (timeFilter) {
         case 'today':
           return itemDate >= startOfDay;
@@ -212,25 +272,38 @@ function DashboardContent() {
     const filteredInvoices = getFilteredData(invoices);
     const filteredQuotations = getFilteredData(quotations);
 
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[Dashboard] filteredInvoices length:', filteredInvoices.length);
+      console.debug('[Dashboard] filteredInvoices sample:', filteredInvoices[0] || null);
+      console.debug('[Dashboard] filteredQuotations length:', filteredQuotations.length);
+    }
+    // Helper to read invoice numeric fields with common fallback keys
+    const readNum = (inv: any, ...keys: string[]) => {
+      for (const k of keys) {
+        if (inv && inv[k] !== undefined && inv[k] !== null) return Number(inv[k]) || 0;
+      }
+      return 0;
+    };
+
     // Total revenue
-    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + readNum(inv, 'totalAmount', 'total', 'total_amount'), 0);
+
     // Paid and pending amounts
-    const paidAmount = filteredInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+    const paidAmount = filteredInvoices.reduce((sum, inv) => sum + readNum(inv, 'amountPaid', 'amount_paid', 'paid_amount'), 0);
     const pendingAmount = filteredInvoices.reduce((sum, inv) => {
-      const total = inv.totalAmount || 0;
-      const paid = inv.amountPaid || 0;
+      const total = readNum(inv, 'totalAmount', 'total', 'total_amount');
+      const paid = readNum(inv, 'amountPaid', 'amount_paid', 'paid_amount');
       return sum + Math.max(0, total - paid);
     }, 0);
 
     // Average invoice value
-    const averageInvoiceValue = filteredInvoices.length > 0 
-      ? totalRevenue / filteredInvoices.length 
+    const averageInvoiceValue = filteredInvoices.length > 0
+      ? totalRevenue / filteredInvoices.length
       : 0;
 
     // Payment rate
-    const paymentRate = totalRevenue > 0 
-      ? (paidAmount / totalRevenue) * 100 
+    const paymentRate = totalRevenue > 0
+      ? (paidAmount / totalRevenue) * 100
       : 0;
 
     // Growth calculations (compare with previous period)
@@ -261,13 +334,13 @@ function DashboardContent() {
       return invDate < previousPeriodStart;
     });
 
-    const previousRevenue = previousInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const revenueGrowth = previousRevenue > 0 
-      ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
+    const previousRevenue = previousInvoices.reduce((sum, inv) => sum + readNum(inv, 'totalAmount', 'total', 'total_amount'), 0);
+    const revenueGrowth = previousRevenue > 0
+      ? ((totalRevenue - previousRevenue) / previousRevenue) * 100
       : 0;
 
-    const invoicesGrowth = previousInvoices.length > 0 
-      ? ((filteredInvoices.length - previousInvoices.length) / previousInvoices.length) * 100 
+    const invoicesGrowth = previousInvoices.length > 0
+      ? ((filteredInvoices.length - previousInvoices.length) / previousInvoices.length) * 100
       : 0;
 
     // Low stock products
@@ -346,7 +419,7 @@ function DashboardContent() {
               <SelectItem value="all">All Time</SelectItem>
             </SelectContent>
           </Select>
-          
+
           {/* Mobile: Horizontal button group */}
           <div className="flex items-center gap-2">
             <Button
@@ -445,7 +518,7 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        
+
       </div>
 
       {/* Charts and Tables */}
@@ -517,11 +590,11 @@ function DashboardContent() {
 
       {/* Recent Activity and Invoices */}
       <div className="grid gap-4 md:grid-cols-2">
-        <RecentInvoices 
-          invoices={invoices.slice(0, 5)} 
-          clients={clients} 
+        <RecentInvoices
+          invoices={invoices.slice(0, 5)}
+          clients={clients}
         />
-        <RecentActivity 
+        <RecentActivity
           invoices={invoices}
           quotations={quotations}
           clients={clients}

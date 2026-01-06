@@ -87,7 +87,7 @@ class ApiClient {
     this.baseURL = (baseURL || '').replace(/\/+$/,'');
   }
 
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, requestInit?: RequestInit): Promise<T> {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       // FastAPI uses 'detail', others might use 'message'
@@ -102,6 +102,13 @@ class ApiClient {
         errorMessage = JSON.stringify(errorMessage);
       }
       
+      // If 403 with CSRF error, clear cached token for retry
+      if (response.status === 403 && typeof window !== 'undefined' && 
+          (errorMessage.includes('CSRF') || errorMessage.includes('csrf'))) {
+        console.warn('[apiClient] CSRF token invalid, will refresh on next request');
+        this.csrfToken = null;
+      }
+      
       // If unauthorized, clear client session to avoid repeated failing calls
       if (response.status === 401 && typeof window !== 'undefined') {
         try {
@@ -110,6 +117,7 @@ class ApiClient {
           localStorage.removeItem('userToken');
           localStorage.removeItem('orgData');
           localStorage.removeItem('orgToken');
+          this.csrfToken = null;
           // Give caller a chance to handle before redirecting in SPA environments
           setTimeout(() => {
             try {
@@ -143,31 +151,32 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    // Add User ID if available (Fallback for non-cookie environments)
+    // Determine auth method: prefer Bearer token if available, otherwise use cookie
     if (typeof window !== 'undefined') {
-      const userId = localStorage.getItem('userId');
-      if (userId) {
-        headers['x-user-id'] = userId;
-      }
-      
-      // Also send token in Authorization header as fallback if cookie fails
       const userToken = localStorage.getItem('userToken');
+      
       if (userToken) {
+        // Bearer token auth - no CSRF needed
         headers['Authorization'] = `Bearer ${userToken}`;
-      }
-
-      // If using cookie-based auth (no Authorization header present) and CSRF enabled,
-      // ensure we have a CSRF token and include it on state-changing requests.
-      try {
-        const hasAuth = !!headers['Authorization'];
-        if (!hasAuth && includeCsrf) {
-          await this.ensureCsrfToken();
-          if (this.csrfToken) {
-            headers['X-CSRF-Token'] = this.csrfToken;
+        
+        // Optional: send user ID for additional validation
+        const userId = localStorage.getItem('userId');
+        if (userId) {
+          headers['x-user-id'] = userId;
+        }
+      } else {
+        // Cookie-based auth - CSRF required for state-changing methods
+        if (includeCsrf) {
+          try {
+            await this.ensureCsrfToken();
+            if (this.csrfToken) {
+              headers['X-CSRF-Token'] = this.csrfToken;
+            }
+          } catch (e) {
+            console.warn('[apiClient] Failed to fetch CSRF token:', e);
+            // ignore CSRF fetch failures here; calls will fail server-side if required
           }
         }
-      } catch (e) {
-        // ignore CSRF fetch failures here; calls will fail server-side if required
       }
     }
 
@@ -177,26 +186,39 @@ class ApiClient {
     };
   }
 
-  private async ensureCsrfToken(): Promise<void> {
-    if (this.csrfToken) return;
+  private async ensureCsrfToken(forceRefresh = false): Promise<void> {
+    if (this.csrfToken && !forceRefresh) return;
+    
     // Fetch CSRF token endpoint; it relies on cookie auth (credentials: include)
     try {
       const url = buildUrl(this.baseURL, '/auth/csrf-token');
       const resp = await fetch(url, {
         method: 'GET',
         credentials: 'include',
+        cache: 'no-store',
       });
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        console.warn('[apiClient] Failed to fetch CSRF token:', resp.status, resp.statusText);
+        return;
+      }
       const data = await resp.json().catch(() => null);
-      if (data && data.csrfToken) this.csrfToken = data.csrfToken;
+      if (data && data.csrfToken) {
+        this.csrfToken = data.csrfToken;
+        console.debug('[apiClient] CSRF token obtained:', this.csrfToken);
+      }
     } catch (e) {
-      // ignore
+      console.error('[apiClient] Error fetching CSRF token:', e);
     }
   }
 
   // Public helper: allow callers to prime CSRF token after cookie login
   public async initCsrf(): Promise<void> {
-    await this.ensureCsrfToken();
+    await this.ensureCsrfToken(true);
+  }
+
+  // Public helper: clear CSRF token to force refresh on next request
+  public clearCsrf(): void {
+    this.csrfToken = null;
   }
 
   async get<T>(endpoint: string, params?: Record<string, any>, transformCase = false): Promise<T> {

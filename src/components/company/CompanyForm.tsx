@@ -159,7 +159,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Basic Information</CardTitle>
-          <CardDescription>Enter your company's basic details</CardDescription>
         </CardHeader>
 
 
@@ -247,7 +246,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Address</CardTitle>
-          <CardDescription>Company's registered address</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -326,7 +324,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Contact Information</CardTitle>
-          <CardDescription>How to reach your company</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -361,7 +358,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Bank Details</CardTitle>
-          <CardDescription>For payment collection (optional)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -451,7 +447,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Invoice Defaults</CardTitle>
-          <CardDescription>Default terms and notes for all invoices</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

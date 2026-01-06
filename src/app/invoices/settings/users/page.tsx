@@ -133,7 +133,7 @@ export default function UsersPage() {
       },
       { total: 0, super_admin: 0, admin: 0, employee: 0 }
     ),
-  [users]);
+    [users]);
 
   const filteredUsers = useMemo(() =>
     users.filter((user) => {
@@ -151,7 +151,7 @@ export default function UsersPage() {
 
       return matchesSearch && matchesRole && matchesCompany;
     }),
-  [users, searchTerm, roleFilter, companyFilter]);
+    [users, searchTerm, roleFilter, companyFilter]);
 
   const stats = useMemo(() => ([
     {
@@ -181,122 +181,125 @@ export default function UsersPage() {
 
   return (
     <DashboardLayout>
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <PageHeader
-          title="User Management"
-          description="Manage roles, permissions, and company access for your organization."
-          icon={UsersIcon}
-        />
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleRefresh} className="gap-2">
-            <RefreshCcw className="h-4 w-4" />
-            Refresh
-          </Button>
-          <Button onClick={handleCreateUser} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add User
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
-              <stat.icon className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              {stat.badge && (
-                <Badge variant="outline" className="mt-2">{stat.badge}</Badge>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold">Quick Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center">
-          <div className="relative w-full lg:flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or email"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="grid gap-3 w-full sm:grid-cols-2 lg:w-auto lg:flex lg:flex-row">
-            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as typeof roleFilter)}>
-              <SelectTrigger className="w-full lg:w-[160px]">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                <SelectItem value="all">All roles</SelectItem>
-                <SelectItem value="super_admin">Super Admins</SelectItem>
-                <SelectItem value="admin">Admins</SelectItem>
-                <SelectItem value="employee">Employees</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={companyFilter} onValueChange={(value) => setCompanyFilter(value)}>
-              <SelectTrigger className="w-full lg:w-[220px]">
-                <SelectValue placeholder="Filter by company" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64 overflow-y-auto">
-                <SelectItem value="all">All companies</SelectItem>
-                <SelectItem value="unassigned">No company assigned</SelectItem>
-                {companies.length === 0 && (
-                  <SelectItem value="__empty" disabled>
-                    {companiesLoading ? 'Loading companies...' : 'No companies found'}
-                  </SelectItem>
-                )}
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="text-sm text-muted-foreground lg:w-auto text-center lg:text-left whitespace-nowrap">
-            Showing <span className="font-semibold text-foreground">{filteredUsers.length}</span> of{' '}
-            <span className="font-semibold text-foreground">{users.length}</span> users
-          </div>
-        </CardContent>
-      </Card>
-
-      <UserList 
-        users={filteredUsers} 
-        onEdit={handleEditUser} 
-      />
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{selectedUser ? 'Edit User' : 'Create New User'}</DialogTitle>
-            <DialogDescription>
-              {selectedUser 
-                ? 'Update user details and permissions.' 
-                : 'Add a new user to the organization.'}
-            </DialogDescription>
-          </DialogHeader>
-          <UserForm 
-            user={selectedUser} 
-            onSubmit={handleFormSubmit} 
-            onCancel={() => setIsDialogOpen(false)} 
-            // If current user is admin, restrict available companies to their allowed set
-            availableCompanies={currentUser?.role === 'admin'
-              ? companies.filter(c => (currentUser.allowedCompanyIds || []).includes(c.id))
-              : companies}
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <PageHeader
+            title="User Management"
+            description="Manage roles, permissions, and company access for your organization."
+            icon={UsersIcon}
           />
-        </DialogContent>
-      </Dialog>
-    </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={handleRefresh} className="gap-2">
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button onClick={handleCreateUser} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add User
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <Card key={stat.label} className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
+                <stat.icon className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                {stat.badge && (
+                  <Badge variant="outline" className="mt-2">{stat.badge}</Badge>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-semibold">Quick Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <div className="relative w-full lg:flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="grid gap-3 w-full sm:grid-cols-2 lg:w-auto lg:flex lg:flex-row">
+              <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as typeof roleFilter)}>
+                <SelectTrigger className="w-full lg:w-[160px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="all">All roles</SelectItem>
+                  <SelectItem value="super_admin">Super Admins</SelectItem>
+                  <SelectItem value="admin">Admins</SelectItem>
+                  <SelectItem value="employee">Employees</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={companyFilter} onValueChange={(value) => setCompanyFilter(value)}>
+                <SelectTrigger className="w-full lg:w-[220px]">
+                  <SelectValue placeholder="Filter by company" />
+                </SelectTrigger>
+                <SelectContent className="max-h-64 overflow-y-auto">
+                  <SelectItem value="all">All companies</SelectItem>
+                  <SelectItem value="unassigned">No company assigned</SelectItem>
+                  {companies.length === 0 && (
+                    <SelectItem value="__empty" disabled>
+                      {companiesLoading ? 'Loading companies...' : 'No companies found'}
+                    </SelectItem>
+                  )}
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm text-muted-foreground lg:w-auto text-center lg:text-left whitespace-nowrap">
+              Showing <span className="font-semibold text-foreground">{filteredUsers.length}</span> of{' '}
+              <span className="font-semibold text-foreground">{users.length}</span> users
+            </div>
+          </CardContent>
+        </Card>
+
+        <UserList
+          users={filteredUsers}
+          onEdit={handleEditUser}
+        />
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{selectedUser ? 'Edit User' : 'Create New User'}</DialogTitle>
+              <DialogDescription>
+                {selectedUser
+                  ? 'Update user details and permissions.'
+                  : ''}
+              </DialogDescription>
+            </DialogHeader>
+            <UserForm
+              user={selectedUser}
+              onSubmit={handleFormSubmit}
+              onCancel={() => setIsDialogOpen(false)}
+              onPasswordChange={async (userId, newPassword) => {
+                await usersApi.changePassword(userId, newPassword);
+              }}
+              // If current user is admin, restrict available companies to their allowed set
+              availableCompanies={currentUser?.role === 'admin'
+                ? companies.filter(c => (currentUser.allowedCompanyIds || []).includes(c.id))
+                : companies}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
     </DashboardLayout>
   );
 }

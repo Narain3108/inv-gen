@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Shield, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
+import { Users, Plus, Shield, Trash2, Edit, Eye, EyeOff, Key, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanies } from '@/hooks/useCompanies';
 import { usersApi } from '@/lib/api/users.api';
@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { subUserFormSchema, SubUserFormValues } from '@/lib/validations';
+import { ChangePasswordDialog } from '@/components/admin/ChangePasswordDialog';
 
 export default function UserManagementPage() {
   const { user } = useAuth();
@@ -30,6 +31,8 @@ export default function UserManagementPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
 
   // Load users and companies
   useEffect(() => {
@@ -61,6 +64,21 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleOpenPasswordDialog = (targetUser: User) => {
+    setSelectedUserForPassword(targetUser);
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordChangeSuccess = async () => {
+    // Optionally reload users if needed
+    try {
+      const usersData = await usersApi.getAll();
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error reloading users:', error);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -83,21 +101,33 @@ export default function UserManagementPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Access</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.name}</TableCell>
-                    <TableCell>{u.email}</TableCell>
+            {isLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : users.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No users found. Create your first user to get started.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Access</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => {
+                    const canDelete = u.role !== 'super_admin';
+                    
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.name}</TableCell>
+                        <TableCell>{u.email}</TableCell>
                     <TableCell>
                       <Badge variant={u.role === 'super_admin' ? 'default' : u.role === 'admin' ? 'secondary' : 'outline'}>
                         {u.role.replace('_', ' ').toUpperCase()}
@@ -120,19 +150,36 @@ export default function UserManagementPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {u.role !== 'super_admin' && (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id)}>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenPasswordDialog(u)}
+                          title="Change Password"
+                          className="hover:bg-primary/10"
+                        >
+                          <Key className="h-4 w-4 text-primary" />
+                        </Button>
+                        {canDelete && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteUser(u.id)}
+                            title="Delete User"
+                            className="hover:bg-destructive/10"
+                          >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
         </Card>
 
         <UserDialog
@@ -144,6 +191,16 @@ export default function UserManagementPage() {
             setIsDialogOpen(false);
           }}
         />
+
+        {selectedUserForPassword && (
+          <ChangePasswordDialog
+            open={passwordDialogOpen}
+            onOpenChange={setPasswordDialogOpen}
+            userId={selectedUserForPassword.id}
+            userName={selectedUserForPassword.name}
+            onSuccess={handlePasswordChangeSuccess}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

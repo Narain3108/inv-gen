@@ -236,7 +236,6 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
       <Card>
         <CardHeader>
           <CardTitle>Product Information</CardTitle>
-          <CardDescription>Enter the product or service details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Product Type */}

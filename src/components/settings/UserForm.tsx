@@ -8,7 +8,7 @@ import { User, Company } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, KeyRound } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -52,14 +52,19 @@ interface UserFormProps {
   user?: User;
   onSubmit: (data: UserFormData) => Promise<void>;
   onCancel: () => void;
+  onPasswordChange?: (userId: string, newPassword: string) => Promise<void>;
   // If provided, use these companies as available options (useful to limit admin choices)
   availableCompanies?: Company[];
 }
 
-export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserFormProps) {
+export function UserForm({ user, onSubmit, onCancel, onPasswordChange, availableCompanies }: UserFormProps) {
   const { companies: globalCompanies } = useAppData();
   const companies = availableCompanies || globalCompanies;
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordUpdate, setShowPasswordUpdate] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
   const isEditing = !!user;
 
   const {
@@ -90,6 +95,9 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
         role: (user.role as any) || 'employee',
         allowedCompanyIds: user.allowedCompanyIds || [],
       });
+      setShowPasswordUpdate(false);
+      setNewPassword('');
+      setConfirmPassword('');
     } else {
       reset({
         name: '',
@@ -121,6 +129,33 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
     }
   };
 
+  const handlePasswordUpdate = async () => {
+    if (!user || !onPasswordChange) return;
+
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    try {
+      setPasswordUpdating(true);
+      await onPasswordChange(user.id, newPassword);
+      toast.success('Password updated successfully');
+      setShowPasswordUpdate(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update password');
+    } finally {
+      setPasswordUpdating(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-4">
@@ -132,11 +167,11 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
 
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input 
-            id="email" 
-            {...register('email')} 
-            placeholder="john@example.com" 
-            disabled={isEditing} 
+          <Input
+            id="email"
+            {...register('email')}
+            placeholder="john@example.com"
+            disabled={isEditing}
           />
           {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
         </div>
@@ -145,11 +180,11 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
           <div className="grid gap-2">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
-              <Input 
-                id="password" 
-                type={showPassword ? "text" : "password"} 
-                {...register('password')} 
-                placeholder="******" 
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                {...register('password')}
+                placeholder="******"
               />
               <button
                 type="button"
@@ -163,10 +198,72 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
           </div>
         )}
 
+        {/* Password Update Section for Editing */}
+        {isEditing && onPasswordChange && (
+          <div className="grid gap-2 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Update Password
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPasswordUpdate(!showPasswordUpdate)}
+              >
+                {showPasswordUpdate ? 'Cancel' : 'Change Password'}
+              </Button>
+            </div>
+
+            {showPasswordUpdate && (
+              <div className="space-y-3 mt-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handlePasswordUpdate}
+                  disabled={passwordUpdating || !newPassword || !confirmPassword}
+                  className="w-full"
+                >
+                  {passwordUpdating ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-2">
           <Label htmlFor="role">Role</Label>
-          <Select 
-            onValueChange={(value) => setValue('role', value as any, { shouldDirty: true })} 
+          <Select
+            onValueChange={(value) => setValue('role', value as any, { shouldDirty: true })}
             value={selectedRole}
           >
             <SelectTrigger>
@@ -186,8 +283,8 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
             <Label>Allowed Companies</Label>
             <div className="border rounded-md p-4 space-y-3 max-h-60 overflow-y-auto">
               <div className="flex items-center space-x-2 pb-2 border-b">
-                <Checkbox 
-                  id="select-all" 
+                <Checkbox
+                  id="select-all"
                   checked={selectedCompanyIds?.length === companies.length && companies.length > 0}
                   onCheckedChange={handleSelectAllCompanies}
                 />
@@ -195,8 +292,8 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
               </div>
               {companies.map((company) => (
                 <div key={company.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`company-${company.id}`} 
+                  <Checkbox
+                    id={`company-${company.id}`}
                     checked={selectedCompanyIds?.includes(company.id)}
                     onCheckedChange={() => handleCompanyToggle(company.id)}
                   />
@@ -225,3 +322,4 @@ export function UserForm({ user, onSubmit, onCancel, availableCompanies }: UserF
     </form>
   );
 }
+

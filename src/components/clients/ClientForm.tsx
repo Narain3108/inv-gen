@@ -191,7 +191,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
           <Card>
         <CardHeader>
           <CardTitle>Client Information</CardTitle>
-          <CardDescription>Enter the client's basic details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* GSTIN (Optional) */}
@@ -261,7 +260,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
           <Card>
         <CardHeader>
           <CardTitle>Contact Information</CardTitle>
-          <CardDescription>Client contact details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Phone */}
@@ -313,7 +311,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
           <Card>
             <CardHeader>
               <CardTitle>Address</CardTitle>
-              <CardDescription>Primary address for the client</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
           {/* Street */}
@@ -388,7 +385,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
           <Card>
         <CardHeader>
           <CardTitle>Bank Details (Optional)</CardTitle>
-          <CardDescription>Client's bank account information for payments</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Bank Name */}

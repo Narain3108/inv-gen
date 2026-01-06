@@ -33,19 +33,22 @@ export interface RevenueBreakdown {
 export class DashboardDataTransformer {
   static transformInvoicesToMetrics(invoices: any[]): DashboardMetrics {
     const totalInvoices = invoices.length;
-    const paidInvoices = invoices.filter(inv => inv.status === 'paid').length;
-    const pendingInvoices = invoices.filter(inv => inv.status === 'pending').length;
-    const overdueInvoices = invoices.filter(inv => inv.status === 'overdue').length;
-    
+    // Use paymentStatus field (not status) for payment-related filtering
+    const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'paid').length;
+    const pendingInvoices = invoices.filter(inv => inv.paymentStatus === 'pending' || inv.paymentStatus === 'partially_paid').length;
+    const overdueInvoices = invoices.filter(inv => inv.paymentStatus === 'overdue').length;
+
+    // Total revenue from all invoices (not just paid)
     const totalRevenue = invoices
-      .filter(inv => inv.status === 'paid')
-      .reduce((sum, inv) => sum + (inv.total || 0), 0);
-    
+      .reduce((sum, inv) => sum + (inv.totalAmount || inv.total || 0), 0);
+
     const uniqueClients = new Set(invoices.map(inv => inv.clientId)).size;
     const activeClients = new Set(
       invoices
         .filter(inv => {
-          const invoiceDate = new Date(inv.createdAt);
+          const rawDate = inv.createdAt || inv.date || inv.created_at;
+          if (!rawDate) return false;
+          const invoiceDate = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
           const threeMonthsAgo = new Date();
           threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
           return invoiceDate >= threeMonthsAgo;
@@ -53,8 +56,8 @@ export class DashboardDataTransformer {
         .map(inv => inv.clientId)
     ).size;
 
-    const averageInvoiceValue = totalInvoices > 0 
-      ? invoices.reduce((sum, inv) => sum + (inv.total || 0), 0) / totalInvoices 
+    const averageInvoiceValue = totalInvoices > 0
+      ? invoices.reduce((sum, inv) => sum + (inv.totalAmount || inv.total || 0), 0) / totalInvoices
       : 0;
 
     const paymentRate = totalInvoices > 0 ? (paidInvoices / totalInvoices) * 100 : 0;
@@ -73,8 +76,10 @@ export class DashboardDataTransformer {
   }
 
   static transformToStatusChart(invoices: any[]): ChartDataPoint[] {
+    // Use paymentStatus for payment-related charts
     const statusCounts = invoices.reduce((acc, inv) => {
-      acc[inv.status] = (acc[inv.status] || 0) + 1;
+      const status = inv.paymentStatus || 'pending';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -82,12 +87,13 @@ export class DashboardDataTransformer {
     const colors = {
       paid: '#10B981',
       pending: '#F59E0B',
+      partially_paid: '#F59E0B',
       overdue: '#EF4444',
       draft: '#6B7280'
     };
 
     return Object.entries(statusCounts).map(([status, count]) => ({
-      label: status.charAt(0).toUpperCase() + status.slice(1),
+      label: status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1),
       value: count as number,
       color: colors[status as keyof typeof colors] || '#6B7280',
       percentage: total > 0 ? Math.round(((count as number) / total) * 100) : 0
@@ -95,10 +101,13 @@ export class DashboardDataTransformer {
   }
 
   static transformToRevenueChart(invoices: any[], period: 'daily' | 'weekly' | 'monthly' = 'monthly'): TimeSeriesData[] {
-    const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-    
+    // Use paymentStatus for filtering paid invoices
+    const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'paid');
+
     const groupedData = paidInvoices.reduce((acc, inv) => {
-      const date = new Date(inv.paidAt || inv.createdAt);
+      const rawDate = inv.paidAt || inv.createdAt || inv.date || inv.created_at;
+      if (!rawDate) return acc;
+      const date = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
       let key: string;
 
       switch (period) {
@@ -117,7 +126,7 @@ export class DashboardDataTransformer {
           key = date.toISOString().split('T')[0];
       }
 
-      acc[key] = (acc[key] || 0) + (inv.total || 0);
+      acc[key] = (acc[key] || 0) + (inv.totalAmount || inv.total || 0);
       return acc;
     }, {} as Record<string, number>);
 
@@ -131,15 +140,16 @@ export class DashboardDataTransformer {
   }
 
   static transformToTopClientsChart(invoices: any[], clients: any[], limit: number = 5): ChartDataPoint[] {
+    // Use paymentStatus for filtering paid invoices
     const clientRevenue = invoices
-      .filter(inv => inv.status === 'paid')
+      .filter(inv => inv.paymentStatus === 'paid')
       .reduce((acc, inv) => {
-        acc[inv.clientId] = (acc[inv.clientId] || 0) + (inv.total || 0);
+        acc[inv.clientId] = (acc[inv.clientId] || 0) + (inv.totalAmount || inv.total || 0);
         return acc;
       }, {} as Record<string, number>);
 
     const clientMap = clients.reduce((acc, client) => {
-      acc[client.id] = client.name || client.companyName || 'Unknown Client';
+      acc[client.id] = client.name || client.clientName || client.companyName || 'Unknown Client';
       return acc;
     }, {} as Record<string, string>);
 
@@ -153,10 +163,13 @@ export class DashboardDataTransformer {
   }
 
   static transformToRevenueBreakdown(invoices: any[], period: 'monthly' | 'quarterly' = 'monthly'): RevenueBreakdown[] {
-    const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-    
+    // Use paymentStatus for filtering paid invoices
+    const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'paid');
+
     const groupedData = paidInvoices.reduce((acc, inv) => {
-      const date = new Date(inv.paidAt || inv.createdAt);
+      const rawDate = inv.paidAt || inv.createdAt || inv.date || inv.created_at;
+      if (!rawDate) return acc;
+      const date = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
       let key: string;
 
       if (period === 'monthly') {
@@ -169,10 +182,10 @@ export class DashboardDataTransformer {
       if (!acc[key]) {
         acc[key] = { revenue: 0, invoiceCount: 0 };
       }
-      
-      acc[key].revenue += inv.total || 0;
+
+      acc[key].revenue += inv.totalAmount || inv.total || 0;
       acc[key].invoiceCount += 1;
-      
+
       return acc;
     }, {} as Record<string, { revenue: number; invoiceCount: number }>);
 
@@ -190,10 +203,12 @@ export class DashboardDataTransformer {
   }
 
   static transformToPaymentTrends(invoices: any[]): TimeSeriesData[] {
+    // Use paymentStatus for filtering paid invoices
     const monthlyPayments = invoices
-      .filter(inv => inv.status === 'paid' && inv.paidAt)
+      .filter(inv => inv.paymentStatus === 'paid' && (inv.paidAt || inv.createdAt))
       .reduce((acc, inv) => {
-        const date = new Date(inv.paidAt);
+        const rawDate = inv.paidAt || inv.createdAt;
+        const date = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         acc[key] = (acc[key] || 0) + 1;
         return acc;
@@ -232,13 +247,16 @@ export class DashboardDataTransformer {
   }
 
   static calculateAveragePaymentTime(invoices: any[]): number {
-    const paidInvoices = invoices.filter(inv => inv.status === 'paid' && inv.paidAt && inv.createdAt);
-    
+    // Use paymentStatus for filtering paid invoices
+    const paidInvoices = invoices.filter(inv => inv.paymentStatus === 'paid' && inv.paidAt && inv.createdAt);
+
     if (paidInvoices.length === 0) return 0;
 
     const totalDays = paidInvoices.reduce((sum, inv) => {
-      const created = new Date(inv.createdAt);
-      const paid = new Date(inv.paidAt);
+      const createdRaw = inv.createdAt;
+      const paidRaw = inv.paidAt;
+      const created = createdRaw.toDate ? createdRaw.toDate() : new Date(createdRaw);
+      const paid = paidRaw.toDate ? paidRaw.toDate() : new Date(paidRaw);
       const days = Math.floor((paid.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
       return sum + days;
     }, 0);
@@ -248,7 +266,7 @@ export class DashboardDataTransformer {
 
   static getTopPerformingPeriod(revenueData: TimeSeriesData[]): TimeSeriesData | null {
     if (revenueData.length === 0) return null;
-    return revenueData.reduce((max, current) => 
+    return revenueData.reduce((max, current) =>
       current.value > max.value ? current : max
     );
   }

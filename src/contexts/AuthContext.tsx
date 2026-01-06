@@ -107,6 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.login(email, password);
 
+      // Clear any stale tokens from localStorage to ensure cookie-based auth only
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('userId');
+
       // Fetch user profile
       const freshUser = await usersApi.getMe();
       setUser(freshUser);
@@ -116,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await apiClient.initCsrf();
       } catch (e) {
+        console.error('Failed to initialize CSRF token:', e);
         // ignore failures; requests will attempt to fetch CSRF lazily
       }
 
