@@ -39,6 +39,7 @@ import {
   DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
+import { TotalsSummary } from '@/components/forms/shared';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 
@@ -97,7 +98,7 @@ export function InvoiceForm({
   // (moved) If editing an existing invoice, load its serial numbers into local state so the SerialManager
   // shows the already-saved serials for each item when editing.
   // This effect was moved below to run after `fields` is declared by useFieldArray.
-  
+
   // Shipping Address State (opt-in)
   const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
   const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
@@ -189,23 +190,23 @@ export function InvoiceForm({
     if (!company?.invoiceNumbering) {
       return 'INV0001';
     }
-    
+
     const { prefix, suffix, order, nextNumber } = company.invoiceNumbering;
     const components: Record<string, string> = {
       prefix: prefix || '',
       number: String(nextNumber).padStart(3, '0'),
       suffix: suffix || '',
     };
-    
+
     const orderParts = order.split(',').map(p => p.trim());
     const numberParts = orderParts.map(part => components[part] || '');
-    
+
     const result = numberParts.join('');
-    
+
     if (!result || result.trim() === '') {
       return `INV${String(nextNumber).padStart(4, '0')}`;
     }
-    
+
     return result;
   };
 
@@ -247,12 +248,12 @@ export function InvoiceForm({
       setValue(`items.${index}.productId`, productId);
       setValue(`items.${index}.unitPrice`, product.price);
       setValue(`items.${index}.unit`, product.unit);
-      
+
       // Fetch fresh product data to ensure serial numbers list is up to date (no auto-fill)
       try {
         const freshProduct = await productsApi.getById(productId);
         if (freshProduct) {
-            setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
+          setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
         }
       } catch (error) {
         console.error("Failed to refresh product details", error);
@@ -267,7 +268,7 @@ export function InvoiceForm({
   const handleQuantityChange = (index: number, quantity: number) => {
     const item = watchItems?.[index];
     const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
-    
+
     if (!product || quantity <= 0 || isNaN(quantity)) {
       return;
     }
@@ -275,7 +276,7 @@ export function InvoiceForm({
     // If editing an existing invoice, perform delta-based validation
     const isEdit = !!invoice;
     const fieldId = fields?.[index]?.id;
-    
+
     if (isEdit && product.type === 'product') {
       // Logic: available_for_edit = s_db + q_old (if product matches)
       const origItem = fieldId ? originalItems[fieldId] : null;
@@ -309,7 +310,7 @@ export function InvoiceForm({
 
     // Update quantity in form
     setValue(`items.${index}.quantity`, quantity);
-    
+
     // If product has serial numbers, open serial manager if quantity increased
     if (product.hasSerialNumber) {
       const currentSerials = fieldId ? (serialNumbers[fieldId] || []) : [];
@@ -334,7 +335,7 @@ export function InvoiceForm({
       setOutOfStockData(null);
     }
   };
-  
+
   const closeSerialModal = () => setSerialModalIndex(null);
 
   // No automatic serial auto-fill; user must manage serials via the modal.
@@ -511,7 +512,7 @@ export function InvoiceForm({
     });
 
     setSerialNumberErrors(newErrors);
-    
+
     if (hasSerialNumberError) {
       toast.error('Please fill in all required serial numbers');
       return;
@@ -534,7 +535,7 @@ export function InvoiceForm({
         return;
       }
       finalShippingAddress = newShippingAddress;
-      
+
       // Update client with new address
       if (selectedClient) {
         try {
@@ -577,7 +578,7 @@ export function InvoiceForm({
       toast.success(invoice ? 'Invoice updated successfully' : 'Invoice created successfully');
     } catch (error: any) {
       console.error('Error saving invoice:', error);
-      
+
       // Handle 409 Conflict for serial number unavailability
       if (error.response?.status === 409) {
         const detail = error.response?.data?.detail || '';
@@ -590,10 +591,10 @@ export function InvoiceForm({
           toast.error(detail || 'Conflict occurred while saving invoice');
         }
       } else {
-        const errorMessage = error.response?.data?.detail 
-          ? (Array.isArray(error.response.data.detail) 
-              ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
-              : error.response.data.detail)
+        const errorMessage = error.response?.data?.detail
+          ? (Array.isArray(error.response.data.detail)
+            ? error.response.data.detail.map((e: any) => e.msg).join(', ')
+            : error.response.data.detail)
           : 'Failed to save invoice';
         toast.error(errorMessage);
       }
@@ -779,31 +780,31 @@ export function InvoiceForm({
 
                     {shippingAddressMode === 'new' && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Input 
-                          placeholder="Street" 
+                        <Input
+                          placeholder="Street"
                           value={newShippingAddress.street}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, street: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, street: e.target.value })}
                           className="col-span-2"
                         />
-                        <Input 
-                          placeholder="City" 
+                        <Input
+                          placeholder="City"
                           value={newShippingAddress.city}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, city: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, city: e.target.value })}
                         />
-                        <Input 
-                          placeholder="State" 
+                        <Input
+                          placeholder="State"
                           value={newShippingAddress.state}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, state: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, state: e.target.value })}
                         />
-                        <Input 
-                          placeholder="Pincode" 
+                        <Input
+                          placeholder="Pincode"
                           value={newShippingAddress.pincode}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, pincode: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, pincode: e.target.value })}
                         />
-                        <Input 
-                          placeholder="Country" 
+                        <Input
+                          placeholder="Country"
                           value={newShippingAddress.country}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, country: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, country: e.target.value })}
                         />
                       </div>
                     )}
@@ -847,173 +848,172 @@ export function InvoiceForm({
 
                   return (
                     <React.Fragment key={field.id}>
-                    <tr className="border-b align-middle">
-                      <td className="p-2 w-64 align-top">
-                        <Select
-                          value={item?.productId || ''}
-                          onValueChange={(value) => {
-                            handleProductSelect(index, value);
-                            setActiveRowIndex(index);
-                          }}
-                        >
-                          <SelectTrigger className="w-full truncate">
-                            <SelectValue placeholder="Select product" className="truncate" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {localProducts.map((product) => {
-                              const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
-                              return (
-                                <SelectItem 
-                                  key={product.id} 
-                                  value={product.id}
-                                  disabled={isOutOfStock}
-                                >
-                                  {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        {/* Manage Serials Button - Only for products with serial numbers */}
-                        {product?.hasSerialNumber === true && (
-                          <div className="mt-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                              Manage Serials
-                            </Button>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                      <tr className="border-b align-middle">
+                        <td className="p-2 w-64 align-top">
+                          <Select
+                            value={item?.productId || ''}
+                            onValueChange={(value) => {
+                              handleProductSelect(index, value);
+                              setActiveRowIndex(index);
+                            }}
+                          >
+                            <SelectTrigger className="w-full truncate">
+                              <SelectValue placeholder="Select product" className="truncate" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {localProducts.map((product) => {
+                                const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
+                                return (
+                                  <SelectItem
+                                    key={product.id}
+                                    value={product.id}
+                                    disabled={isOutOfStock}
+                                  >
+                                    {product.productName} ({product.hsn}){isOutOfStock ? ' - Out of Stock' : ''}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {/* Manage Serials Button - Only for products with serial numbers */}
+                          {product?.hasSerialNumber === true && (
+                            <div className="mt-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                                Manage Serials
+                              </Button>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 text-center w-24">
-                        {product?.itemCode ? (
-                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                            {product.itemCode}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="p-2 w-16">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.quantity` as const}
-                          defaultValue={item?.quantity ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => {
-                                const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
-                                field.onChange(newQuantity);
-                                // Call handleQuantityChange immediately for any valid number
-                                if (newQuantity && !isNaN(newQuantity) && newQuantity > 0) {
-                                  handleQuantityChange(index, newQuantity);
-                                }
-                              }}
-                              className={`text-center w-full text-base font-medium ${
-                                product?.type === 'product' && 
-                                typeof product.stock === 'number' && 
-                                field.value && 
-                                !isNaN(field.value as number) && 
-                                (field.value as number) > product.stock 
-                                  ? 'border-red-500' 
+                          )}
+                        </td>
+                        <td className="p-2 text-center w-24">
+                          {product?.itemCode ? (
+                            <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                              {product.itemCode}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="p-2 w-16">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.quantity` as const}
+                            defaultValue={item?.quantity ?? ''}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="1"
+                                min="1"
+                                max={product?.type === 'product' && typeof product.stock === 'number' ? product.stock : undefined}
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  const newQuantity = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  field.onChange(newQuantity);
+                                  // Call handleQuantityChange immediately for any valid number
+                                  if (newQuantity && !isNaN(newQuantity) && newQuantity > 0) {
+                                    handleQuantityChange(index, newQuantity);
+                                  }
+                                }}
+                                className={`text-center w-full text-base font-medium ${product?.type === 'product' &&
+                                  typeof product.stock === 'number' &&
+                                  field.value &&
+                                  !isNaN(field.value as number) &&
+                                  (field.value as number) > product.stock
+                                  ? 'border-red-500'
                                   : ''
-                              }`}
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 w-28">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unit` as const}
-                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
-                          render={({ field }) => (
-                            <Input
-                              list={`unit-options-${index}`}
-                              {...field}
-                              value={field.value ?? ''}
-                              className="text-center w-full text-sm"
-                              placeholder="Unit"
-                            />
-                          )}
-                        />
-                        <datalist id={`unit-options-${index}`}>
-                          <option value="Nos" />
-                          <option value="Pcs" />
-                          <option value="Kgs" />
-                          <option value="Gms" />
-                          <option value="Ltrs" />
-                          <option value="Mtrs" />
-                          <option value="Hrs" />
-                          <option value="Days" />
-                          <option value="Box" />
-                          <option value="Set" />
-                        </datalist>
-                      </td>
-                      <td className="p-2 w-28">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unitPrice` as const}
-                          defaultValue={item?.unitPrice ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-right w-full text-base font-medium"
-                              placeholder="0.00"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 w-20">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? 0}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 w-32 text-right font-medium text-base">
-                        {formatCurrency(amount)}
-                      </td>
-                      <td className="p-2 w-10">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </td>
-                    </tr>
-                    {/* Serial input moved to modal — no inline inputs here */}
-                  </React.Fragment>
-                );
-              })}
+                                  }`}
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-28">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.unit` as const}
+                            defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
+                            render={({ field }) => (
+                              <Input
+                                list={`unit-options-${index}`}
+                                {...field}
+                                value={field.value ?? ''}
+                                className="text-center w-full text-sm"
+                                placeholder="Unit"
+                              />
+                            )}
+                          />
+                          <datalist id={`unit-options-${index}`}>
+                            <option value="Nos" />
+                            <option value="Pcs" />
+                            <option value="Kgs" />
+                            <option value="Gms" />
+                            <option value="Ltrs" />
+                            <option value="Mtrs" />
+                            <option value="Hrs" />
+                            <option value="Days" />
+                            <option value="Box" />
+                            <option value="Set" />
+                          </datalist>
+                        </td>
+                        <td className="p-2 w-28">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.unitPrice` as const}
+                            defaultValue={item?.unitPrice ?? ''}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                className="text-right w-full text-base font-medium"
+                                placeholder="0.00"
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-20">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.discount` as const}
+                            defaultValue={item?.discount ?? 0}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                className="text-center w-full text-base font-medium"
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-32 text-right font-medium text-base">
+                          {formatCurrency(amount)}
+                        </td>
+                        <td className="p-2 w-10">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </td>
+                      </tr>
+                      {/* Serial input moved to modal — no inline inputs here */}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1061,8 +1061,8 @@ export function InvoiceForm({
                           {localProducts.map((product) => {
                             const isOutOfStock = product.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
                             return (
-                              <SelectItem 
-                                key={product.id} 
+                              <SelectItem
+                                key={product.id}
                                 value={product.id}
                                 disabled={isOutOfStock}
                               >
@@ -1078,9 +1078,9 @@ export function InvoiceForm({
                           <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
                             Manage Serials
                           </Button>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
-                            </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1108,15 +1108,14 @@ export function InvoiceForm({
                                   handleQuantityChange(index, value as number);
                                 }
                               }}
-                              className={`text-center text-lg font-semibold ${
-                                product?.type === 'product' && 
-                                typeof product.stock === 'number' && 
-                                field.value && 
-                                !isNaN(field.value as number) && 
-                                (field.value as number) > product.stock 
-                                  ? 'border-red-500' 
-                                  : ''
-                              }`}
+                              className={`text-center text-lg font-semibold ${product?.type === 'product' &&
+                                typeof product.stock === 'number' &&
+                                field.value &&
+                                !isNaN(field.value as number) &&
+                                (field.value as number) > product.stock
+                                ? 'border-red-500'
+                                : ''
+                                }`}
                             />
                           )}
                         />
@@ -1195,48 +1194,18 @@ export function InvoiceForm({
         </CardContent>
       </Card>
 
+
       {/* Tax Summary */}
       {totals && (
-        <Card className="border-primary/30 shadow-md hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-white to-primary/5">
-          <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary to-accent border-b">
-            <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
-              <div className="p-1.5 rounded-lg bg-white/20">
-                <Calculator className="h-5 w-5" />
-              </div>
-              Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Taxable Amount:</span>
-                <span className="font-medium">{formatCurrency(totals.taxableAmount)}</span>
-              </div>
-              {totals.cgst > 0 && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span>CGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.cgst)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>SGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.sgst)}</span>
-                  </div>
-                </>
-              )}
-              {totals.igst > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>IGST:</span>
-                  <span className="font-medium">{formatCurrency(totals.igst)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Grand Total:</span>
-                <span>{formatCurrency(totals.totalAmount)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TotalsSummary
+          taxableAmount={totals.taxableAmount}
+          cgst={totals.cgst}
+          sgst={totals.sgst}
+          igst={totals.igst}
+          totalAmount={totals.totalAmount}
+          taxBreakdown={totals.taxBreakdown}
+          isInterState={companyState !== selectedClient?.address?.state}
+        />
       )}
 
       {/* Form Actions */}

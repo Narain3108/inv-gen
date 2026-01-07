@@ -27,6 +27,7 @@ import { productsApi } from '@/lib/api/products.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import SerialManager from '@/components/shared/SerialManager';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
+import { TotalsSummary } from '@/components/forms/shared';
 
 // Schema Definition (Inline for now to match backend)
 const purchaseItemSchema = z.object({
@@ -182,12 +183,12 @@ export function PurchaseForm({
       setValue(`items.${index}.gstRate`, product.gstRate);
       setValue(`items.${index}.cessRate`, product.cessRate || 0);
       setValue(`items.${index}.itemCode`, product.itemCode || '');
-      
+
       // Fetch fresh product data
       try {
         const freshProduct = await productsApi.getById(productId);
         if (freshProduct) {
-            setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
+          setLocalProducts(prev => prev.map(p => p.id === freshProduct.id ? freshProduct : p));
         }
       } catch (error) {
         console.error("Failed to refresh product details", error);
@@ -198,13 +199,13 @@ export function PurchaseForm({
   const handleQuantityChange = (index: number, quantity: number) => {
     const item = watchItems?.[index];
     const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
-    
+
     if (!product || quantity <= 0 || isNaN(quantity)) {
       return;
     }
 
     setValue(`items.${index}.quantity`, quantity);
-    
+
     // If product has serial numbers, open serial manager if quantity increased
     if (product.hasSerialNumber) {
       const fieldId = fields?.[index]?.id;
@@ -329,7 +330,7 @@ export function PurchaseForm({
       sgst: totalSgst,
       igst: totalIgst,
       totalAmount: grandTotal,
-      totalAmountInWords: '', 
+      totalAmountInWords: '',
       taxBreakdown,
     };
   };
@@ -364,7 +365,7 @@ export function PurchaseForm({
     });
 
     setSerialNumberErrors(newErrors);
-    
+
     if (hasSerialNumberError) {
       toast.error('Please fill in all required serial numbers');
       return;
@@ -548,128 +549,128 @@ export function PurchaseForm({
 
                   return (
                     <React.Fragment key={field.id}>
-                    <tr className="border-b align-middle">
-                      <td className="p-2 w-64 align-top">
-                        <Select
-                          value={item?.productId || ''}
-                          onValueChange={(value) => {
-                            handleProductSelect(index, value);
-                            setActiveRowIndex(index);
-                          }}
-                        >
-                          <SelectTrigger className="w-full truncate">
-                            <SelectValue placeholder="Select product" className="truncate" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {localProducts.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.productName} ({product.hsn})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {product?.hasSerialNumber === true && (
-                          <div className="mt-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                              Manage Serials
-                            </Button>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                      <tr className="border-b align-middle">
+                        <td className="p-2 w-64 align-top">
+                          <Select
+                            value={item?.productId || ''}
+                            onValueChange={(value) => {
+                              handleProductSelect(index, value);
+                              setActiveRowIndex(index);
+                            }}
+                          >
+                            <SelectTrigger className="w-full truncate">
+                              <SelectValue placeholder="Select product" className="truncate" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {localProducts.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.productName} ({product.hsn})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {product?.hasSerialNumber === true && (
+                            <div className="mt-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
+                                Manage Serials
+                              </Button>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {(serialNumbers[field.id] || []).filter(Boolean).length} selected
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 text-center w-24">
-                        <span className="text-xs text-muted-foreground">{product?.itemCode || '—'}</span>
-                      </td>
-                      <td className="p-2 w-16">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.quantity` as const}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              {...field}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                                field.onChange(val);
-                                if (val && !isNaN(val as number) && val > 0) {
-                                  handleQuantityChange(index, val as number);
-                                }
-                              }}
-                              className="text-center w-full text-base font-medium"
-                            />
                           )}
-                        />
-                      </td>
-                      <td className="p-2 w-28">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unit` as const}
-                          render={({ field }) => (
-                            <Input
-                              list={`unit-options-${index}`}
-                              {...field}
-                              className="text-center w-full text-sm"
-                            />
-                          )}
-                        />
-                        <datalist id={`unit-options-${index}`}>
-                          <option value="Nos" />
-                          <option value="Pcs" />
-                          <option value="Kgs" />
-                        </datalist>
-                      </td>
-                      <td className="p-2 w-28">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unitPrice` as const}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-right w-full text-base font-medium"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 w-20">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.discount` as const}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 w-32 text-right font-medium text-base">
-                        {formatCurrency(amount)}
-                      </td>
-                      <td className="p-2 w-10">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="p-2 text-center w-24">
+                          <span className="text-xs text-muted-foreground">{product?.itemCode || '—'}</span>
+                        </td>
+                        <td className="p-2 w-16">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.quantity` as const}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="1"
+                                min="1"
+                                {...field}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  field.onChange(val);
+                                  if (val && !isNaN(val as number) && val > 0) {
+                                    handleQuantityChange(index, val as number);
+                                  }
+                                }}
+                                className="text-center w-full text-base font-medium"
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-28">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.unit` as const}
+                            render={({ field }) => (
+                              <Input
+                                list={`unit-options-${index}`}
+                                {...field}
+                                className="text-center w-full text-sm"
+                              />
+                            )}
+                          />
+                          <datalist id={`unit-options-${index}`}>
+                            <option value="Nos" />
+                            <option value="Pcs" />
+                            <option value="Kgs" />
+                          </datalist>
+                        </td>
+                        <td className="p-2 w-28">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.unitPrice` as const}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                className="text-right w-full text-base font-medium"
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-20">
+                          <Controller
+                            control={control}
+                            name={`items.${index}.discount` as const}
+                            render={({ field }) => (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                className="text-center w-full text-base font-medium"
+                              />
+                            )}
+                          />
+                        </td>
+                        <td className="p-2 w-32 text-right font-medium text-base">
+                          {formatCurrency(amount)}
+                        </td>
+                        <td className="p-2 w-10">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </td>
+                      </tr>
                     </React.Fragment>
                   );
                 })}
@@ -799,46 +800,15 @@ export function PurchaseForm({
 
       {/* Tax Summary */}
       {totals && (
-        <Card className="border-primary/30 shadow-md hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-white to-primary/5">
-          <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary to-accent border-b">
-            <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
-              <div className="p-1.5 rounded-lg bg-white/20">
-                <Calculator className="h-5 w-5" />
-              </div>
-              Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Taxable Amount:</span>
-                <span className="font-medium">{formatCurrency(totals.taxableAmount)}</span>
-              </div>
-              {totals.cgst > 0 && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span>CGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.cgst)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>SGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.sgst)}</span>
-                  </div>
-                </>
-              )}
-              {totals.igst > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>IGST:</span>
-                  <span className="font-medium">{formatCurrency(totals.igst)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Grand Total:</span>
-                <span>{formatCurrency(totals.totalAmount)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TotalsSummary
+          taxableAmount={totals.taxableAmount}
+          cgst={totals.cgst}
+          sgst={totals.sgst}
+          igst={totals.igst}
+          totalAmount={totals.totalAmount}
+          taxBreakdown={totals.taxBreakdown}
+          isInterState={companyState !== selectedClient?.address?.state}
+        />
       )}
 
       {/* Form Actions */}

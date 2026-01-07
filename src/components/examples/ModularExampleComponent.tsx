@@ -310,6 +310,15 @@ export function ModularExampleComponent() {
                                 )}
                             </div>
 
+
+                            ￼Open
+                            Documents the complete form refactoring work: shared hooks and components created, and their integration into the three main form components.
+                            Good
+                            Bad
+                            Good response
+                            0 Files With Changes
+                            0 Files With Changes
+                            ￼Review Changes
                             <div>
                                 <Label htmlFor="role">Role</Label>
                                 <select

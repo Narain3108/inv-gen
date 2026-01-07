@@ -1,4 +1,4 @@
-import type { User } from '@/types/auth';
+import type { User } from '@/types';
 
 /**
  * Check if the current user can change another user's password

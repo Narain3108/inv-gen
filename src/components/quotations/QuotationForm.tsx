@@ -24,6 +24,7 @@ import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
+import { TotalsSummary } from '@/components/forms/shared';
 
 type QuotationFormData = z.infer<typeof quotationFormSchema>;
 
@@ -282,7 +283,7 @@ export function QuotationForm({
         return;
       }
       finalShippingAddress = newShippingAddress;
-      
+
       // Update client with new address
       if (selectedClient) {
         try {
@@ -319,10 +320,10 @@ export function QuotationForm({
       toast.success(quotation ? 'Quotation updated successfully' : 'Quotation created successfully');
     } catch (error: any) {
       console.error('Error saving quotation:', error);
-      const errorMessage = error.response?.data?.detail 
-        ? (Array.isArray(error.response.data.detail) 
-            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
-            : error.response.data.detail)
+      const errorMessage = error.response?.data?.detail
+        ? (Array.isArray(error.response.data.detail)
+          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
+          : error.response.data.detail)
         : 'Failed to save quotation';
       toast.error(errorMessage);
     } finally {
@@ -458,31 +459,31 @@ export function QuotationForm({
 
                     {shippingAddressMode === 'new' && (
                       <div className="grid grid-cols-2 gap-2">
-                        <Input 
-                          placeholder="Street" 
+                        <Input
+                          placeholder="Street"
                           value={newShippingAddress.street}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, street: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, street: e.target.value })}
                           className="col-span-2"
                         />
-                        <Input 
-                          placeholder="City" 
+                        <Input
+                          placeholder="City"
                           value={newShippingAddress.city}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, city: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, city: e.target.value })}
                         />
-                        <Input 
-                          placeholder="State" 
+                        <Input
+                          placeholder="State"
                           value={newShippingAddress.state}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, state: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, state: e.target.value })}
                         />
-                        <Input 
-                          placeholder="Pincode" 
+                        <Input
+                          placeholder="Pincode"
                           value={newShippingAddress.pincode}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, pincode: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, pincode: e.target.value })}
                         />
-                        <Input 
-                          placeholder="Country" 
+                        <Input
+                          placeholder="Country"
                           value={newShippingAddress.country}
-                          onChange={(e) => setNewShippingAddress({...newShippingAddress, country: e.target.value})}
+                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, country: e.target.value })}
                         />
                       </div>
                     )}
@@ -848,48 +849,18 @@ export function QuotationForm({
         </CardContent>
       </Card>
 
+
       {/* Tax Summary */}
       {totals && (
-        <Card className="border-primary/30 shadow-md hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-white to-primary/5">
-          <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary to-accent border-b">
-            <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
-              <div className="p-1.5 rounded-lg bg-white/20">
-                <Calculator className="h-5 w-5" />
-              </div>
-              Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Taxable Amount:</span>
-                <span className="font-medium">{formatCurrency(totals.taxableAmount)}</span>
-              </div>
-              {totals.cgst > 0 && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span>CGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.cgst)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>SGST:</span>
-                    <span className="font-medium">{formatCurrency(totals.sgst)}</span>
-                  </div>
-                </>
-              )}
-              {totals.igst > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>IGST:</span>
-                  <span className="font-medium">{formatCurrency(totals.igst)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Estimated Total:</span>
-                <span>{formatCurrency(totals.totalAmount)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TotalsSummary
+          taxableAmount={totals.taxableAmount}
+          cgst={totals.cgst}
+          sgst={totals.sgst}
+          igst={totals.igst}
+          totalAmount={totals.totalAmount}
+          taxBreakdown={totals.taxBreakdown}
+          isInterState={companyState !== selectedClient?.address?.state}
+        />
       )}
 
       {/* Form Actions */}
