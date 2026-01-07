@@ -14,6 +14,8 @@ export interface QuotationFilters {
   date_from?: string;
   date_to?: string;
   ordering?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export const quotationsApi = {
@@ -28,8 +30,8 @@ export const quotationsApi = {
    * Get quotations by company ID
    * Used for dashboard and list views
    */
-  getByCompanyId: async (companyId: string): Promise<Quotation[]> => {
-    return apiClient.get<Quotation[]>('/quotations', { company_id: companyId });
+  getByCompanyId: async (companyId: string, limit: number = 50, offset: number = 0): Promise<Quotation[]> => {
+    return apiClient.get<Quotation[]>('/quotations', { company_id: companyId, limit, offset });
   },
 
   /**
@@ -88,8 +90,8 @@ export const quotationsApi = {
    * Generate quotation number
    */
   generateNumber: async (companyId: string): Promise<{ quotation_number: string }> => {
-    return apiClient.get<{ quotation_number: string }>('/quotations/generate_number', { 
-      company: companyId 
+    return apiClient.get<{ quotation_number: string }>('/quotations/generate_number', {
+      company: companyId
     });
   },
 };

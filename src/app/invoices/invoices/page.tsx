@@ -9,7 +9,9 @@
 import React, { useState, useEffect } from 'react';
 import { Invoice, Client, Company } from '@/types';
 import { InvoiceForm, InvoiceList, InvoiceFilters, PaymentDialog, CustomizationDialog, CopyTypeDialog } from '@/components/invoices';
-import { FilterBar } from '@/components/shared';
+import { FilterBar, PageHeader, ExportButton, ConfirmDialog } from '@/components/shared';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils/export-utils';
 import { invoicesApi } from '@/lib/api/invoices.api';
 import { clientsApi } from '@/lib/api/clients.api';
@@ -37,6 +39,8 @@ import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { useInvoiceActions } from '@/hooks/useInvoiceActions';
 import { toast } from 'sonner';
 import { DashboardLayout } from '@/components/layout';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 import { InvoicePageHeader } from '@/components/pages/invoices';
 
 /**
@@ -48,8 +52,11 @@ const createFilterConfig = (): FilterConfig<Invoice> => ({
     if (!invoice.date) return false;
     const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     switch (value) {
+      case 'today':
+        return invoiceDate >= today;
       case 'this-week': {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         return invoiceDate >= weekAgo;
@@ -68,34 +75,29 @@ const createFilterConfig = (): FilterConfig<Invoice> => ({
         return invoiceDate.getMonth() === lastMonth.getMonth() &&
           invoiceDate.getFullYear() === lastMonth.getFullYear();
       }
-      case 'this-year': {
-        return invoiceDate.getFullYear() === now.getFullYear();
-      }
-      case 'last-year': {
-        return invoiceDate.getFullYear() === now.getFullYear() - 1;
-      }
+      case 'month':
+        const monthAgo = new Date(today);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        return invoiceDate >= monthAgo;
+      case 'quarter':
+        const quarterAgo = new Date(today);
+        quarterAgo.setMonth(quarterAgo.getMonth() - 3);
+        return invoiceDate >= quarterAgo;
+      case 'year':
+        const yearAgo = new Date(today);
+        yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+        return invoiceDate >= yearAgo;
       default:
         return true;
     }
   },
-  month: (invoice, value) => {
-    if (!invoice.date) return false;
-    const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
-    const monthYear = invoiceDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    return monthYear === value;
-  },
-  year: (invoice, value) => {
-    if (!invoice.date) return false;
-    const invoiceDate = typeof invoice.date === 'string' ? new Date(invoice.date) : invoice.date;
-    return invoiceDate.getFullYear() === parseInt(value);
-  },
-  minAmount: (invoice, value) => invoice.totalAmount >= value,
-  maxAmount: (invoice, value) => invoice.totalAmount <= value,
 });
 
 function InvoicesContent() {
+  const { user } = useAuth(); // Add user auth check
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, companiesInitialized, products } = useAppData();
+  const router = useRouter();
 
   // Local state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -133,36 +135,65 @@ function InvoicesContent() {
     }
   }, [selectedCompany, setSelectedCompany]);
 
-  // Load invoices
-  const loadInvoices = React.useCallback(async () => {
+  // Pagination state
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 50;
+
+  // Load initial data
+  const loadInitialData = React.useCallback(async () => {
     if (!selectedCompany) return;
 
     setLoading(true);
     try {
-      const freshCompany = await companiesApi.getById(selectedCompany.id);
-      setCompany(freshCompany);
+      // Fetch fresh company data, FIRST PAGE of invoices, and all clients
+      const [invoicesData, clientsData] = await Promise.all([
+        invoicesApi.getByCompanyId(selectedCompany.id, LIMIT, 0),
+        clientsApi.getAll({ company_id: selectedCompany.id })
+      ]);
 
-      if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
-        setSelectedCompany(freshCompany);
-      }
+      // Ensure company state is synced
+      setCompany(selectedCompany);
 
-      const invoicesData = await invoicesApi.getByCompanyId(selectedCompany.id);
-      invoicesData.sort((a, b) => {
-        const aTime = new Date(a.createdAt || 0).getTime();
-        const bTime = new Date(b.createdAt || 0).getTime();
-        return bTime - aTime;
-      });
+      // Backend already sorts by createdAt DESC, so no need to sort here
       setInvoices(invoicesData);
-
-      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
       setClients(clientsData);
+
+      // Reset pagination state
+      setOffset(0);
+      setHasMore(invoicesData.length === LIMIT);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany, setSelectedCompany]);
+  }, [selectedCompany]); // Removed setSelectedCompany from deps as it's not directly used here
+
+  // Load more invoices
+  const handleLoadMore = async () => {
+    if (!selectedCompany || loadingMore) return;
+
+    const newOffset = offset + LIMIT;
+    setLoadingMore(true);
+    try {
+      const moreInvoices = await invoicesApi.getByCompanyId(selectedCompany.id, LIMIT, newOffset);
+
+      if (moreInvoices.length > 0) {
+        setInvoices(prev => [...prev, ...moreInvoices]);
+        setOffset(newOffset);
+        setHasMore(moreInvoices.length === LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more invoices:', error);
+      toast.error('Failed to load more invoices');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Refresh clients
   const refreshClients = async () => {
@@ -183,10 +214,10 @@ function InvoicesContent() {
     if (selectedCompany && companies.length > 0) {
       const isValidCompany = companies.find(c => c.id === selectedCompany.id);
       if (isValidCompany) {
-        loadInvoices();
+        loadInitialData(); // Changed from loadInvoices()
       }
     }
-  }, [selectedCompany, companiesInitialized, companies, loadInvoices]);
+  }, [selectedCompany, companiesInitialized, companies, loadInitialData]); // Changed loadInvoices to loadInitialData
 
   // Invoice actions hook
   const actions = useInvoiceActions({
@@ -196,7 +227,7 @@ function InvoicesContent() {
     clients,
     invoices,
     onInvoicesChange: setInvoices,
-    onRefreshInvoices: loadInvoices,
+    onRefreshInvoices: loadInitialData, // Changed from loadInvoices
     onRefreshClients: refreshClients,
     reloadCompanyData,
   });
@@ -212,6 +243,36 @@ function InvoicesContent() {
     return exportToCSV(data, `invoices-${new Date().toISOString().split('T')[0]}`);
   };
 
+  // Initial data load
+  useEffect(() => {
+    loadInitialData();
+  }, [selectedCompany?.id, loadInitialData]);
+
+  const handleInvoiceChange = async () => {
+    await loadInitialData();
+  };
+
+  if (!selectedCompany) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Invoices"
+          description="Manage and track your invoices"
+        >
+          <Button disabled>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Button>
+        </PageHeader>
+        <div className="rounded-lg border border-dashed p-12 text-center">
+          <p className="text-muted-foreground">
+            Please select a company to manage invoices
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (loading || !companiesInitialized) {
     return (
@@ -226,13 +287,21 @@ function InvoicesContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <InvoicePageHeader
-        onAddInvoice={actions.handleAddInvoice}
-        onOpenCustomization={() => actions.setIsCustomizationDialogOpen(true)}
-        onExportExcel={handleExportExcel}
-        onExportCSV={handleExportCSV}
-      />
+      <PageHeader
+        title="Invoices"
+        description="Manage and track your invoices"
+      >
+        <div className="flex gap-2">
+          <ExportButton
+            onExportExcel={handleExportExcel}
+            onExportCSV={handleExportCSV}
+          />
+          <Button onClick={() => actions.handleAddInvoice()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Button>
+        </div>
+      </PageHeader>
 
       {/* Filter Bar */}
       <FilterBar
@@ -248,16 +317,39 @@ function InvoicesContent() {
         />
       </FilterBar>
 
-      {/* Invoice List */}
-      <InvoiceList
-        invoices={filteredInvoices}
-        clients={clients}
-        onEdit={actions.handleEditInvoice}
-        onDelete={actions.setDeleteInvoice}
-        onView={actions.handleViewInvoice}
-        onDownload={actions.handleDownloadInvoice}
-        onPayment={actions.handleOpenPaymentDialog}
-      />
+      {loading ? (
+        <div className="text-center py-12">Loading invoices...</div>
+      ) : (
+        <>
+          <InvoiceList
+            invoices={filteredInvoices}
+            clients={clients}
+            onEdit={actions.handleEditInvoice}
+            onDelete={actions.setDeleteInvoice}
+            onView={actions.handleViewInvoice}
+            onDownload={actions.handleDownloadInvoice}
+            onPayment={actions.handleOpenPaymentDialog}
+          />
+
+          {/* Pagination: Load More Button */}
+          {hasMore && !activeFilterCount && (
+            <div className="flex justify-center pt-4 pb-8">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="w-full md:w-auto min-w-[200px]"
+              >
+                {loadingMore ? (
+                  <>Building invoice list...</>
+                ) : (
+                  <>Load More Invoices</>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={actions.isDialogOpen} onOpenChange={actions.setIsDialogOpen}>
@@ -329,7 +421,7 @@ function InvoicesContent() {
           onOpenChange={actions.setIsCustomizationDialogOpen}
           companyId={selectedCompany.id}
           type="invoice"
-          onSave={loadInvoices}
+          onSave={loadInitialData}
         />
       )}
 

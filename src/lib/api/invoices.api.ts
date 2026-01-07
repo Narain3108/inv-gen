@@ -16,6 +16,8 @@ export interface InvoiceFilters {
   date_from?: string;
   date_to?: string;
   ordering?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface PaymentData {
@@ -36,8 +38,8 @@ export const invoicesApi = {
   /**
    * Get invoices by company ID
    */
-  getByCompanyId: async (companyId: string): Promise<Invoice[]> => {
-    return apiClient.get<Invoice[]>('/invoices', { company_id: companyId }, true);
+  getByCompanyId: async (companyId: string, limit: number = 50, offset: number = 0): Promise<Invoice[]> => {
+    return apiClient.get<Invoice[]>('/invoices', { company_id: companyId, limit, offset }, true);
   },
 
   /**
@@ -96,8 +98,8 @@ export const invoicesApi = {
    * Generate invoice number
    */
   generateNumber: async (companyId: string): Promise<{ invoice_number: string }> => {
-    return apiClient.get<{ invoice_number: string }>('/invoices/generate_number', { 
-      company: companyId 
+    return apiClient.get<{ invoice_number: string }>('/invoices/generate_number', {
+      company: companyId
     });
   },
 };

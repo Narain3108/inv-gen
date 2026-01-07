@@ -13,6 +13,7 @@ import { CustomizationDialog } from '@/components/invoices';
 import { FilterBar } from '@/components/shared';
 import { exportToExcel, exportToCSV, formatQuotationsForExport } from '@/lib/utils/export-utils';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -118,32 +119,37 @@ function QuotationsContent() {
     }
   }, [selectedCompany, setSelectedCompany]);
 
-  // Load data
-  const loadData = React.useCallback(async () => {
+  // Pagination state
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 50;
+
+  // Load initial data
+  const loadInitialData = React.useCallback(async () => {
     if (!selectedCompany) return;
 
     setLoading(true);
     try {
-      const freshCompany = await companiesApi.getById(selectedCompany.id);
-      setCompany(freshCompany);
+      // PERFORMANCE FIX: Use selectedCompany from context instead of refetching
+      // Also fetch related data in parallel
+      const [quotationsData, productsData, clientsData] = await Promise.all([
+        quotationsApi.getByCompanyId(selectedCompany.id, LIMIT, 0),
+        productsApi.getAll({ company_id: selectedCompany.id }),
+        clientsApi.getAll({ company_id: selectedCompany.id })
+      ]);
 
-      if (JSON.stringify(freshCompany) !== JSON.stringify(selectedCompany)) {
-        setSelectedCompany(freshCompany);
-      }
+      // Ensure company state is synced
+      setCompany(selectedCompany);
 
-      const quotationsData = await quotationsApi.getAll({ company_id: selectedCompany.id });
-      quotationsData.sort((a, b) => {
-        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return bTime - aTime;
-      });
+      // Backend already sorts by createdAt DESC
       setQuotations(quotationsData);
-
-      const productsData = await productsApi.getAll({ company_id: selectedCompany.id });
       setProducts(productsData);
-
-      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
       setClients(clientsData);
+
+      // Reset pagination state
+      setOffset(0);
+      setHasMore(quotationsData.length === LIMIT);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -151,6 +157,30 @@ function QuotationsContent() {
       setLoading(false);
     }
   }, [selectedCompany, setSelectedCompany]);
+
+  // Load more quotations
+  const handleLoadMore = async () => {
+    if (!selectedCompany || loadingMore) return;
+
+    const newOffset = offset + LIMIT;
+    setLoadingMore(true);
+    try {
+      const moreQuotations = await quotationsApi.getByCompanyId(selectedCompany.id, LIMIT, newOffset);
+
+      if (moreQuotations.length > 0) {
+        setQuotations(prev => [...prev, ...moreQuotations]);
+        setOffset(newOffset);
+        setHasMore(moreQuotations.length === LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more quotations:', error);
+      toast.error('Failed to load more quotations');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Refresh clients
   const refreshClients = async () => {
@@ -171,10 +201,10 @@ function QuotationsContent() {
     if (selectedCompany && companies.length > 0) {
       const isValidCompany = companies.find(c => c.id === selectedCompany.id);
       if (isValidCompany) {
-        loadData();
+        loadInitialData();
       }
     }
-  }, [selectedCompany, initialized, companies, loadData]);
+  }, [selectedCompany, initialized, companies, loadInitialData]);
 
   // Quotation actions hook
   const actions = useQuotationActions({
@@ -184,7 +214,7 @@ function QuotationsContent() {
     clients,
     quotations,
     onQuotationsChange: setQuotations,
-    onRefreshData: loadData,
+    onRefreshData: loadInitialData,
     reloadCompanyData,
     setCompany,
     setSelectedCompany,
@@ -245,6 +275,24 @@ function QuotationsContent() {
         onConvertToInvoice={actions.handleConvertToInvoice}
         onUpdateStatus={actions.handleUpdateStatus}
       />
+
+      {/* Pagination: Load More Button */}
+      {hasMore && !activeFilterCount && (
+        <div className="flex justify-center pt-4 pb-8">
+          <Button
+            variant="outline"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="w-full md:w-auto min-w-[200px]"
+          >
+            {loadingMore ? (
+              <>Building quotation list...</>
+            ) : (
+              <>Load More Quotations</>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={actions.isDialogOpen} onOpenChange={actions.setIsDialogOpen}>
@@ -353,7 +401,7 @@ function QuotationsContent() {
           onOpenChange={actions.setIsCustomizationDialogOpen}
           companyId={selectedCompany.id}
           type="quotation"
-          onSave={loadData}
+          onSave={loadInitialData}
         />
       )}
     </div>
