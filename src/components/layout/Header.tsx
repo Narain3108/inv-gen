@@ -7,11 +7,13 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, Menu, Search } from 'lucide-react';
+import { LogOut, Menu, Search, User } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -19,7 +21,27 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick, className }: HeaderProps) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const router = useRouter();
+
+  const getUserInitials = () => {
+    if (!user) return 'U';
+    if (user.name) {
+      const nameParts = user.name.trim().split(' ');
+      if (nameParts.length >= 2) {
+        return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
+      }
+      return user.name.substring(0, 2).toUpperCase();
+    }
+    if (user.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const handleProfileClick = () => {
+    router.push('/invoices/profile');
+  };
 
   return (
     <header className={cn(
@@ -65,6 +87,21 @@ export function Header({ onMenuClick, className }: HeaderProps) {
 
         {/* Theme Toggle */}
         <ThemeToggle className="shrink-0" />
+
+        {/* Profile Avatar */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleProfileClick}
+          className="shrink-0 hover:bg-primary/10 transition-colors"
+          aria-label="Profile"
+        >
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+              {getUserInitials()}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
 
         {/* Logout */}
         <Button

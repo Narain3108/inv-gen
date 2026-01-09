@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, RefreshCcw, Search, ShieldCheck, Users as UsersIcon, UserPlus } from 'lucide-react';
 import {
   Dialog,
@@ -177,7 +178,67 @@ export default function UsersPage() {
     },
   ]), [roleCounts, filteredUsers.length]);
 
-  if (authLoading) return <div>Loading...</div>;
+  // Show loading skeleton while auth or users are loading
+  if (authLoading || loading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header Skeleton */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-28" />
+            </div>
+          </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4 rounded" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-12" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters Skeleton */}
+          <Card>
+            <CardHeader className="pb-4">
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 lg:flex-row">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-full lg:w-[160px]" />
+              <Skeleton className="h-10 w-full lg:w-[220px]" />
+            </CardContent>
+          </Card>
+
+          {/* Table Skeleton */}
+          <Card>
+            <div className="p-4 space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 w-32" />
+                  <Skeleton className="h-12 w-24" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -189,8 +250,8 @@ export default function UsersPage() {
             icon={UsersIcon}
           />
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={handleRefresh} className="gap-2">
-              <RefreshCcw className="h-4 w-4" />
+            <Button variant="outline" onClick={handleRefresh} className="gap-2" disabled={loading}>
+              <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             <Button onClick={handleCreateUser} className="gap-2">
