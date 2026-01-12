@@ -13,6 +13,7 @@ import { Plus, FileText, Calendar, Package, Pencil, Trash2, Eye, Download } from
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { resolveVendorName } from '@/utils/vendor';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TableSkeleton } from '@/components/shared/Skeletons';
 import { DashboardLayout } from '@/components/layout';
 import { toast } from 'sonner';
 import {
@@ -97,6 +98,23 @@ export default function PurchaseHistoryPage() {
   if (!user) return null;
 
   const canEdit = user.role === 'super_admin' || user.role === 'admin';
+
+  // Show skeleton loading state
+  if (isLoading && purchases.length === 0) {
+      return (
+          <DashboardLayout>
+              <div className="space-y-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight">Purchase History</h2>
+                        <p className="text-muted-foreground">Track and manage your purchase bills</p>
+                    </div>
+                </div>
+                <TableSkeleton />
+              </div>
+          </DashboardLayout>
+      );
+  }
 
   const handleDelete = async () => {
     if (!deleteId || !selectedCompany) return;

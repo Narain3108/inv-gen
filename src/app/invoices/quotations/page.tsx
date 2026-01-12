@@ -44,6 +44,7 @@ import { productsApi } from '@/lib/api/products.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import { companiesApi } from '@/lib/api/companies.api';
 import { QuotationPageHeader } from '@/components/pages/quotations';
+import { TableSkeleton } from '@/components/shared/Skeletons';
 
 /**
  * Quotation filter configuration
@@ -90,6 +91,18 @@ function QuotationsContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(quotations, createFilterConfig());
+
+  if (loading && quotations.length === 0) {
+      return (
+        <div className="space-y-6">
+            <QuotationPageHeader
+              onNewQuotation={() => {}} 
+              loading={true}
+            />
+            <TableSkeleton />
+        </div>
+      );
+  }
 
   // Load companies on mount
   useEffect(() => {

@@ -42,6 +42,7 @@ import { DashboardLayout } from '@/components/layout';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { InvoicePageHeader } from '@/components/pages/invoices';
+import { TableSkeleton } from '@/components/shared/Skeletons';
 
 /**
  * Invoice filter configuration
@@ -113,6 +114,19 @@ function InvoicesContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(invoices, createFilterConfig());
+
+  if (loading && invoices.length === 0) {
+      return (
+         <div className="space-y-6">
+            <InvoicePageHeader
+                onNewInvoice={() => {}} 
+                onImport={() => {}}
+                loading={true}
+            />
+            <TableSkeleton />
+         </div>
+      );
+  }
 
   // Set company when selectedCompany changes
   useEffect(() => {

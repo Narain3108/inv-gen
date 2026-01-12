@@ -35,6 +35,7 @@ import {
 import { DashboardHeader, SecondaryMetrics } from '@/components/pages/dashboard';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { generateDashboardPDFReport, previewDashboardPDFReport } from '@/lib/utils/dashboard-pdf';
+import { DashboardSkeleton } from '@/components/shared/Skeletons';
 
 function DashboardContent() {
   const { selectedCompany } = useCompany();
@@ -57,6 +58,10 @@ function DashboardContent() {
     clients,
     products,
   });
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
 
   const handleExportReport = async () => {
     if (!selectedCompany) return false;

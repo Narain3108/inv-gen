@@ -13,7 +13,7 @@ import { MobileSidebar } from './MobileSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppData } from '@/contexts/AppDataContext';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { DashboardSkeleton } from '../shared/Skeletons';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -52,8 +52,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   if (authLoading || (user && companiesLoading && !companiesInitialized)) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-screen overflow-hidden bg-background">
+         <aside className="hidden lg:block w-64 shrink-0 border-r border-border/50">
+           {/* Simple Sidebar Skeleton */}
+           <div className="h-full flex flex-col p-4 space-y-4">
+              <div className="h-10 w-32 bg-muted rounded animate-pulse mb-8"></div>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                    <div className="h-5 w-5 bg-muted rounded-full animate-pulse"></div>
+                    <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
+                </div>
+              ))}
+           </div>
+         </aside>
+         <div className="flex-1 p-6">
+            <DashboardSkeleton />
+         </div>
       </div>
     );
   }

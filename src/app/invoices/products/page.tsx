@@ -22,6 +22,7 @@ import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatProductsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { productsApi } from '@/lib/api/products.api';
+import { TableSkeleton } from '@/components/shared/Skeletons';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
 
@@ -55,6 +56,24 @@ function ProductsContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(products, filterConfig);
+
+  if (productsLoading && products.length === 0) {
+      return (
+        <div className="space-y-6">
+          <PageHeader
+            title="Products & Services"
+            description="Manage your product inventory and services"
+            action={
+              <Button disabled>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            }
+          />
+          <TableSkeleton />
+        </div>
+      );
+  }
 
   const handleOpenForm = (product?: Product) => {
     setEditingProduct(product);

@@ -23,6 +23,7 @@ import { exportToExcel, exportToCSV, formatClientsForExport } from '@/lib/utils/
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { clientsApi } from '@/lib/api/clients.api';
 import { useAuth } from '@/hooks/useAuth';
+import { TableSkeleton } from '@/components/shared/Skeletons';
 
 type ClientFormData = z.infer<typeof clientFormSchema>;
 
@@ -47,6 +48,25 @@ function ClientsContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(clients, filterConfig);
+
+  // Show skeleton while loading
+  if (clientsLoading && clients.length === 0) {
+    return (
+       <div className="space-y-6">
+        <PageHeader
+          title="Clients"
+          description="Manage your client base"
+          action={
+            <Button disabled>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Client
+            </Button>
+          }
+        />
+        <TableSkeleton />
+      </div>
+    );
+  }
 
   const handleOpenForm = (client?: Client) => {
     setEditingClient(client);
