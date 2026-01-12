@@ -16,6 +16,7 @@ import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils
 import { invoicesApi } from '@/lib/api/invoices.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import { companiesApi } from '@/lib/api/companies.api';
+import { servicesApi } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ import { useInvoiceActions } from '@/hooks/useInvoiceActions';
 import { toast } from 'sonner';
 import { DashboardLayout } from '@/components/layout';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { InvoicePageHeader } from '@/components/pages/invoices';
 import { TableSkeleton } from '@/components/shared/Skeletons';
 
@@ -99,12 +100,14 @@ function InvoicesContent() {
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, companiesInitialized, products } = useAppData();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Local state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(false);
+  const [prefillData, setPrefillData] = useState<any>(null);
 
   // Filter hook
   const {
@@ -249,6 +252,34 @@ function InvoicesContent() {
     loadInitialData();
   }, [selectedCompany?.id, loadInitialData]);
 
+  // Handle createFor query param
+  useEffect(() => {
+    const createForServiceId = searchParams?.get('createFor');
+    if (createForServiceId && selectedCompany && !loading && clients.length > 0) {
+      const initInvoiceFromService = async () => {
+        try {
+          // Clear query param to prevent loop/re-trigger
+          router.replace('/invoices/invoices');
+
+          const service = await servicesApi.getById(createForServiceId);
+          if (service && service.companyId === selectedCompany.id) {
+            setPrefillData({
+              clientId: service.clientId,
+              referenceNumber: service.serviceNumber,
+            });
+            await actions.handleAddInvoice();
+            toast.info(`Creating invoice for Service ${service.serviceNumber}`);
+          }
+        } catch (error) {
+          console.error("Failed to load service for invoice creation", error);
+          toast.error("Failed to load service details");
+        }
+      };
+
+      initInvoiceFromService();
+    }
+  }, [searchParams, selectedCompany, loading, clients, actions, router]);
+
   const handleInvoiceChange = async () => {
     await loadInitialData();
   };
@@ -378,6 +409,7 @@ function InvoicesContent() {
               invoiceCount={invoices.length}
               onSubmit={actions.handleSubmit}
               onCancel={() => actions.setIsDialogOpen(false)}
+              prefillData={prefillData}
               onClientAdded={(newClient) => {
                 setTimeout(() => {
                   setClients(prev => {

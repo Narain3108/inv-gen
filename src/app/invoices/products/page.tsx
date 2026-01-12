@@ -63,13 +63,12 @@ function ProductsContent() {
           <PageHeader
             title="Products & Services"
             description="Manage your product inventory and services"
-            action={
-              <Button disabled>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Product
-              </Button>
-            }
-          />
+          >
+            <Button disabled>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          </PageHeader>
           <TableSkeleton />
         </div>
       );

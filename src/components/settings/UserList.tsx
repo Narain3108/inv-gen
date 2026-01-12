@@ -11,15 +11,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Edit, MoreVertical, Users } from 'lucide-react';
+import { Edit, MoreVertical, Users, TrendingUp } from 'lucide-react';
 import { ROLES } from '@/lib/constants';
 
 interface UserListProps {
   users: User[];
   onEdit: (user: User) => void;
+  onAnalysis: (user: User) => void;
 }
 
-export function UserList({ users, onEdit }: UserListProps) {
+export function UserList({ users, onEdit, onAnalysis }: UserListProps) {
   if (users.length === 0) {
     return (
       <Card className="flex flex-col items-center justify-center p-12">
@@ -68,6 +69,10 @@ export function UserList({ users, onEdit }: UserListProps) {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAnalysis(user)}>
+                          <TrendingUp className="mr-2 h-4 w-4" />
+                          Analysis
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -109,6 +114,10 @@ export function UserList({ users, onEdit }: UserListProps) {
                 <DropdownMenuItem onClick={() => onEdit(user)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onAnalysis(user)}>
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  Analysis
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, DollarSign } from 'lucide-react';
+import { Download, Edit, Eye, FileText, MoreVertical, Search, Trash2, DollarSign, Wrench } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
@@ -55,7 +55,7 @@ export function InvoiceList({
       if (canViewCreators && !inv.createdByUsername && inv.createdBy) idsToFetch.add(inv.createdBy);
     });
     if (idsToFetch.size === 0) return;
-    
+
     (async () => {
       try {
         const users = await usersApi.getBatch(Array.from(idsToFetch));
@@ -69,7 +69,7 @@ export function InvoiceList({
         console.error('Failed to fetch creator names', e);
       }
     })();
-    
+
     return () => { mounted = false; };
   }, [invoices, user]);
 
@@ -88,7 +88,7 @@ export function InvoiceList({
 
   const getPaymentStatusBadge = (invoice: Invoice) => {
     const status = invoice.paymentStatus || 'pending';
-    
+
     const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
       paid: { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
       partially_paid: { variant: 'default', className: 'bg-orange-500 hover:bg-orange-600' },
@@ -162,14 +162,22 @@ export function InvoiceList({
                 const roundTo2 = (num: number) => Math.round((num || 0) * 100) / 100;
                 const amountPending = roundTo2(invoice.amountPending ?? invoice.totalAmount);
                 const paymentStatus = (amountPending <= 0.01) ? 'paid' : (invoice.paymentStatus || 'pending');
-                
+
                 return (
                   <tr
                     key={invoice.id}
                     className="border-b last:border-0 hover:bg-muted/30"
                   >
                     <td className="p-3">
-                      <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
+                        {invoice.sourceType === 'service' && invoice.serviceNumber && (
+                          <Badge variant="outline" className="text-xs border-blue-500 text-blue-600">
+                            <Wrench className="w-3 h-3 mr-1" />
+                            {invoice.serviceNumber}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <span className="text-sm">{getClientName(invoice.clientId)}</span>

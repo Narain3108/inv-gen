@@ -85,6 +85,7 @@ export interface Company {
   additionalNotes?: string; // Default notes for all invoices
   invoiceNumbering?: NumberingConfig;
   quotationNumbering?: NumberingConfig;
+  serviceNumbering?: NumberingConfig;
   createdAt: string | Date;
   updatedAt?: string | Date;
 }
@@ -105,6 +106,11 @@ export interface CompanyFormData {
     order: string;
   };
   quotationNumbering?: {
+    prefix: string;
+    suffix: string;
+    order: string;
+  };
+  serviceNumbering?: {
     prefix: string;
     suffix: string;
     order: string;
@@ -278,6 +284,16 @@ export interface Invoice {
   payments: PaymentRecord[];
   createdAt: string | Date;
   updatedAt: string | Date;
+  // Service linking (for invoices created from services)
+  sourceType?: 'service' | 'manual';
+  serviceId?: string;
+  serviceNumber?: string;
+  serviceDetails?: {
+    problemDescription?: string;
+    actionTaken?: string;
+    attendedBy?: string;
+    attendedAt?: string;
+  };
 }
 
 export interface InvoiceFormData {
@@ -289,7 +305,7 @@ export interface InvoiceFormData {
 
 // ==================== Quotation Types ====================
 
-export type QuotationStatus = 
+export type QuotationStatus =
   | 'pending'
   | 'accepted'
   | 'rejected'
@@ -329,7 +345,7 @@ export interface QuotationFormData {
 
 // ==================== Enums & Constants ====================
 
-export type PaymentMode = 
+export type PaymentMode =
   | 'cash'
   | 'upi'
   | 'bank_transfer'
@@ -338,13 +354,13 @@ export type PaymentMode =
   | 'debit_card'
   | 'net_banking';
 
-export type PaymentStatus = 
+export type PaymentStatus =
   | 'paid'
   | 'unpaid'
   | 'partially_paid'
   | 'overdue';
 
-export type InvoiceStatus = 
+export type InvoiceStatus =
   | 'draft'
   | 'sent'
   | 'viewed'
@@ -359,7 +375,7 @@ export interface PaymentFormData {
   notes?: string;
 }
 
-export type UnitType = 
+export type UnitType =
   | 'Nos'
   | 'Pcs'
   | 'Kgs'
@@ -454,4 +470,104 @@ export interface FilterState {
   status?: string;
   sortBy?: string;
   sortOrder: 'asc' | 'desc';
+}
+
+// ==================== Service Management Types ====================
+
+export type ServiceType =
+  | 'warranty'
+  | 'per_call'
+  | 'amc'
+  | 'new_installation';
+
+export type ServiceStatusType =
+  | 'open'
+  | 'pending'
+  | 'closed';
+
+export interface ServiceResolution {
+  observation?: string;
+  actionTaken?: string;
+  isSolved: boolean;
+  attendedBy?: string;
+  attendedByName?: string;
+  attendedAt?: string | Date;
+  clientSignatureUrl?: string;
+  proofDocumentUrl?: string;
+}
+
+export interface Service {
+  id: string;
+  serviceNumber: string;
+  companyId: string;
+  clientId: string;
+  clientName?: string;
+  clientAddress?: Address;
+
+  // Call details
+  callDate: string | Date;
+  serviceType: ServiceType;
+  problemDescription: string;
+  initialSolution?: string;
+
+  // Service location
+  serviceAddress?: Address;
+
+  // Assignment
+  assignedToIds: string[];
+  assignedToNames: string[];
+  assignedDate: string | Date;
+  assignedTime: string;
+
+  // Status & Resolution
+  status: ServiceStatusType;
+  resolution?: ServiceResolution;  // Latest resolution (backwards compat)
+  serviceHistory?: ServiceResolution[];  // All attendance history
+
+  // Invoice Integration
+  invoiceId?: string;
+
+  // Audit
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface ServiceFormData {
+  companyId: string;
+  clientId: string;
+  callDate: Date;
+  serviceType: ServiceType;
+  problemDescription: string;
+  initialSolution?: string;
+  useClientAddress: boolean;
+  serviceAddress?: Address;
+  assignedToIds: string[];
+  assignedDate: Date;
+  assignedTime: string;
+}
+
+export interface ServiceAttendData {
+  observation?: string;
+  actionTaken?: string;
+  isSolved: boolean;
+  clientSignatureUrl?: string;
+  proofDocumentUrl?: string;
+  // Inline invoice creation
+  createInvoice?: boolean;
+  invoiceItems?: InlineInvoiceItem[];
+}
+
+// For inline invoice creation during service attendance
+export interface InlineInvoiceItem {
+  productId: string;
+  productName?: string;
+  description?: string;
+  hsn?: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  discount?: number;
+  gstRate?: number;
 }

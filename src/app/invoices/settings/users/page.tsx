@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
+import { useCompany } from '@/hooks/useCompany';
 import { DashboardLayout } from '@/components/layout';
 import { useAppData } from '@/contexts/AppDataContext';
 import { User } from '@/types';
@@ -31,15 +32,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { EmployeePerformanceWidget } from '@/components/dashboard';
 
 export default function UsersPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { selectedCompany } = useCompany();
   const { companies, companiesLoading } = useAppData();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
+  const [analysisUser, setAnalysisUser] = useState<User | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'employee'>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
@@ -78,6 +83,15 @@ export default function UsersPage() {
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
     setIsDialogOpen(true);
+  };
+
+  const handleAnalysis = (user: User) => {
+    if (!selectedCompany) {
+      toast.error("Please select a company from the sidebar to view analytics");
+      return;
+    }
+    setAnalysisUser(user);
+    setIsAnalysisOpen(true);
   };
 
   const handleRefresh = () => {
@@ -334,6 +348,7 @@ export default function UsersPage() {
         <UserList
           users={filteredUsers}
           onEdit={handleEditUser}
+          onAnalysis={handleAnalysis}
         />
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -358,6 +373,26 @@ export default function UsersPage() {
                 ? companies.filter(c => (currentUser.allowedCompanyIds || []).includes(c.id))
                 : companies}
             />
+          </DialogContent>
+        </Dialog>
+
+        {/* Employee Analysis Dialog */}
+        <Dialog open={isAnalysisOpen} onOpenChange={setIsAnalysisOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Performance Analysis</DialogTitle>
+              <DialogDescription>
+                Performance metrics for {analysisUser?.name}
+              </DialogDescription>
+            </DialogHeader>
+            {analysisUser && selectedCompany && (
+              <div className="py-4">
+                <EmployeePerformanceWidget
+                  companyId={selectedCompany.id}
+                  userId={analysisUser.id}
+                />
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

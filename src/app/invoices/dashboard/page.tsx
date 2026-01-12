@@ -31,6 +31,8 @@ import {
   RevenueChart,
   GSTSummary,
   QuotationMetrics,
+  ServiceOverviewWidget,
+  EmployeePerformanceWidget,
 } from '@/components/dashboard';
 import { DashboardHeader, SecondaryMetrics } from '@/components/pages/dashboard';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -182,6 +184,12 @@ function DashboardContent() {
 
       {/* Secondary Metrics */}
       <SecondaryMetrics stats={stats} />
+
+      {/* Service & Performance Widgets */}
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+        <ServiceOverviewWidget companyId={selectedCompany.id} />
+
+      </div>
 
       {/* Charts and Tables */}
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-7">

@@ -20,6 +20,8 @@ import {
   Sparkles,
   UserCog,
   ShoppingCart,
+  Wrench,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,6 +86,24 @@ const navItems: NavItem[] = [
   },
 ];
 
+// Admin-only navigation items
+const adminNavItems: NavItem[] = [
+  {
+    title: 'Services',
+    href: '/invoices/services',
+    icon: Wrench,
+  },
+];
+
+// Employee-only navigation items
+const employeeNavItems: NavItem[] = [
+  {
+    title: 'Assigned Tasks',
+    href: '/invoices/my-tasks',
+    icon: ClipboardList,
+  },
+];
+
 const superAdminNavItems: NavItem[] = [
   {
     title: 'User Management',
@@ -127,8 +147,8 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="border-b border-sidebar-border/50 p-3 sm:p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className={cn(
                 'w-full justify-between h-auto py-2.5 px-3',
                 'hover:shadow-md hover:border-primary/40 active:scale-[0.98]',
@@ -221,8 +241,8 @@ export function Sidebar({ className }: SidebarProps) {
                   >
                     <div className={cn(
                       "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
-                      isActive 
-                        ? "bg-white/20 backdrop-blur-sm" 
+                      isActive
+                        ? "bg-white/20 backdrop-blur-sm"
                         : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
                     )}>
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -257,8 +277,8 @@ export function Sidebar({ className }: SidebarProps) {
                   >
                     <div className={cn(
                       "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
-                      isActive 
-                        ? "bg-white/20 backdrop-blur-sm" 
+                      isActive
+                        ? "bg-white/20 backdrop-blur-sm"
                         : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
                     )}>
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -268,7 +288,67 @@ export function Sidebar({ className }: SidebarProps) {
                 );
               })}
 
-              {/* Render Settings for super admin below User Management */}
+              {/* Admin Navigation - Services (visible to Admin and Super Admin) */}
+              {showPrivilegedNav && adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                      'transition-all duration-200 group relative overflow-hidden',
+                      'active:scale-[0.97]',
+                      isActive
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+                    )}
+                  >
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                      isActive
+                        ? "bg-white/20 backdrop-blur-sm"
+                        : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+                    )}>
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <span className="font-semibold relative z-10 truncate">{item.title}</span>
+                  </Link>
+                );
+              })}
+
+              {/* Employee Navigation - Assigned Tasks (visible only to Employees) */}
+              {user?.role === ROLES.EMPLOYEE && employeeNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl px-3 py-2.5 sm:py-3 text-sm font-medium',
+                      'transition-all duration-200 group relative overflow-hidden',
+                      'active:scale-[0.97]',
+                      isActive
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 dark:shadow-primary/20'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent hover:scale-[1.02] hover:shadow-sm'
+                    )}
+                  >
+                    <div className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
+                      isActive
+                        ? "bg-white/20 backdrop-blur-sm"
+                        : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
+                    )}>
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </div>
+                    <span className="font-semibold relative z-10 truncate">{item.title}</span>
+                  </Link>
+                );
+              })}
               {isSuper && (() => {
                 const settingsItem = navItems.find(i => i.title === 'Settings');
                 if (!settingsItem) return null;
@@ -294,8 +374,8 @@ export function Sidebar({ className }: SidebarProps) {
                   >
                     <div className={cn(
                       "p-1.5 rounded-lg transition-all duration-200 relative z-10 shrink-0",
-                      isActive 
-                        ? "bg-white/20 backdrop-blur-sm" 
+                      isActive
+                        ? "bg-white/20 backdrop-blur-sm"
                         : "bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30"
                     )}>
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5" />

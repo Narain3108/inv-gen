@@ -179,17 +179,8 @@ export function useInvoiceActions({
                     });
                 }
 
-                // Deduct stock
-                for (const item of data.items) {
-                    if (item.productId) {
-                        const product = products.find(p => p.id === item.productId);
-                        if (product?.type === 'product' && typeof product.stock === 'number') {
-                            await productsApi.update(item.productId, {
-                                stock: Math.max(0, product.stock - item.quantity),
-                            });
-                        }
-                    }
-                }
+                // Stock deduction is handled by the backend during invoice creation
+
 
                 toast.success('Invoice created and stock updated successfully');
             }

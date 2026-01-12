@@ -54,6 +54,7 @@ interface InvoiceFormProps {
   onSubmit: (data: InvoiceFormData) => Promise<void>;
   onCancel?: () => void;
   onClientAdded?: (client: Client) => void;
+  prefillData?: Partial<InvoiceFormData>;
 }
 
 export function InvoiceForm({
@@ -67,6 +68,7 @@ export function InvoiceForm({
   onSubmit,
   onCancel,
   onClientAdded,
+  prefillData,
 }: InvoiceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -148,6 +150,7 @@ export function InvoiceForm({
     } : {
       date: new Date().toISOString().split('T')[0],
       items: [{ productId: '' }],
+      ...prefillData,
     } as any,
   });
 

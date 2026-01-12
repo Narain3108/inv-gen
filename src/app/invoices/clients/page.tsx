@@ -52,17 +52,16 @@ function ClientsContent() {
   // Show skeleton while loading
   if (clientsLoading && clients.length === 0) {
     return (
-       <div className="space-y-6">
+      <div className="space-y-6">
         <PageHeader
           title="Clients"
           description="Manage your client base"
-          action={
-            <Button disabled>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add Client
-            </Button>
-          }
-        />
+        >
+          <Button disabled>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Client
+          </Button>
+        </PageHeader>
         <TableSkeleton />
       </div>
     );
