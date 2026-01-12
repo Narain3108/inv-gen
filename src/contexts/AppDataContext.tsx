@@ -21,17 +21,17 @@ interface AppDataContextType {
   companies: Company[];
   companiesLoading: boolean;
   companiesInitialized: boolean;
-  
+
   // Clients (global - not company-specific)
   clients: Client[];
   clientsLoading: boolean;
   clientsInitialized: boolean;
-  
+
   // Products (filtered by selected company)
   products: Product[];
   productsLoading: boolean;
   productsInitialized: boolean;
-  
+
   // Methods
   refreshCompanies: () => Promise<void>;
   refreshClients: () => Promise<void>;
@@ -46,23 +46,23 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const pathname = usePathname();
-  
+
   // Define public pages where we shouldn't fetch app data
   const isPublicPage = React.useMemo(() => {
     const path = pathname || '';
     return ['/', '/onboarding'].includes(path) || path.startsWith('/auth/');
   }, [pathname]);
-  
+
   // Companies state
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const [companiesInitialized, setCompaniesInitialized] = useState(false);
-  
+
   // Clients state (global)
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [clientsInitialized, setClientsInitialized] = useState(false);
-  
+
   // Products state (company-specific)
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -77,22 +77,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Load companies once on mount
   const loadCompanies = useCallback(async (force = false) => {
     if (!force && companiesInitialized && !companiesLoading) return; // Already loaded
-    
+
     setCompaniesLoading(true);
     try {
       console.log('🏢 Loading companies...');
       const data = await companiesApi.getAll();
-      
+
       setCompanies(data);
       console.log('✅ Companies loaded:', data.length);
-      
+
       // DO NOT auto-select here - let Sidebar handle company selection
       // This prevents overriding persisted company from Zustand localStorage
-      
-      setCompaniesInitialized(true);
+
     } catch (error) {
       console.error('❌ Error loading companies:', error);
+      // Set empty array on error to allow UI to continue
+      setCompanies([]);
+      toast.error('Failed to load companies. Please try refreshing the page.');
     } finally {
+      // CRITICAL: Always set initialized to true to prevent infinite loading
+      setCompaniesInitialized(true);
       setCompaniesLoading(false);
     }
   }, [companiesInitialized, companiesLoading]);
@@ -100,18 +104,22 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Load clients once on mount (global - not company-specific)
   const loadClients = useCallback(async (force = false) => {
     if (!force && clientsInitialized && !clientsLoading) return; // Already loaded
-    
+
     setClientsLoading(true);
     try {
       console.log('👥 Loading clients...');
       const data = await clientsApi.getAll();
-      
+
       setClients(data);
       console.log('✅ Clients loaded:', data.length);
-      setClientsInitialized(true);
     } catch (error) {
       console.error('❌ Error loading clients:', error);
+      // Set empty array on error to allow UI to continue
+      setClients([]);
+      toast.error('Failed to load clients. Some features may be limited.');
     } finally {
+      // CRITICAL: Always set initialized to true to prevent infinite loading
+      setClientsInitialized(true);
       setClientsLoading(false);
     }
   }, [clientsInitialized, clientsLoading]);
@@ -127,24 +135,28 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     // Safety check: Ensure selected company is actually in the loaded companies list
     // This prevents 403 errors when switching users with persisted selectedCompany
     if (companiesInitialized && companies.length > 0) {
-        const isValid = companies.find(c => c.id === selectedCompany.id);
-        if (!isValid) {
-            console.log('⚠️ Skipping product load for invalid company:', selectedCompany.name);
-            return;
-        }
+      const isValid = companies.find(c => c.id === selectedCompany.id);
+      if (!isValid) {
+        console.log('⚠️ Skipping product load for invalid company:', selectedCompany.name);
+        return;
+      }
     }
-    
+
     setProductsLoading(true);
     try {
       console.log('📦 Loading products for company:', selectedCompany.name);
       const data = await productsApi.getAll({ company_id: selectedCompany.id });
-      
+
       setProducts(data);
       console.log('✅ Products loaded:', data.length);
-      setProductsInitialized(true);
     } catch (error) {
       console.error('❌ Error loading products:', error);
+      // Set empty array on error to allow UI to continue
+      setProducts([]);
+      toast.error('Failed to load products. Some features may be limited.');
     } finally {
+      // CRITICAL: Always set initialized to true to prevent infinite loading
+      setProductsInitialized(true);
       setProductsLoading(false);
     }
   }, [selectedCompany, companies, companiesInitialized]);
@@ -152,13 +164,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Initial load on mount and user change handling
   useEffect(() => {
     if (authLoading) return;
-    
+
     // Skip data fetching on public pages to prevent unnecessary API calls
     if (isPublicPage) return;
 
     if (user) {
       const hasUserChanged = user.id !== prevUserId;
-      
+
       if (hasUserChanged) {
         console.log('👤 User changed, forcing data reload');
         setPrevUserId(user.id);
@@ -176,7 +188,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           loadClients(hasUserChanged),
         ]);
       };
-      
+
       initializeData();
     } else {
       // Clear data on logout
@@ -237,7 +249,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const deleteClient = useCallback(async (id: string) => {
     const previousClients = [...clients];
     setClients(prev => prev.filter(c => c.id !== id));
-    
+
     try {
       await clientsApi.delete(id);
       toast.success('Client deleted successfully');
@@ -253,7 +265,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const productToDelete = products.find(p => p.id === id);
     const previousProducts = [...products];
     setProducts(prev => prev.filter(p => p.id !== id));
-    
+
     try {
       await productsApi.delete(id, productToDelete?.companyId);
       toast.success('Product deleted successfully');
@@ -269,15 +281,15 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     companies,
     companiesLoading,
     companiesInitialized,
-    
+
     clients,
     clientsLoading,
     clientsInitialized,
-    
+
     products,
     productsLoading,
     productsInitialized,
-    
+
     refreshCompanies,
     refreshClients,
     refreshProducts,

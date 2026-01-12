@@ -69,32 +69,6 @@ export default function CompanySettingsPage() {
     }
   }, [isLoading, companies]);
 
-  if (authLoading || (user && user.role !== 'super_admin' && user.role !== 'admin')) {
-    return null; // Or a loading spinner
-  }
-
-  if (isLoading && companies.length === 0) {
-      return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                 <PageHeader
-                    title="Company Management"
-                    description="Manage your business profiles and settings"
-                    action={
-                    user?.role === 'super_admin' ? (
-                        <Button onClick={handleCreateCompany}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Company
-                        </Button>
-                    ) : undefined
-                    }
-                />
-                <TableSkeleton />
-            </div>
-        </DashboardLayout>
-      );
-  }
-
   const handleCreateCompany = () => {
     setEditingCompany(undefined);
     setIsFormOpen(true);
@@ -245,6 +219,31 @@ export default function CompanySettingsPage() {
       throw error;
     }
   };
+
+  if (authLoading || (user && user.role !== 'super_admin' && user.role !== 'admin')) {
+    return null; // Or a loading spinner
+  }
+
+  if (isLoading && companies.length === 0) {
+      return (
+        <DashboardLayout>
+            <div className="space-y-6">
+                 <PageHeader
+                    title="Company Management"
+                    description="Manage your business profiles and settings"
+                >
+                    {user?.role === 'super_admin' && (
+                        <Button onClick={handleCreateCompany}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Company
+                        </Button>
+                    )}
+                </PageHeader>
+                <TableSkeleton />
+            </div>
+        </DashboardLayout>
+      );
+  }
 
   if (isLoading) {
     return (

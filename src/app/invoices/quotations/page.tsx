@@ -80,7 +80,7 @@ function QuotationsContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Filter hook
@@ -91,18 +91,6 @@ function QuotationsContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(quotations, createFilterConfig());
-
-  if (loading && quotations.length === 0) {
-      return (
-        <div className="space-y-6">
-            <QuotationPageHeader
-              onNewQuotation={() => {}} 
-              loading={true}
-            />
-            <TableSkeleton />
-        </div>
-      );
-  }
 
   // Load companies on mount
   useEffect(() => {
@@ -244,11 +232,21 @@ function QuotationsContent() {
     return exportToCSV(data, `quotations-${new Date().toISOString().split('T')[0]}`);
   };
 
-  // Loading state
-  if (loading || companiesLoading) {
+  // Check for selected company first - prevents infinite loading when no company is selected
+  if (!selectedCompany) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6 p-6">
+        <QuotationPageHeader
+          onAddQuotation={() => { }}
+          onOpenCustomization={() => { }}
+          onExportExcel={async () => false}
+          onExportCSV={async () => false}
+        />
+        <div className="rounded-lg border border-dashed p-12 text-center">
+          <p className="text-muted-foreground">
+            Please select a company to manage quotations
+          </p>
+        </div>
       </div>
     );
   }
@@ -277,34 +275,41 @@ function QuotationsContent() {
         />
       </FilterBar>
 
-      {/* Quotations List */}
-      <QuotationList
-        quotations={filteredQuotations}
-        clients={clients}
-        onEdit={actions.handleEditQuotation}
-        onDelete={actions.setDeleteQuotation}
-        onView={actions.handleViewQuotation}
-        onDownload={actions.handleDownloadQuotation}
-        onConvertToInvoice={actions.handleConvertToInvoice}
-        onUpdateStatus={actions.handleUpdateStatus}
-      />
+      {/* Show skeleton when actively loading data for a selected company */}
+      {loading ? (
+        <TableSkeleton />
+      ) : (
+        <>
+          {/* Quotations List */}
+          <QuotationList
+            quotations={filteredQuotations}
+            clients={clients}
+            onEdit={actions.handleEditQuotation}
+            onDelete={actions.setDeleteQuotation}
+            onView={actions.handleViewQuotation}
+            onDownload={actions.handleDownloadQuotation}
+            onConvertToInvoice={actions.handleConvertToInvoice}
+            onUpdateStatus={actions.handleUpdateStatus}
+          />
 
-      {/* Pagination: Load More Button */}
-      {hasMore && !activeFilterCount && (
-        <div className="flex justify-center pt-4 pb-8">
-          <Button
-            variant="outline"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="w-full md:w-auto min-w-[200px]"
-          >
-            {loadingMore ? (
-              <>Building quotation list...</>
-            ) : (
-              <>Load More Quotations</>
-            )}
-          </Button>
-        </div>
+          {/* Pagination: Load More Button */}
+          {hasMore && !activeFilterCount && (
+            <div className="flex justify-center pt-4 pb-8">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="w-full md:w-auto min-w-[200px]"
+              >
+                {loadingMore ? (
+                  <>Building quotation list...</>
+                ) : (
+                  <>Load More Quotations</>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create/Edit Dialog */}

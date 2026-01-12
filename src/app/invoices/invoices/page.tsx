@@ -104,7 +104,7 @@ function InvoicesContent() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Filter hook
   const {
@@ -114,19 +114,6 @@ function InvoicesContent() {
     clearFilters,
     activeFilterCount,
   } = useFilters(invoices, createFilterConfig());
-
-  if (loading && invoices.length === 0) {
-      return (
-         <div className="space-y-6">
-            <InvoicePageHeader
-                onNewInvoice={() => {}} 
-                onImport={() => {}}
-                loading={true}
-            />
-            <TableSkeleton />
-         </div>
-      );
-  }
 
   // Set company when selectedCompany changes
   useEffect(() => {
@@ -266,6 +253,7 @@ function InvoicesContent() {
     await loadInitialData();
   };
 
+  // Check for selected company first - prevents infinite loading when no company is selected
   if (!selectedCompany) {
     return (
       <div className="space-y-6">
@@ -287,13 +275,13 @@ function InvoicesContent() {
     );
   }
 
-  // Loading state
-  if (loading || !companiesInitialized) {
+  // Loading state - only show when companies are being initialized
+  if (!companiesInitialized) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-muted-foreground">Loading data...</p>
+          <p className="mt-4 text-sm text-muted-foreground">Loading companies...</p>
         </div>
       </div>
     );
@@ -331,8 +319,9 @@ function InvoicesContent() {
         />
       </FilterBar>
 
+      {/* Show skeleton when actively loading data for a selected company */}
       {loading ? (
-        <div className="text-center py-12">Loading invoices...</div>
+        <TableSkeleton />
       ) : (
         <>
           <InvoiceList
