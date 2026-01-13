@@ -35,14 +35,20 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string>(company?.logoUrl || '');
   const [signatureUrl, setSignatureUrl] = useState<string>(company?.signatureUrl || '');
-  
+
   const [invoicePrefix, setInvoicePrefix] = useState(company?.invoiceNumbering?.prefix || '');
   const [invoiceSuffix, setInvoiceSuffix] = useState(company?.invoiceNumbering?.suffix || '');
   const [invoiceOrder, setInvoiceOrder] = useState(company?.invoiceNumbering?.order || 'prefix,number,suffix');
-  
+
   const [quotationPrefix, setQuotationPrefix] = useState(company?.quotationNumbering?.prefix || '');
   const [quotationSuffix, setQuotationSuffix] = useState(company?.quotationNumbering?.suffix || '');
   const [quotationOrder, setQuotationOrder] = useState(company?.quotationNumbering?.order || 'prefix,number,suffix');
+
+  const [servicePrefix, setServicePrefix] = useState(company?.serviceNumbering?.prefix || '');
+  const [serviceSuffix, setServiceSuffix] = useState(company?.serviceNumbering?.suffix || '');
+  const [serviceOrder, setServiceOrder] = useState(company?.serviceNumbering?.order || 'prefix,number,suffix');
+
+
 
   const {
     register,
@@ -136,16 +142,21 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           suffix: quotationSuffix,
           order: quotationOrder,
         },
+        serviceNumbering: {
+          prefix: servicePrefix,
+          suffix: serviceSuffix,
+          order: serviceOrder,
+        },
       };
 
       await onSubmit(companyData as any);
       toast.success(company ? 'Company updated successfully' : 'Company created successfully');
     } catch (error: any) {
       console.error('Error saving company:', error);
-      const errorMessage = error.response?.data?.detail 
-        ? (Array.isArray(error.response.data.detail) 
-            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
-            : error.response.data.detail)
+      const errorMessage = error.response?.data?.detail
+        ? (Array.isArray(error.response.data.detail)
+          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
+          : error.response.data.detail)
         : 'Failed to save company';
       toast.error(errorMessage);
     } finally {
@@ -163,9 +174,9 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
 
 
         <CardContent className="space-y-4">
-        
-          
-       
+
+
+
           {/* GSTIN */}
           <div className="space-y-2">
             <Label htmlFor="gstin">GSTIN (Optional)</Label>
@@ -443,6 +454,21 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
         onOrderChange={setQuotationOrder}
       />
 
+      {/* Service Numbering Configuration */}
+      <NumberingConfig
+        title="Service Numbering"
+        description="Configure how service numbers are generated automatically"
+        prefix={servicePrefix}
+        suffix={serviceSuffix}
+        order={serviceOrder}
+        nextNumber={company?.serviceNumbering?.nextNumber || 1}
+        onPrefixChange={setServicePrefix}
+        onSuffixChange={setServiceSuffix}
+        onOrderChange={setServiceOrder}
+      />
+
+
+
       {/* Terms and Conditions */}
       <Card>
         <CardHeader>
@@ -481,7 +507,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
             {errors.additionalNotes && (
               <p className="text-sm text-red-500">{errors.additionalNotes.message}</p>
 
-            
+
             )}
           </div>
         </CardContent>
@@ -517,7 +543,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       </Card>
 
 
-      
+
 
       {/* Form Actions */}
       <div className="flex justify-end gap-4">
