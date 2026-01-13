@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     // For static exported sites disable Next/Image optimization so files remain static.
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
