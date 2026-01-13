@@ -4,7 +4,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { FilterBar, ExportButton } from '@/components/shared';
@@ -17,11 +17,10 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { clientFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useClientsQuery, useCreateClientMutation, useUpdateClientMutation, useDeleteClientMutation } from '@/hooks/queries';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatClientsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
-import { clientsApi } from '@/lib/api/clients.api';
 import { useAuth } from '@/hooks/useAuth';
 import { TableSkeleton } from '@/components/shared/Skeletons';
 
@@ -30,7 +29,13 @@ type ClientFormData = z.infer<typeof clientFormSchema>;
 function ClientsContent() {
   const { user } = useAuth();
   const { selectedCompany } = useCompany();
-  const { clients, clientsLoading, refreshClients, deleteClient } = useAppData();
+
+  // React Query - replaces useAppData for clients
+  const { data: clients = [], isLoading: clientsLoading } = useClientsQuery(selectedCompany?.id);
+  const createClientMutation = useCreateClientMutation();
+  const updateClientMutation = useUpdateClientMutation();
+  const deleteClientMutation = useDeleteClientMutation();
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
@@ -81,14 +86,11 @@ function ClientsContent() {
     if (!selectedCompany) return;
 
     try {
-      // Clients are global in backend
       // Sanitize data to match backend expectations
       const clientData: any = {
         ...data,
-        companyId: selectedCompany.id, // Add companyId from context
-        // Company address is used as billing address
+        companyId: selectedCompany.id,
         billingAddress: data.address || undefined,
-        // Do NOT include shippingAddress from client form (shipping handled via invoices)
         bankDetails: data.bankDetails ? Object.fromEntries(
           Object.entries(data.bankDetails).filter(([, v]) => v != null)
         ) as any : undefined,
@@ -101,25 +103,21 @@ function ClientsContent() {
       };
 
       if (editingClient) {
-        // Update existing client using API
-        await clientsApi.update(editingClient.id, clientData);
-        toast.success('Client updated successfully');
+        // Update existing client using mutation
+        await updateClientMutation.mutateAsync({ id: editingClient.id, data: clientData });
       } else {
-        // Create new client using API
-        // Initialize empty shippingAddresses array for newly created clients
+        // Create new client using mutation
         clientData.shippingAddresses = [];
-        await clientsApi.create(clientData);
-        toast.success('Client created successfully');
+        await createClientMutation.mutateAsync(clientData);
       }
 
       handleCloseForm();
-      await refreshClients();
     } catch (error: any) {
       console.error('Error saving client:', error);
-      const errorMessage = error.response?.data?.detail 
-        ? (Array.isArray(error.response.data.detail) 
-            ? error.response.data.detail.map((e: any) => e.msg).join(', ') 
-            : error.response.data.detail)
+      const errorMessage = error.response?.data?.detail
+        ? (Array.isArray(error.response.data.detail)
+          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
+          : error.response.data.detail)
         : 'Failed to save client';
       toast.error(errorMessage);
       throw error;
@@ -127,15 +125,15 @@ function ClientsContent() {
   };
 
   const handleDelete = async () => {
-    if (!deletingClient) return;
+    if (!deletingClient || !selectedCompany) return;
 
     const clientToDelete = deletingClient;
     setDeletingClient(null);
 
     try {
-      await deleteClient(clientToDelete.id);
+      await deleteClientMutation.mutateAsync({ id: clientToDelete.id, companyId: selectedCompany.id });
     } catch (error) {
-      // Error handled in context
+      // Error handled in mutation
     }
   };
 
@@ -189,8 +187,8 @@ function ClientsContent() {
       </PageHeader>
 
       {/* Filter Bar */}
-      <FilterBar 
-        activeFilterCount={activeFilterCount} 
+      <FilterBar
+        activeFilterCount={activeFilterCount}
         onClearFilters={clearFilters}
         resultsCount={filteredClients.length}
         totalCount={clients.length}

@@ -6,13 +6,14 @@
  * Follows SOLID, KISS, DRY principles
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Info, Search, Filter, CheckCircle2, Clock, XCircle, PlayCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useMyTasksQuery, useAttendServiceMutation } from '@/hooks/queries';
 import { servicesApi } from '@/lib/api';
 import { Service, ServiceStatusType, ServiceType, ServiceAttendData } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -89,14 +90,11 @@ function MyTasksContent() {
     const { user } = useAuth();
 
     // State
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [attendOpen, setAttendOpen] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
 
     // Attend form state
     const [attendForm, setAttendForm] = useState<ServiceAttendData>({
@@ -107,31 +105,15 @@ function MyTasksContent() {
     const [proofDocumentUrl, setProofDocumentUrl] = useState('');
     const [createInvoiceAfterSolved, setCreateInvoiceAfterSolved] = useState(false);
 
-    // Load services assigned to current user
-    const loadServices = useCallback(async () => {
-        if (!selectedCompany?.id) {
-            setLoading(false);
-            return;
-        }
+    // React Query - replaces manual useState/useEffect fetching
+    const { data: services = [], isLoading: loading, refetch } = useMyTasksQuery(
+        selectedCompany?.id,
+        user?.id
+    );
 
-        setLoading(true);
-        try {
-            const data = await servicesApi.getAll(selectedCompany.id, {
-                assignedToMe: true,
-                status: statusFilter !== 'all' ? statusFilter : undefined,
-            });
-            setServices(data);
-        } catch (error) {
-            console.error('Error loading services:', error);
-            toast.error('Failed to load your tasks');
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedCompany?.id, statusFilter]);
-
-    useEffect(() => {
-        loadServices();
-    }, [loadServices]);
+    // Mutation for attending services
+    const attendMutation = useAttendServiceMutation();
+    const submitting = attendMutation.isPending;
 
     // Filtered services
     const filteredServices = services.filter((service) => {
@@ -161,7 +143,7 @@ function MyTasksContent() {
         setAttendOpen(true);
     };
 
-    // Submit attend form
+    // Submit attend form using mutation
     const handleSubmitAttend = async () => {
         if (!selectedService) return;
 
@@ -171,29 +153,27 @@ function MyTasksContent() {
             return;
         }
 
-        setSubmitting(true);
-        try {
-            const attendData: ServiceAttendData = {
-                ...attendForm,
-                proofDocumentUrl: proofDocumentUrl || undefined,
-            };
+        const attendData: ServiceAttendData = {
+            ...attendForm,
+            proofDocumentUrl: proofDocumentUrl || undefined,
+        };
 
-            await servicesApi.attend(selectedService.id, attendData);
-            toast.success(attendForm.isSolved ? 'Service marked as solved!' : 'Service status updated');
-
-            setAttendOpen(false);
-            loadServices();
-
-            // Redirect to invoice creation if selected
-            if (attendForm.isSolved && createInvoiceAfterSolved) {
-                router.push(`/invoices/invoices?createFor=${selectedService.id}`);
+        attendMutation.mutate(
+            { id: selectedService.id, data: attendData },
+            {
+                onSuccess: () => {
+                    setAttendOpen(false);
+                    // Redirect to invoice creation if selected
+                    if (attendForm.isSolved && createInvoiceAfterSolved) {
+                        router.push(`/invoices/invoices?createFor=${selectedService.id}`);
+                    }
+                },
+                onError: (error) => {
+                    console.error('Error attending service:', error);
+                    toast.error('Failed to update service');
+                },
             }
-        } catch (error) {
-            console.error('Error attending service:', error);
-            toast.error('Failed to update service');
-        } finally {
-            setSubmitting(false);
-        }
+        );
     };
 
     // Create invoice from resolved service
@@ -211,16 +191,13 @@ function MyTasksContent() {
             return;
         }
 
-        setSubmitting(true);
         try {
             const result = await servicesApi.createInvoice(service.id);
             toast.success(`Invoice ${result.invoiceNumber} created successfully!`);
-            loadServices(); // Refresh to show updated status
+            refetch(); // Refresh to show updated status
         } catch (error: any) {
             console.error('Error creating invoice:', error);
             toast.error(error.message || 'Failed to create invoice');
-        } finally {
-            setSubmitting(false);
         }
     };
 

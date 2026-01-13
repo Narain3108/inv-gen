@@ -34,15 +34,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
-import { useCompanies } from '@/hooks/useCompanies';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { useQuotationActions } from '@/hooks/useQuotationActions';
 import { DashboardLayout } from '@/components/layout';
-import { toast } from 'sonner';
-import { quotationsApi } from '@/lib/api/quotations.api';
-import { productsApi } from '@/lib/api/products.api';
-import { clientsApi } from '@/lib/api/clients.api';
 import { companiesApi } from '@/lib/api/companies.api';
+import { useQuotationsQuery, useProductsQuery, useClientsQuery } from '@/hooks/queries';
 import { QuotationPageHeader } from '@/components/pages/quotations';
 import { TableSkeleton } from '@/components/shared/Skeletons';
 
@@ -73,15 +69,16 @@ const createFilterConfig = (): FilterConfig<Quotation> => ({
 
 function QuotationsContent() {
   const { selectedCompany, setSelectedCompany } = useCompany();
-  const { companies, loading: companiesLoading, loadCompanies } = useCompanies();
+
+  // React Query for quotations, products, and clients
+  const { data: quotations = [], isLoading: quotationsLoading, refetch: refetchQuotations } = useQuotationsQuery(selectedCompany?.id);
+  const { data: products = [], isLoading: productsLoading } = useProductsQuery(selectedCompany?.id);
+  const { data: clients = [], isLoading: clientsLoading, refetch: refetchClients } = useClientsQuery(selectedCompany?.id);
+
+  const loading = quotationsLoading || productsLoading || clientsLoading;
 
   // Local state
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
-  const [initialized, setInitialized] = useState(false);
 
   // Filter hook
   const {
@@ -92,21 +89,12 @@ function QuotationsContent() {
     activeFilterCount,
   } = useFilters(quotations, createFilterConfig());
 
-  // Load companies on mount
+  // Set company when selectedCompany changes
   useEffect(() => {
-    const init = async () => {
-      await loadCompanies();
-      setInitialized(true);
-    };
-    init();
-  }, []);
-
-  // Auto-select first company
-  useEffect(() => {
-    if (initialized && !selectedCompany && companies.length > 0) {
-      setSelectedCompany(companies[0]);
+    if (selectedCompany) {
+      setCompany(selectedCompany);
     }
-  }, [companies, selectedCompany, initialized, setSelectedCompany]);
+  }, [selectedCompany]);
 
   // Reload company data
   const reloadCompanyData = React.useCallback(async () => {
@@ -120,92 +108,10 @@ function QuotationsContent() {
     }
   }, [selectedCompany, setSelectedCompany]);
 
-  // Pagination state
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const LIMIT = 50;
-
-  // Load initial data
-  const loadInitialData = React.useCallback(async () => {
-    if (!selectedCompany) return;
-
-    setLoading(true);
-    try {
-      // PERFORMANCE FIX: Use selectedCompany from context instead of refetching
-      // Also fetch related data in parallel
-      const [quotationsData, productsData, clientsData] = await Promise.all([
-        quotationsApi.getByCompanyId(selectedCompany.id, LIMIT, 0),
-        productsApi.getAll({ company_id: selectedCompany.id }),
-        clientsApi.getAll({ company_id: selectedCompany.id })
-      ]);
-
-      // Ensure company state is synced
-      setCompany(selectedCompany);
-
-      // Backend already sorts by createdAt DESC
-      setQuotations(quotationsData);
-      setProducts(productsData);
-      setClients(clientsData);
-
-      // Reset pagination state
-      setOffset(0);
-      setHasMore(quotationsData.length === LIMIT);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCompany, setSelectedCompany]);
-
-  // Load more quotations
-  const handleLoadMore = async () => {
-    if (!selectedCompany || loadingMore) return;
-
-    const newOffset = offset + LIMIT;
-    setLoadingMore(true);
-    try {
-      const moreQuotations = await quotationsApi.getByCompanyId(selectedCompany.id, LIMIT, newOffset);
-
-      if (moreQuotations.length > 0) {
-        setQuotations(prev => [...prev, ...moreQuotations]);
-        setOffset(newOffset);
-        setHasMore(moreQuotations.length === LIMIT);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more quotations:', error);
-      toast.error('Failed to load more quotations');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Refresh clients
-  const refreshClients = async () => {
-    if (!selectedCompany) return;
-    try {
-      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
-      setClients(clientsData);
-    } catch (error) {
-      console.error('Error refreshing clients:', error);
-    }
-  };
-
-  // Load data when company is ready
-  useEffect(() => {
-    if (!initialized) return;
-    if (companies.length === 0 && selectedCompany === null) return;
-
-    if (selectedCompany && companies.length > 0) {
-      const isValidCompany = companies.find(c => c.id === selectedCompany.id);
-      if (isValidCompany) {
-        loadInitialData();
-      }
-    }
-  }, [selectedCompany, initialized, companies, loadInitialData]);
+  // Refresh data function - triggers React Query refetch
+  const refreshData = React.useCallback(async () => {
+    await Promise.all([refetchQuotations(), refetchClients()]);
+  }, [refetchQuotations, refetchClients]);
 
   // Quotation actions hook
   const actions = useQuotationActions({
@@ -214,8 +120,8 @@ function QuotationsContent() {
     products,
     clients,
     quotations,
-    onQuotationsChange: setQuotations,
-    onRefreshData: loadInitialData,
+    onQuotationsChange: () => { },
+    onRefreshData: refreshData,
     reloadCompanyData,
     setCompany,
     setSelectedCompany,
@@ -275,41 +181,20 @@ function QuotationsContent() {
         />
       </FilterBar>
 
-      {/* Show skeleton when actively loading data for a selected company */}
+      {/* Quotations List */}
       {loading ? (
         <TableSkeleton />
       ) : (
-        <>
-          {/* Quotations List */}
-          <QuotationList
-            quotations={filteredQuotations}
-            clients={clients}
-            onEdit={actions.handleEditQuotation}
-            onDelete={actions.setDeleteQuotation}
-            onView={actions.handleViewQuotation}
-            onDownload={actions.handleDownloadQuotation}
-            onConvertToInvoice={actions.handleConvertToInvoice}
-            onUpdateStatus={actions.handleUpdateStatus}
-          />
-
-          {/* Pagination: Load More Button */}
-          {hasMore && !activeFilterCount && (
-            <div className="flex justify-center pt-4 pb-8">
-              <Button
-                variant="outline"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="w-full md:w-auto min-w-[200px]"
-              >
-                {loadingMore ? (
-                  <>Building quotation list...</>
-                ) : (
-                  <>Load More Quotations</>
-                )}
-              </Button>
-            </div>
-          )}
-        </>
+        <QuotationList
+          quotations={filteredQuotations}
+          clients={clients}
+          onEdit={actions.handleEditQuotation}
+          onDelete={actions.setDeleteQuotation}
+          onView={actions.handleViewQuotation}
+          onDownload={actions.handleDownloadQuotation}
+          onConvertToInvoice={actions.handleConvertToInvoice}
+          onUpdateStatus={actions.handleUpdateStatus}
+        />
       )}
 
       {/* Create/Edit Dialog */}
@@ -339,11 +224,7 @@ function QuotationsContent() {
             }}
             onClientAdded={(newClient) => {
               setTimeout(() => {
-                setClients(prev => {
-                  if (prev.find(c => c.id === newClient.id)) return prev;
-                  return [...prev, newClient];
-                });
-                refreshClients();
+                refetchClients();
               }, 0);
             }}
           />
@@ -419,7 +300,7 @@ function QuotationsContent() {
           onOpenChange={actions.setIsCustomizationDialogOpen}
           companyId={selectedCompany.id}
           type="quotation"
-          onSave={loadInitialData}
+          onSave={refreshData}
         />
       )}
     </div>

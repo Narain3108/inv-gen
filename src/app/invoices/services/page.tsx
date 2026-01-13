@@ -6,14 +6,13 @@
  * Follows SOLID, KISS, DRY principles
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Info, Search, Filter, CheckCircle2, Clock, XCircle, FileText, Users } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
-import { servicesApi } from '@/lib/api';
+import { useServicesQuery } from '@/hooks/queries';
 import { Service, ServiceStatusType, ServiceType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,12 +83,16 @@ function ServicesContent() {
     const { user } = useAuth();
 
     // State
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
+
+    // React Query - replaces manual useState/useEffect fetching
+    const { data: services = [], isLoading: loading, error } = useServicesQuery(
+        selectedCompany?.id,
+        statusFilter !== 'all' ? statusFilter : undefined
+    );
 
     // RBAC: Redirect employees
     useEffect(() => {
@@ -97,31 +100,6 @@ function ServicesContent() {
             router.push('/invoices/my-tasks');
         }
     }, [user, router]);
-
-    // Load services
-    const loadServices = useCallback(async () => {
-        if (!selectedCompany?.id) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const data = await servicesApi.getAll(selectedCompany.id, {
-                status: statusFilter !== 'all' ? statusFilter : undefined,
-            });
-            setServices(data);
-        } catch (error) {
-            console.error('Error loading services:', error);
-            toast.error('Failed to load services');
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedCompany?.id, statusFilter]);
-
-    useEffect(() => {
-        loadServices();
-    }, [loadServices]);
 
     // Filtered services
     const filteredServices = services.filter((service) => {

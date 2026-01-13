@@ -4,7 +4,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
 import { FilterBar, ExportButton } from '@/components/shared';
@@ -17,18 +17,23 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useProductsQuery, useCreateProductMutation, useUpdateProductMutation, useDeleteProductMutation } from '@/hooks/queries';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatProductsForExport } from '@/lib/utils/export-utils';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
-import { productsApi } from '@/lib/api/products.api';
 import { TableSkeleton } from '@/components/shared/Skeletons';
 
 type ProductFormData = z.infer<typeof productFormSchema>;
 
 function ProductsContent() {
   const { selectedCompany } = useCompany();
-  const { products, productsLoading, refreshProducts, deleteProduct } = useAppData();
+
+  // React Query - replaces useAppData for products
+  const { data: products = [], isLoading: productsLoading } = useProductsQuery(selectedCompany?.id);
+  const createProductMutation = useCreateProductMutation();
+  const updateProductMutation = useUpdateProductMutation();
+  const deleteProductMutation = useDeleteProductMutation();
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
@@ -58,20 +63,20 @@ function ProductsContent() {
   } = useFilters(products, filterConfig);
 
   if (productsLoading && products.length === 0) {
-      return (
-        <div className="space-y-6">
-          <PageHeader
-            title="Products & Services"
-            description="Manage your product inventory and services"
-          >
-            <Button disabled>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </PageHeader>
-          <TableSkeleton />
-        </div>
-      );
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Products & Services"
+          description="Manage your product inventory and services"
+        >
+          <Button disabled>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
+        </PageHeader>
+        <TableSkeleton />
+      </div>
+    );
   }
 
   const handleOpenForm = (product?: Product) => {
@@ -89,13 +94,11 @@ function ProductsContent() {
 
     try {
       // Filter out undefined values and null values
-      // Remove itemCode if it's empty or undefined
       const cleanData = { ...data };
       if (!cleanData.itemCode || cleanData.itemCode.trim() === '') {
         delete cleanData.itemCode;
       }
-      
-      // Remove null values and replace with undefined
+
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key as keyof typeof cleanData] === null) {
           delete cleanData[key as keyof typeof cleanData];
@@ -103,24 +106,18 @@ function ProductsContent() {
       });
 
       if (editingProduct) {
-        // Update existing product using API - don't send companyId
-        console.log('Updating product:', editingProduct.id, cleanData);
-        await productsApi.update(editingProduct.id, cleanData as Partial<Product>);
-        toast.success('Product updated successfully');
+        // Update existing product using mutation
+        await updateProductMutation.mutateAsync({ id: editingProduct.id, data: cleanData as Partial<Product> });
       } else {
-        // Create new product using API - include companyId
-        const productData: Partial<Product> = {
+        // Create new product using mutation
+        const productData = {
           ...cleanData,
           companyId: selectedCompany.id,
-        } as Partial<Product>;
-        console.log('Creating new product:', productData);
-        const newProduct = await productsApi.create(productData);
-        console.log('Created product with ID:', newProduct.id);
-        toast.success('Product created successfully');
+        } as Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
+        await createProductMutation.mutateAsync(productData);
       }
 
       handleCloseForm();
-      await refreshProducts();
     } catch (error) {
       console.error('Error saving product:', error);
       throw error;
@@ -128,15 +125,15 @@ function ProductsContent() {
   };
 
   const handleDelete = async () => {
-    if (!deletingProduct) return;
+    if (!deletingProduct || !selectedCompany) return;
 
     const productToDelete = deletingProduct;
     setDeletingProduct(null);
 
     try {
-      await deleteProduct(productToDelete.id);
+      await deleteProductMutation.mutateAsync({ id: productToDelete.id, companyId: selectedCompany.id });
     } catch (error) {
-      // Error handled in context
+      // Error handled in mutation
     }
   };
 
@@ -190,8 +187,8 @@ function ProductsContent() {
       </PageHeader>
 
       {/* Filter Bar */}
-      <FilterBar 
-        activeFilterCount={activeFilterCount} 
+      <FilterBar
+        activeFilterCount={activeFilterCount}
         onClearFilters={clearFilters}
         resultsCount={filteredProducts.length}
         totalCount={products.length}

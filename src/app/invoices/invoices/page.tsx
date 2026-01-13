@@ -13,10 +13,9 @@ import { FilterBar, PageHeader, ExportButton, ConfirmDialog } from '@/components
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils/export-utils';
-import { invoicesApi } from '@/lib/api/invoices.api';
-import { clientsApi } from '@/lib/api/clients.api';
 import { companiesApi } from '@/lib/api/companies.api';
 import { servicesApi } from '@/lib/api';
+import { useInvoicesQuery, useClientsQuery } from '@/hooks/queries';
 import {
   Dialog,
   DialogContent,
@@ -96,17 +95,20 @@ const createFilterConfig = (): FilterConfig<Invoice> => ({
 });
 
 function InvoicesContent() {
-  const { user } = useAuth(); // Add user auth check
+  const { user } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { companies, companiesInitialized, products } = useAppData();
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // React Query for invoices and clients
+  const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoicesQuery(selectedCompany?.id);
+  const { data: clients = [], isLoading: clientsLoading, refetch: refetchClients } = useClientsQuery(selectedCompany?.id);
+
+  const loading = invoicesLoading || clientsLoading;
+
   // Local state
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
   const [prefillData, setPrefillData] = useState<any>(null);
 
   // Filter hook
@@ -139,89 +141,10 @@ function InvoicesContent() {
     }
   }, [selectedCompany, setSelectedCompany]);
 
-  // Pagination state
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const LIMIT = 50;
-
-  // Load initial data
-  const loadInitialData = React.useCallback(async () => {
-    if (!selectedCompany) return;
-
-    setLoading(true);
-    try {
-      // Fetch fresh company data, FIRST PAGE of invoices, and all clients
-      const [invoicesData, clientsData] = await Promise.all([
-        invoicesApi.getByCompanyId(selectedCompany.id, LIMIT, 0),
-        clientsApi.getAll({ company_id: selectedCompany.id })
-      ]);
-
-      // Ensure company state is synced
-      setCompany(selectedCompany);
-
-      // Backend already sorts by createdAt DESC, so no need to sort here
-      setInvoices(invoicesData);
-      setClients(clientsData);
-
-      // Reset pagination state
-      setOffset(0);
-      setHasMore(invoicesData.length === LIMIT);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCompany]); // Removed setSelectedCompany from deps as it's not directly used here
-
-  // Load more invoices
-  const handleLoadMore = async () => {
-    if (!selectedCompany || loadingMore) return;
-
-    const newOffset = offset + LIMIT;
-    setLoadingMore(true);
-    try {
-      const moreInvoices = await invoicesApi.getByCompanyId(selectedCompany.id, LIMIT, newOffset);
-
-      if (moreInvoices.length > 0) {
-        setInvoices(prev => [...prev, ...moreInvoices]);
-        setOffset(newOffset);
-        setHasMore(moreInvoices.length === LIMIT);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more invoices:', error);
-      toast.error('Failed to load more invoices');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Refresh clients
-  const refreshClients = async () => {
-    if (!selectedCompany) return;
-    try {
-      const clientsData = await clientsApi.getAll({ company_id: selectedCompany.id });
-      setClients(clientsData);
-    } catch (error) {
-      console.error('Error refreshing clients:', error);
-    }
-  };
-
-  // Load invoices when company is ready
-  useEffect(() => {
-    if (!companiesInitialized) return;
-    if (companies.length === 0 && selectedCompany === null) return;
-
-    if (selectedCompany && companies.length > 0) {
-      const isValidCompany = companies.find(c => c.id === selectedCompany.id);
-      if (isValidCompany) {
-        loadInitialData(); // Changed from loadInvoices()
-      }
-    }
-  }, [selectedCompany, companiesInitialized, companies, loadInitialData]); // Changed loadInvoices to loadInitialData
+  // Refresh data function - now just triggers React Query refetch
+  const refreshData = React.useCallback(async () => {
+    await Promise.all([refetchInvoices(), refetchClients()]);
+  }, [refetchInvoices, refetchClients]);
 
   // Invoice actions hook
   const actions = useInvoiceActions({
@@ -230,9 +153,11 @@ function InvoicesContent() {
     products,
     clients,
     invoices,
-    onInvoicesChange: setInvoices,
-    onRefreshInvoices: loadInitialData, // Changed from loadInvoices
-    onRefreshClients: refreshClients,
+    onInvoicesChange: (newInvoices: Invoice[]) => {
+      // React Query handles state now, the hook will call refetch after mutations
+    },
+    onRefreshInvoices: refreshData,
+    onRefreshClients: async () => { await refetchClients(); },
     reloadCompanyData,
   });
 
@@ -247,10 +172,12 @@ function InvoicesContent() {
     return exportToCSV(data, `invoices-${new Date().toISOString().split('T')[0]}`);
   };
 
-  // Initial data load
+  // Load company data when selected
   useEffect(() => {
-    loadInitialData();
-  }, [selectedCompany?.id, loadInitialData]);
+    if (selectedCompany) {
+      setCompany(selectedCompany);
+    }
+  }, [selectedCompany]);
 
   // Handle createFor query param
   useEffect(() => {
@@ -281,7 +208,7 @@ function InvoicesContent() {
   }, [searchParams, selectedCompany, loading, clients, actions, router]);
 
   const handleInvoiceChange = async () => {
-    await loadInitialData();
+    await refreshData();
   };
 
   // Check for selected company first - prevents infinite loading when no company is selected
@@ -354,35 +281,15 @@ function InvoicesContent() {
       {loading ? (
         <TableSkeleton />
       ) : (
-        <>
-          <InvoiceList
-            invoices={filteredInvoices}
-            clients={clients}
-            onEdit={actions.handleEditInvoice}
-            onDelete={actions.setDeleteInvoice}
-            onView={actions.handleViewInvoice}
-            onDownload={actions.handleDownloadInvoice}
-            onPayment={actions.handleOpenPaymentDialog}
-          />
-
-          {/* Pagination: Load More Button */}
-          {hasMore && !activeFilterCount && (
-            <div className="flex justify-center pt-4 pb-8">
-              <Button
-                variant="outline"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="w-full md:w-auto min-w-[200px]"
-              >
-                {loadingMore ? (
-                  <>Building invoice list...</>
-                ) : (
-                  <>Load More Invoices</>
-                )}
-              </Button>
-            </div>
-          )}
-        </>
+        <InvoiceList
+          invoices={filteredInvoices}
+          clients={clients}
+          onEdit={actions.handleEditInvoice}
+          onDelete={actions.setDeleteInvoice}
+          onView={actions.handleViewInvoice}
+          onDownload={actions.handleDownloadInvoice}
+          onPayment={actions.handleOpenPaymentDialog}
+        />
       )}
 
       {/* Add/Edit Dialog */}
@@ -412,11 +319,7 @@ function InvoicesContent() {
               prefillData={prefillData}
               onClientAdded={(newClient) => {
                 setTimeout(() => {
-                  setClients(prev => {
-                    if (prev.find(c => c.id === newClient.id)) return prev;
-                    return [...prev, newClient];
-                  });
-                  refreshClients();
+                  refetchClients();
                 }, 0);
               }}
             />
@@ -456,7 +359,7 @@ function InvoicesContent() {
           onOpenChange={actions.setIsCustomizationDialogOpen}
           companyId={selectedCompany.id}
           type="invoice"
-          onSave={loadInitialData}
+          onSave={refreshData}
         />
       )}
 
@@ -477,3 +380,4 @@ export default function InvoicesPage() {
     </DashboardLayout>
   );
 }
+

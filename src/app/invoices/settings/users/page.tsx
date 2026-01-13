@@ -7,6 +7,7 @@ import { usersApi } from '@/lib/api/users.api';
 import { useCompany } from '@/hooks/useCompany';
 import { DashboardLayout } from '@/components/layout';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useUsersQuery, useCreateUserMutation, useUpdateUserMutation } from '@/hooks/queries';
 import { User } from '@/types';
 import { UserList } from '@/components/settings/UserList';
 import { UserForm } from '@/components/settings/UserForm';
@@ -39,8 +40,14 @@ export default function UsersPage() {
   const router = useRouter();
   const { selectedCompany } = useCompany();
   const { companies, companiesLoading } = useAppData();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // React Query for users
+  const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = useUsersQuery();
+  const createUserMutation = useCreateUserMutation();
+  const updateUserMutation = useUpdateUserMutation();
+
+  const loading = usersLoading;
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
@@ -55,25 +62,9 @@ export default function UsersPage() {
       if (currentUser.role !== 'super_admin' && currentUser.role !== 'admin') {
         toast.error('Unauthorized access');
         router.push('/invoices/dashboard');
-        return;
       }
-      fetchUsers();
     }
   }, [currentUser, authLoading, router]);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      // Backend implements RBAC-aware filtering for the requesting user
-      const data = await usersApi.getAll();
-      setUsers(data);
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
-      toast.error('Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateUser = () => {
     setSelectedUser(undefined);
@@ -95,21 +86,23 @@ export default function UsersPage() {
   };
 
   const handleRefresh = () => {
-    fetchUsers();
+    refetchUsers();
     toast.info('User list refreshed');
   };
 
   const handleFormSubmit = async (data: any) => {
     try {
       if (selectedUser) {
-        await usersApi.update(selectedUser.id, {
-          name: data.name,
-          role: currentUser?.role === 'admin' ? 'employee' : data.role,
-          allowedCompanyIds: currentUser?.role === 'admin'
-            ? (data.allowedCompanyIds || []).filter((c: string) => (currentUser.allowedCompanyIds || []).includes(c))
-            : data.allowedCompanyIds,
+        await updateUserMutation.mutateAsync({
+          id: selectedUser.id,
+          data: {
+            name: data.name,
+            role: currentUser?.role === 'admin' ? 'employee' : data.role,
+            allowedCompanyIds: currentUser?.role === 'admin'
+              ? (data.allowedCompanyIds || []).filter((c: string) => (currentUser.allowedCompanyIds || []).includes(c))
+              : data.allowedCompanyIds,
+          },
         });
-        toast.success('User updated successfully');
       } else {
         if (!data.password) {
           toast.error('Password is required for new users');
@@ -126,14 +119,12 @@ export default function UsersPage() {
             : data.allowedCompanyIds,
           organizationId: currentUser?.organizationId,
         };
-        await usersApi.create(payload);
-        toast.success('User created successfully');
+        await createUserMutation.mutateAsync(payload);
       }
       setIsDialogOpen(false);
-      fetchUsers();
     } catch (error: any) {
       console.error('Operation failed:', error);
-      toast.error(error.message || 'Operation failed');
+      // Error already shown by mutations
     }
   };
 

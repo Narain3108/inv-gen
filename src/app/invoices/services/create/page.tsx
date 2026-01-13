@@ -10,11 +10,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { servicesApi, clientsApi } from '@/lib/api';
 import { usersApi } from '@/lib/api/users.api';
+import { queryKeys } from '@/lib/query';
 import { ServiceFormData, ServiceType, Client, User, Address } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +53,7 @@ function CreateServiceContent() {
     const router = useRouter();
     const { selectedCompany } = useCompany();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
 
     // Data state
     const [clients, setClients] = useState<Client[]>([]);
@@ -147,6 +150,12 @@ function CreateServiceContent() {
             });
 
             toast.success('Service created successfully!');
+
+            // Invalidate the services cache so the list updates immediately
+            queryClient.invalidateQueries({ queryKey: queryKeys.services.byCompany(selectedCompany.id) });
+            // Also invalidate myTasks since the new service might be assigned to employees
+            queryClient.invalidateQueries({ queryKey: ['services', 'my-tasks', selectedCompany.id] });
+
             router.push('/invoices/services');
         } catch (error) {
             console.error('Error creating service:', error);

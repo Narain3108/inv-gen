@@ -4,10 +4,9 @@
  * Following Single Responsibility Principle
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Invoice, Quotation, Product, Client, Company } from '@/types';
-import { invoicesApi } from '@/lib/api/invoices.api';
-import { quotationsApi } from '@/lib/api/quotations.api';
+import { useInvoicesQuery, useQuotationsQuery } from '@/hooks/queries';
 import { toast } from 'sonner';
 
 export type TimeFilter = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
@@ -103,60 +102,46 @@ export function useDashboardData({
     products,
 }: UseDashboardDataConfig): UseDashboardDataReturn {
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [quotations, setQuotations] = useState<Quotation[]>([]);
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Load data function
-    const loadData = useCallback(async () => {
-        if (!selectedCompany) return;
+    // React Query for invoices and quotations
+    const {
+        data: rawInvoices = [],
+        isLoading: invoicesLoading,
+        refetch: refetchInvoices
+    } = useInvoicesQuery(selectedCompany?.id);
 
-        if (companiesInitialized) {
-            const isValidCompany = companies.find(c => c.id === selectedCompany.id);
-            if (!isValidCompany) {
-                console.log('⚠️ Skipping dashboard load - selected company not in user list');
-                return;
-            }
-        } else {
-            return;
-        }
+    const {
+        data: rawQuotations = [],
+        isLoading: quotationsLoading,
+        refetch: refetchQuotations
+    } = useQuotationsQuery(selectedCompany?.id);
 
-        try {
-            setLoading(true);
-            const [invoicesData, quotationsData] = await Promise.all([
-                invoicesApi.getByCompanyId(selectedCompany.id),
-                quotationsApi.getByCompanyId(selectedCompany.id)
-            ]);
+    // Normalize invoices
+    const invoices = useMemo(() =>
+        (rawInvoices || []).map(normalizeInvoice),
+        [rawInvoices]
+    );
 
-            const normalizedInvoices = (invoicesData || []).map(normalizeInvoice);
-            const normalizedQuotations = (quotationsData || []).map((q: any) => ({ ...q }));
+    const quotations = useMemo(() =>
+        (rawQuotations || []).map((q: any) => ({ ...q })),
+        [rawQuotations]
+    );
 
-            setInvoices(normalizedInvoices);
-            setQuotations(normalizedQuotations);
-        } catch (error) {
-            console.error('Error loading dashboard data:', error);
-            setInvoices([]);
-            setQuotations([]);
-            toast.error('Failed to load dashboard data');
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedCompany, companiesInitialized, companies]);
-
-    // Load on mount and company change
-    useEffect(() => {
-        if (!selectedCompany || !companiesInitialized) return;
-        loadData();
-    }, [selectedCompany, companiesInitialized, loadData]);
+    const loading = invoicesLoading || quotationsLoading;
 
     // Refresh handler
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadData();
+        await Promise.all([refetchInvoices(), refetchQuotations()]);
         setRefreshing(false);
         toast.success('Dashboard refreshed');
-    }, [loadData]);
+    }, [refetchInvoices, refetchQuotations]);
+
+    // Load data function (for compatibility with existing interface)
+    const loadData = useCallback(async () => {
+        await Promise.all([refetchInvoices(), refetchQuotations()]);
+    }, [refetchInvoices, refetchQuotations]);
 
     // Filter data based on time period
     const getFilteredData = useCallback(<T extends { createdAt?: any; date?: any; created_at?: any }>(

@@ -14,3 +14,4 @@ export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary';
 export { default as Splash } from './Splash';
 export { SearchableClientDropdown } from './SearchableClientDropdown';
 export { SearchableProductDropdown } from './SearchableProductDropdown';
+export { PrefetchableLink } from './PrefetchableLink';
