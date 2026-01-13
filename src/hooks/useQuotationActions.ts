@@ -12,7 +12,7 @@ import { invoicesApi } from '@/lib/api/invoices.api';
 import { companiesApi } from '@/lib/api/companies.api';
 import { loadCustomization } from '@/lib/services/customization-service';
 import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
-import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
+import { generateQuotationNumber, generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { toast } from 'sonner';
 
@@ -226,16 +226,49 @@ export function useQuotationActions({
             const currentCompany = await companiesApi.getById(selectedCompany.id);
             setCompany(currentCompany);
             setSelectedCompany(currentCompany);
-        } catch (e) {
-            console.error("Failed to reload company data", e);
-        }
 
-        try {
-            const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
-            setInvoiceNumber(invoice_number);
+            // Count-based numbering: Get total invoices and use count + 1 as next number
+            let suggestedNumber = '';
+            try {
+                // Fetch invoices to count them (using a high limit to get all)
+                const allInvoices = await invoicesApi.getAll({
+                    company_id: selectedCompany.id,
+                    limit: 100
+                });
+
+                const totalCount = allInvoices.length;
+                const nextSequence = totalCount + 1;
+
+                // Generate formatted number using company config
+                // We pass totalCount to get count + 1 as the sequence
+                // Override nextNumber in config to ensure our calculated sequence is used
+                const tempCompany = {
+                    ...currentCompany,
+                    invoiceNumbering: {
+                        ...currentCompany.invoiceNumbering,
+                        nextNumber: nextSequence  // Force our calculated sequence
+                    }
+                };
+                suggestedNumber = generateInvoiceNumber(tempCompany, 0); // count 0 forces use of nextNumber
+
+                console.log('📊 Count-based numbering:', { totalCount, nextSequence, suggestedNumber });
+            } catch (e) {
+                console.error("Failed to count invoices:", e);
+                // Fallback to backend generated number
+                try {
+                    const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
+                    suggestedNumber = invoice_number;
+                } catch (fallbackError) {
+                    console.error("Fallback number generation also failed:", fallbackError);
+                    suggestedNumber = '';
+                }
+            }
+
+            setInvoiceNumber(suggestedNumber);
+
         } catch (e) {
-            console.error("Failed to generate invoice number", e);
-            toast.error("Failed to generate invoice number");
+            console.error("Failed to prepare conversion", e);
+            toast.error("Failed to prepare conversion");
         }
 
         setConvertingQuotation(quotation);
@@ -284,6 +317,30 @@ export function useQuotationActions({
             };
 
             const newInvoice = await invoicesApi.create(invoiceData);
+
+            // Update company invoice numbering counter to ensure next number is correct
+            if (selectedCompany.invoiceNumbering) {
+                try {
+                    // Try to extract number from the used invoice number to auto-advance correctly (e.g. INV-034 -> 35)
+                    // This handles cases where user manually corrected the number
+                    const match = invoiceNumber.trim().match(/(\d+)$/);
+                    let newNextNumber = (selectedCompany.invoiceNumbering.nextNumber || 1) + 1;
+
+                    if (match) {
+                        const currentNum = parseInt(match[0], 10);
+                        if (!isNaN(currentNum)) {
+                            newNextNumber = currentNum + 1;
+                        }
+                    }
+
+                    await companiesApi.update(selectedCompany.id, {
+                        invoiceNumbering: { ...selectedCompany.invoiceNumbering, nextNumber: newNextNumber },
+                    });
+                } catch (err) {
+                    console.error("Failed to update invoice numbering:", err);
+                    // Don't block the UI flow for this, as invoice is already created
+                }
+            }
 
             await quotationsApi.partialUpdate(convertingQuotation.id, {
                 status: 'converted' as QuotationStatus,

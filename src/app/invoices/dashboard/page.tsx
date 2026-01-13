@@ -187,7 +187,7 @@ function DashboardContent() {
 
       {/* Service & Performance Widgets */}
       <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-        <ServiceOverviewWidget companyId={selectedCompany.id} />
+        {/* <ServiceOverviewWidget companyId={selectedCompany.id} /> */}
 
       </div>
 

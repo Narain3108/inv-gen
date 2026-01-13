@@ -1,30 +1,28 @@
-/**
- * Invoice Customization Dialog
- * Allows users to customize invoice layout and format
- * Refactored to use separate tab components and useCustomization hook
- */
-
-'use client';
-
 import React from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, Settings, Save, RotateCcw } from 'lucide-react';
 import { useCustomization } from '@/hooks/useCustomization';
-import {
-  HeaderTab,
-  AddressesTab,
-  ColumnsTab,
-  TotalsTab,
-  FooterTab,
-  LayoutTab,
-} from '@/components/customization';
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import HeaderTab from '../customization/HeaderTab';
+import FooterTab from '../customization/FooterTab';
+
+import { Company } from '@/types';
 
 interface CustomizationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId: string;
+  company?: Company; // Add company prop
   type: 'invoice' | 'quotation';
   onSave?: () => void;
 }
@@ -33,6 +31,7 @@ export function CustomizationDialog({
   open,
   onOpenChange,
   companyId,
+  company,
   type,
   onSave,
 }: CustomizationDialogProps) {
@@ -41,12 +40,11 @@ export function CustomizationDialog({
     loading,
     saving,
     updateCustomization,
-    handleColumnToggle,
-    handleColumnReorder,
     handleSave,
     handleReset,
   } = useCustomization({
     companyId,
+    company, // Pass company to hook
     type,
     open,
     onSave,
@@ -56,7 +54,7 @@ export function CustomizationDialog({
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-md">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
@@ -67,29 +65,26 @@ export function CustomizationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Customize {type === 'invoice' ? 'Invoice' : 'Quotation'}
+            Customize Bill
           </DialogTitle>
           <DialogDescription>
-            Customize the layout and format of your {type === 'invoice' ? 'invoices' : 'quotations'}
+            Configure the layout and content for your {type === 'invoice' ? 'invoice' : 'quotation'}.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="header" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="header">Header</TabsTrigger>
-            <TabsTrigger value="addresses">Addresses</TabsTrigger>
-            <TabsTrigger value="columns">Columns</TabsTrigger>
-            <TabsTrigger value="totals">Totals</TabsTrigger>
-            <TabsTrigger value="footer">Footer</TabsTrigger>
-            <TabsTrigger value="layout">Layout</TabsTrigger>
-          </TabsList>
+        <div className="py-2">
+          <Tabs defaultValue="header" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="header">Header</TabsTrigger>
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="footer">Footer</TabsTrigger>
+            </TabsList>
 
-          <div className="flex-1 overflow-y-auto mt-4 pr-2">
-            <TabsContent value="header" className="mt-0">
+            <TabsContent value="header" className="py-4">
               <HeaderTab
                 customization={customization}
                 type={type}
@@ -97,49 +92,40 @@ export function CustomizationDialog({
               />
             </TabsContent>
 
-            <TabsContent value="addresses" className="mt-0">
-              <AddressesTab
-                customization={customization}
-                onUpdate={updateCustomization}
-              />
+            <TabsContent value="general" className="py-4 space-y-4">
+              <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <label
+                    htmlFor="show-discount"
+                    className="text-base font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Show Discount Column
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Enable to display the discount column in the items table.
+                  </p>
+                </div>
+                <Switch
+                  id="show-discount"
+                  checked={customization.table.showDiscount}
+                  onCheckedChange={(checked) => updateCustomization('table.showDiscount', checked)}
+                />
+              </div>
             </TabsContent>
 
-            <TabsContent value="columns" className="mt-0">
-              <ColumnsTab
-                customization={customization}
-                onUpdate={updateCustomization}
-                onColumnToggle={handleColumnToggle}
-                onColumnReorder={handleColumnReorder}
-              />
-            </TabsContent>
-
-            <TabsContent value="totals" className="mt-0">
-              <TotalsTab
-                customization={customization}
-                onUpdate={updateCustomization}
-              />
-            </TabsContent>
-
-            <TabsContent value="footer" className="mt-0">
+            <TabsContent value="footer" className="py-4">
               <FooterTab
                 customization={customization}
                 onUpdate={updateCustomization}
               />
             </TabsContent>
+          </Tabs>
+        </div>
 
-            <TabsContent value="layout" className="mt-0">
-              <LayoutTab
-                customization={customization}
-                onUpdate={updateCustomization}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
-
-        <div className="flex items-center justify-between pt-4 border-t">
-          <Button variant="outline" onClick={handleReset}>
+        <DialogFooter className="gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" onClick={handleReset} className="mr-auto">
             <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Default
+            Reset
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -148,10 +134,10 @@ export function CustomizationDialog({
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Save className="h-4 w-4 mr-2" />
-              Save Customization
+              Save
             </Button>
           </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

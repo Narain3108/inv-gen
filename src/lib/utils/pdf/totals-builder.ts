@@ -15,12 +15,10 @@ export const buildTotalsSection = (
   data: Invoice | Quotation,
   customization?: InvoiceCustomization
 ): any[] => {
-  const showTaxable = customization?.totals?.showTaxableAmount !== false;
-  const showCGST = customization?.totals?.showCGST !== false;
-  const showSGST = customization?.totals?.showSGST !== false;
-  const showIGST = customization?.totals?.showIGST !== false;
-  const showAmountInWords = customization?.totals?.showAmountInWords !== false;
+  // Fixed Layout: Always show standard tax fields
   const showGSTBreakdown = customization?.totals?.showGSTBreakdown !== false;
+  // Always show Amount in Words
+  const showAmountInWords = true;
 
   // If GST breakdown is enabled and available, show detailed breakdown
   if (showGSTBreakdown && data.taxBreakdown && data.taxBreakdown.length > 0) {
@@ -49,19 +47,22 @@ export const buildTotalsSection = (
           table: {
             widths: ['*', 80],
             body: [
-              ...(showTaxable ? [[
-                { text: 'Taxable Amount:', fontSize: 8, alignment: 'center' },
-                { text: safeCurrency(data.taxableAmount), fontSize: 8, alignment: 'center' },
-              ]] : []),
-              ...(showCGST && data.cgst > 0 ? [[
+              // Always show Taxable Amount
+              [{
+                text: 'Taxable Amount:', fontSize: 8, alignment: 'center'
+              },
+              { text: safeCurrency(data.taxableAmount), fontSize: 8, alignment: 'center' }],
+
+              // Show taxes if > 0
+              ...(data.cgst > 0 ? [[
                 { text: 'CGST:', fontSize: 8, alignment: 'center' },
                 { text: safeCurrency(data.cgst), fontSize: 8, alignment: 'center' },
               ]] : []),
-              ...(showSGST && data.sgst > 0 ? [[
+              ...(data.sgst > 0 ? [[
                 { text: 'SGST:', fontSize: 8, alignment: 'center' },
                 { text: safeCurrency(data.sgst), fontSize: 8, alignment: 'center' },
               ]] : []),
-              ...(showIGST && data.igst > 0 ? [[
+              ...(data.igst > 0 ? [[
                 { text: 'IGST:', fontSize: 8, alignment: 'center' },
                 { text: safeCurrency(data.igst), fontSize: 8, alignment: 'center' },
               ]] : []),

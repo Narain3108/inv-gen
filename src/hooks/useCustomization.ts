@@ -9,8 +9,11 @@ import { InvoiceCustomization, DEFAULT_INVOICE_CUSTOMIZATION, DEFAULT_QUOTATION_
 import { customizationsApi } from '@/lib/api/customizations.api';
 import { toast } from 'sonner';
 
+import { Company } from '@/types';
+
 interface UseCustomizationConfig {
     companyId: string;
+    company?: Company;
     type: 'invoice' | 'quotation';
     open: boolean;
     onSave?: () => void;
@@ -30,12 +33,22 @@ interface UseCustomizationReturn {
 
 export function useCustomization({
     companyId,
+    company,
     type,
     open,
     onSave,
     onClose,
 }: UseCustomizationConfig): UseCustomizationReturn {
-    const defaults = type === 'invoice' ? DEFAULT_INVOICE_CUSTOMIZATION : DEFAULT_QUOTATION_CUSTOMIZATION;
+    const baseDefaults = type === 'invoice' ? DEFAULT_INVOICE_CUSTOMIZATION : DEFAULT_QUOTATION_CUSTOMIZATION;
+
+    // Merge company-specific text into defaults
+    const defaults = {
+        ...baseDefaults,
+        footer: {
+            ...baseDefaults.footer,
+            termsText: company?.termsAndConditions || baseDefaults.footer.termsText,
+        }
+    };
 
     const [customization, setCustomization] = useState<InvoiceCustomization>({
         ...defaults,
@@ -49,7 +62,7 @@ export function useCustomization({
         if (open && companyId) {
             loadCustomization();
         }
-    }, [open, companyId, type]);
+    }, [open, companyId, type, company]); // Reload if company data changes
 
     const loadCustomization = async () => {
         setLoading(true);
@@ -57,6 +70,12 @@ export function useCustomization({
             const data = await customizationsApi.getByCompanyId(companyId, type);
 
             if (data && data.id !== 'default') {
+                // Sanitize legacy defaults: If the loaded text matches the old hardcoded string, use company data instead
+                const legacyTermMatch = data.footer?.termsText?.includes('Due within 30 days') || data.footer?.termsText?.includes('1.5% monthly interest');
+                const termsText = legacyTermMatch && company?.termsAndConditions
+                    ? company.termsAndConditions
+                    : (data.footer?.termsText !== undefined ? data.footer?.termsText : defaults.footer.termsText);
+
                 setCustomization({
                     ...defaults,
                     ...data,
@@ -65,7 +84,11 @@ export function useCustomization({
                     addresses: { ...defaults.addresses, ...(data.addresses || {}) },
                     table: { ...defaults.table, ...(data.table || {}) },
                     totals: { ...defaults.totals, ...(data.totals || {}) },
-                    footer: { ...defaults.footer, ...(data.footer || {}) },
+                    footer: {
+                        ...defaults.footer,
+                        ...(data.footer || {}),
+                        termsText // Use sanitized terms
+                    },
                     colorScheme: { ...defaults.colorScheme, ...(data.colorScheme || {}) },
                     margins: { ...defaults.margins, ...(data.margins || {}) },
                     companyId,

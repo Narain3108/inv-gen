@@ -84,7 +84,7 @@ export interface InvoiceCustomization {
   id?: string;
   companyId: string;
   type: 'invoice' | 'quotation';
-  
+
   // Layout settings
   pageSize: 'A4' | 'Letter';
   orientation: 'portrait' | 'landscape';
@@ -145,7 +145,7 @@ export const DEFAULT_INVOICE_CUSTOMIZATION: Omit<InvoiceCustomization, 'id' | 'c
   pageSize: 'A4',
   orientation: 'portrait',
   margins: { top: 60, right: 40, bottom: 60, left: 40 },
-  
+
   companyDetails: {
     showLogo: true,
     showName: true,
@@ -207,7 +207,7 @@ export const DEFAULT_INVOICE_CUSTOMIZATION: Omit<InvoiceCustomization, 'id' | 'c
 
   footer: {
     showTermsAndConditions: true,
-    termsText: 'Payment terms: Due within 30 days\nLate payments subject to 1.5% monthly interest',
+    termsText: '',
     showSignature: true,
     signatureLabel: 'Authorized Signatory',
     showSeal: false,
@@ -238,7 +238,7 @@ export const DEFAULT_QUOTATION_CUSTOMIZATION: Omit<InvoiceCustomization, 'id' | 
   },
   footer: {
     ...DEFAULT_INVOICE_CUSTOMIZATION.footer,
-    termsText: 'This quotation is valid for 30 days from the date of issue.\\nPrices are subject to change without notice.',
+    termsText: '', // Will be populated from Company settings
     thankYouText: 'We look forward to serving you!',
   },
   totals: {

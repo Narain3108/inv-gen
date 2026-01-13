@@ -61,14 +61,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Search Bar - Hidden on small mobile */}
-      <div className="hidden sm:flex flex-1 max-w-md relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input 
-          placeholder="Search..." 
-          className="pl-10 bg-muted/30 border-border/50 focus-visible:ring-primary/50 transition-all"
-        />
-      </div>
+
 
       {/* Spacer for mobile */}
       <div className="flex-1 sm:hidden" />
@@ -76,17 +69,9 @@ export function Header({ onMenuClick, className }: HeaderProps) {
       {/* Actions */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
         {/* Search Button - Mobile Only */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="sm:hidden shrink-0 hover:bg-primary/10 transition-colors"
-          aria-label="Search"
-        >
-          <Search className="h-5 w-5" />
-        </Button>
+
 
         {/* Theme Toggle */}
-        <ThemeToggle className="shrink-0" />
 
         {/* Profile Avatar */}
         <Button

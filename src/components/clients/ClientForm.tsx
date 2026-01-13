@@ -106,12 +106,12 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
   const handleFormSubmit = async (data: ClientFormData) => {
     console.log('Form submitted with data:', data);
     console.log('Form errors:', errors);
-    
+
     setIsLoading(true);
     try {
       // Company address acts as the billing address. Always copy primary address
       data.billingAddress = data.address;
-      
+
       // Ensure backend gets an empty shippingAddresses array for new clients
       if (!client) {
         // @ts-ignore - shippingAddresses may not be defined in the form type
@@ -132,7 +132,13 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
   type TabKey = typeof tabsOrder[number];
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
 
-  const goToNext = async () => {
+  const goToNext = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+    // Explicitly prevent any form submission behavior
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
     // Validate fields relevant to the current tab before moving
     const fieldsForTab: Record<TabKey, string[]> = {
       basic: ['clientName', 'gstin', 'pan'],
@@ -151,6 +157,17 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
     const idx = tabsOrder.indexOf(activeTab);
     if (idx >= 0 && idx < tabsOrder.length - 1) {
       setActiveTab(tabsOrder[idx + 1]);
+    }
+  };
+
+  const goBack = (event?: React.MouseEvent<HTMLButtonElement>) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const idx = tabsOrder.indexOf(activeTab);
+    if (idx > 0) {
+      setActiveTab(tabsOrder[idx - 1]);
     }
   };
 
@@ -178,7 +195,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
           </ul>
         </div>
       )}
-      
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
         <TabsList>
           <TabsTrigger value="basic">Basic</TabsTrigger>
@@ -189,121 +206,121 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
 
         <TabsContent value="basic">
           <Card>
-        <CardHeader>
-          <CardTitle>Client Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* GSTIN (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="gstin">GSTIN (Optional)</Label>
-            <div className="flex gap-2">
-              <Input
-                id="gstin"
-                {...register('gstin')}
-                placeholder="22AAAAA0000A1Z5"
-                maxLength={15}
-                autoComplete="off"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleFetchGSTIN}
-                disabled={isFetchingGSTIN || !gstin}
-              >
-                {isFetchingGSTIN ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
+            <CardHeader>
+              <CardTitle>Client Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* GSTIN (Optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="gstin">GSTIN (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="gstin"
+                    {...register('gstin')}
+                    placeholder="22AAAAA0000A1Z5"
+                    maxLength={15}
+                    autoComplete="off"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleFetchGSTIN}
+                    disabled={isFetchingGSTIN || !gstin}
+                  >
+                    {isFetchingGSTIN ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Leave empty for unregistered clients or B2C customers
+                </p>
+                {errors.gstin && (
+                  <p className="text-sm text-red-500">{errors.gstin.message}</p>
                 )}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Leave empty for unregistered clients or B2C customers
-            </p>
-            {errors.gstin && (
-              <p className="text-sm text-red-500">{errors.gstin.message}</p>
-            )}
-          </div>
+              </div>
 
-          {/* Client Name */}
-          <div className="space-y-2">
-            <Label htmlFor="clientName">Client Name *</Label>
-            <Input
-              id="clientName"
-              {...register('clientName')}
-              placeholder="Enter client name"
-              autoComplete="off"
-            />
-            {errors.clientName && (
-              <p className="text-sm text-red-500">{errors.clientName.message}</p>
-            )}
-          </div>
+              {/* Client Name */}
+              <div className="space-y-2">
+                <Label htmlFor="clientName">Client Name *</Label>
+                <Input
+                  id="clientName"
+                  {...register('clientName')}
+                  placeholder="Enter client name"
+                  autoComplete="off"
+                />
+                {errors.clientName && (
+                  <p className="text-sm text-red-500">{errors.clientName.message}</p>
+                )}
+              </div>
 
-          {/* PAN (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="pan">PAN (Optional)</Label>
-            <Input
-              id="pan"
-              {...register('pan')}
-              placeholder="AAAAA0000A"
-              maxLength={10}
-            />
-            {errors.pan && (
-              <p className="text-sm text-red-500">{errors.pan.message}</p>
-            )}
-          </div>
-        </CardContent>
+              {/* PAN (Optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="pan">PAN (Optional)</Label>
+                <Input
+                  id="pan"
+                  {...register('pan')}
+                  placeholder="AAAAA0000A"
+                  maxLength={10}
+                />
+                {errors.pan && (
+                  <p className="text-sm text-red-500">{errors.pan.message}</p>
+                )}
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="contact">
           <Card>
-        <CardHeader>
-          <CardTitle>Contact Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Phone */}
-          <div className="space-y-2">
-            <Label htmlFor="contact.phone">Phone *</Label>
-            <Input
-              id="contact.phone"
-              {...register('contact.phone')}
-              placeholder="+91 98765 43210"
-              autoComplete="off"
-            />
-            {errors.contact?.phone && (
-              <p className="text-sm text-red-500">{errors.contact.phone.message}</p>
-            )}
-          </div>
+            <CardHeader>
+              <CardTitle>Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="contact.phone">Phone *</Label>
+                <Input
+                  id="contact.phone"
+                  {...register('contact.phone')}
+                  placeholder="+91 98765 43210"
+                  autoComplete="off"
+                />
+                {errors.contact?.phone && (
+                  <p className="text-sm text-red-500">{errors.contact.phone.message}</p>
+                )}
+              </div>
 
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="contact.email">Email *</Label>
-            <Input
-              id="contact.email"
-              type="email"
-              {...register('contact.email')}
-              placeholder="client@example.com"
-              autoComplete="off"
-            />
-            {errors.contact?.email && (
-              <p className="text-sm text-red-500">{errors.contact.email.message}</p>
-            )}
-          </div>
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="contact.email">Email *</Label>
+                <Input
+                  id="contact.email"
+                  type="email"
+                  {...register('contact.email')}
+                  placeholder="client@example.com"
+                  autoComplete="off"
+                />
+                {errors.contact?.email && (
+                  <p className="text-sm text-red-500">{errors.contact.email.message}</p>
+                )}
+              </div>
 
-          {/* Website (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="contact.website">Website (Optional)</Label>
-            <Input
-              id="contact.website"
-              {...register('contact.website')}
-              placeholder="https://example.com"
-            />
-            {errors.contact?.website && (
-              <p className="text-sm text-red-500">{errors.contact.website.message}</p>
-            )}
-          </div>
-        </CardContent>
+              {/* Website (Optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="contact.website">Website (Optional)</Label>
+                <Input
+                  id="contact.website"
+                  {...register('contact.website')}
+                  placeholder="https://example.com"
+                />
+                {errors.contact?.website && (
+                  <p className="text-sm text-red-500">{errors.contact.website.message}</p>
+                )}
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -313,173 +330,182 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               <CardTitle>Address</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-          {/* Street */}
-          <div className="space-y-2">
-            <Label htmlFor="address.street">Street Address *</Label>
-            <Textarea
-              id="address.street"
-              {...register('address.street')}
-              placeholder="Building, Street, Area"
-              rows={2}
-            />
-            {errors.address?.street && (
-              <p className="text-sm text-red-500">{errors.address.street.message}</p>
-            )}
-          </div>
+              {/* Street */}
+              <div className="space-y-2">
+                <Label htmlFor="address.street">Street Address *</Label>
+                <Textarea
+                  id="address.street"
+                  {...register('address.street')}
+                  placeholder="Building, Street, Area"
+                  rows={2}
+                />
+                {errors.address?.street && (
+                  <p className="text-sm text-red-500">{errors.address.street.message}</p>
+                )}
+              </div>
 
-          {/* City and State */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="address.city">City *</Label>
-              <Input
-                id="address.city"
-                {...register('address.city')}
-                placeholder="City"
-              />
-              {errors.address?.city && (
-                <p className="text-sm text-red-500">{errors.address.city.message}</p>
-              )}
-            </div>
+              {/* City and State */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="address.city">City *</Label>
+                  <Input
+                    id="address.city"
+                    {...register('address.city')}
+                    placeholder="City"
+                  />
+                  {errors.address?.city && (
+                    <p className="text-sm text-red-500">{errors.address.city.message}</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address.state">State *</Label>
-              <Select
-                value={watch('address.state') || ''}
-                onValueChange={(value) => setValue('address.state', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {INDIAN_STATES.map((state) => (
-                    <SelectItem key={state.code} value={state.value}>
-                      {state.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.address?.state && (
-                <p className="text-sm text-red-500">{errors.address.state.message}</p>
-              )}
-            </div>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address.state">State *</Label>
+                  <Select
+                    value={watch('address.state') || ''}
+                    onValueChange={(value) => setValue('address.state', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map((state) => (
+                        <SelectItem key={state.code} value={state.value}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.address?.state && (
+                    <p className="text-sm text-red-500">{errors.address.state.message}</p>
+                  )}
+                </div>
+              </div>
 
-          {/* Pincode */}
-          <div className="space-y-2">
-            <Label htmlFor="address.pincode">Pincode *</Label>
-            <Input
-              id="address.pincode"
-              {...register('address.pincode')}
-              placeholder="400001"
-              maxLength={6}
-            />
-            {errors.address?.pincode && (
-              <p className="text-sm text-red-500">{errors.address.pincode.message}</p>
-            )}
-          </div>
+              {/* Pincode */}
+              <div className="space-y-2">
+                <Label htmlFor="address.pincode">Pincode *</Label>
+                <Input
+                  id="address.pincode"
+                  {...register('address.pincode')}
+                  placeholder="400001"
+                  maxLength={6}
+                />
+                {errors.address?.pincode && (
+                  <p className="text-sm text-red-500">{errors.address.pincode.message}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="bank">
           <Card>
-        <CardHeader>
-          <CardTitle>Bank Details (Optional)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Bank Name */}
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.bankName">Bank Name</Label>
-            <Input
-              id="bankDetails.bankName"
-              {...register('bankDetails.bankName')}
-              placeholder="State Bank of India"
-            />
-            {errors.bankDetails?.bankName && (
-              <p className="text-sm text-red-500">{errors.bankDetails.bankName.message}</p>
-            )}
-          </div>
+            <CardHeader>
+              <CardTitle>Bank Details (Optional)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Bank Name */}
+              <div className="space-y-2">
+                <Label htmlFor="bankDetails.bankName">Bank Name</Label>
+                <Input
+                  id="bankDetails.bankName"
+                  {...register('bankDetails.bankName')}
+                  placeholder="State Bank of India"
+                />
+                {errors.bankDetails?.bankName && (
+                  <p className="text-sm text-red-500">{errors.bankDetails.bankName.message}</p>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Account Number */}
-            <div className="space-y-2">
-              <Label htmlFor="bankDetails.accountNumber">Account Number</Label>
-              <Input
-                id="bankDetails.accountNumber"
-                {...register('bankDetails.accountNumber')}
-                placeholder="1234567890"
-              />
-              {errors.bankDetails?.accountNumber && (
-                <p className="text-sm text-red-500">{errors.bankDetails.accountNumber.message}</p>
-              )}
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Account Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="bankDetails.accountNumber">Account Number</Label>
+                  <Input
+                    id="bankDetails.accountNumber"
+                    {...register('bankDetails.accountNumber')}
+                    placeholder="1234567890"
+                  />
+                  {errors.bankDetails?.accountNumber && (
+                    <p className="text-sm text-red-500">{errors.bankDetails.accountNumber.message}</p>
+                  )}
+                </div>
 
-            {/* IFSC Code */}
-            <div className="space-y-2">
-              <Label htmlFor="bankDetails.ifscCode">IFSC Code</Label>
-              <Input
-                id="bankDetails.ifscCode"
-                {...register('bankDetails.ifscCode')}
-                placeholder="SBIN0001234"
-                maxLength={11}
-              />
-              {errors.bankDetails?.ifscCode && (
-                <p className="text-sm text-red-500">{errors.bankDetails.ifscCode.message}</p>
-              )}
-            </div>
-          </div>
+                {/* IFSC Code */}
+                <div className="space-y-2">
+                  <Label htmlFor="bankDetails.ifscCode">IFSC Code</Label>
+                  <Input
+                    id="bankDetails.ifscCode"
+                    {...register('bankDetails.ifscCode')}
+                    placeholder="SBIN0001234"
+                    maxLength={11}
+                  />
+                  {errors.bankDetails?.ifscCode && (
+                    <p className="text-sm text-red-500">{errors.bankDetails.ifscCode.message}</p>
+                  )}
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Account Holder Name */}
-            <div className="space-y-2">
-              <Label htmlFor="bankDetails.accountHolderName">Account Holder Name</Label>
-              <Input
-                id="bankDetails.accountHolderName"
-                {...register('bankDetails.accountHolderName')}
-                placeholder="Account holder name"
-              />
-              {errors.bankDetails?.accountHolderName && (
-                <p className="text-sm text-red-500">{errors.bankDetails.accountHolderName.message}</p>
-              )}
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Account Holder Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="bankDetails.accountHolderName">Account Holder Name</Label>
+                  <Input
+                    id="bankDetails.accountHolderName"
+                    {...register('bankDetails.accountHolderName')}
+                    placeholder="Account holder name"
+                  />
+                  {errors.bankDetails?.accountHolderName && (
+                    <p className="text-sm text-red-500">{errors.bankDetails.accountHolderName.message}</p>
+                  )}
+                </div>
 
-            {/* UPI ID */}
-            <div className="space-y-2">
-              <Label htmlFor="bankDetails.upiId">UPI ID</Label>
-              <Input
-                id="bankDetails.upiId"
-                {...register('bankDetails.upiId')}
-                placeholder="client@upi"
-              />
-              {errors.bankDetails?.upiId && (
-                <p className="text-sm text-red-500">{errors.bankDetails.upiId.message}</p>
-              )}
-            </div>
-          </div>
-        </CardContent>
+                {/* UPI ID */}
+                <div className="space-y-2">
+                  <Label htmlFor="bankDetails.upiId">UPI ID</Label>
+                  <Input
+                    id="bankDetails.upiId"
+                    {...register('bankDetails.upiId')}
+                    placeholder="client@upi"
+                  />
+                  {errors.bankDetails?.upiId && (
+                    <p className="text-sm text-red-500">{errors.bankDetails.upiId.message}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
-        
+
       </Tabs>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-4">
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
-        {activeTab !== 'bank' ? (
-          <Button type="button" onClick={goToNext} className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary">
-            Next
-          </Button>
-        ) : (
-          <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {client ? 'Update Client' : 'Create Client'}
-          </Button>
-        )}
+      <div className="flex justify-between">
+        <div>
+          {activeTab !== 'basic' && (
+            <Button type="button" variant="outline" onClick={goBack}>
+              Back
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-4">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          {activeTab !== 'bank' ? (
+            <Button type="button" onClick={goToNext} className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary">
+              Next
+            </Button>
+          ) : (
+            <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {client ? 'Update Client' : 'Create Client'}
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );

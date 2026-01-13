@@ -15,7 +15,7 @@ import { Plus } from 'lucide-react';
 import { exportToExcel, exportToCSV, formatInvoicesForExport } from '@/lib/utils/export-utils';
 import { companiesApi } from '@/lib/api/companies.api';
 import { servicesApi } from '@/lib/api';
-import { useInvoicesQuery, useClientsQuery } from '@/hooks/queries';
+import { useInvoicesQuery, useClientsQuery, useDeleteInvoiceMutation } from '@/hooks/queries';
 import {
   Dialog,
   DialogContent,
@@ -104,6 +104,7 @@ function InvoicesContent() {
   // React Query for invoices and clients
   const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoicesQuery(selectedCompany?.id);
   const { data: clients = [], isLoading: clientsLoading, refetch: refetchClients } = useClientsQuery(selectedCompany?.id);
+  const deleteInvoiceMutation = useDeleteInvoiceMutation();
 
   const loading = invoicesLoading || clientsLoading;
 
@@ -211,6 +212,20 @@ function InvoicesContent() {
     await refreshData();
   };
 
+  // Custom delete handler using React Query mutation for proper cache invalidation
+  const handleDeleteInvoice = async () => {
+    if (!actions.deleteInvoice?.id) return;
+
+    deleteInvoiceMutation.mutate(
+      { id: actions.deleteInvoice.id, companyId: actions.deleteInvoice.companyId },
+      {
+        onSettled: () => {
+          actions.setDeleteInvoice(null);
+        }
+      }
+    );
+  };
+
   // Check for selected company first - prevents infinite loading when no company is selected
   if (!selectedCompany) {
     return (
@@ -247,21 +262,12 @@ function InvoicesContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Invoices"
-        description="Manage and track your invoices"
-      >
-        <div className="flex gap-2">
-          <ExportButton
-            onExportExcel={handleExportExcel}
-            onExportCSV={handleExportCSV}
-          />
-          <Button onClick={() => actions.handleAddInvoice()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
-          </Button>
-        </div>
-      </PageHeader>
+      <InvoicePageHeader
+        onAddInvoice={() => actions.handleAddInvoice()}
+        onOpenCustomization={() => actions.setIsCustomizationDialogOpen(true)}
+        onExportExcel={handleExportExcel}
+        onExportCSV={handleExportCSV}
+      />
 
       {/* Filter Bar */}
       <FilterBar
@@ -339,7 +345,7 @@ function InvoicesContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={actions.handleDeleteInvoice}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteInvoice}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -358,6 +364,7 @@ function InvoicesContent() {
           open={actions.isCustomizationDialogOpen}
           onOpenChange={actions.setIsCustomizationDialogOpen}
           companyId={selectedCompany.id}
+          company={selectedCompany} // Pass full company object
           type="invoice"
           onSave={refreshData}
         />

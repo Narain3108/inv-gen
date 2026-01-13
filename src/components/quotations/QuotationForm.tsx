@@ -504,9 +504,6 @@ export function QuotationForm({
                 <p className="text-sm text-red-500">{errors.date.message}</p>
               )}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
             {/* Valid Until Date */}
             <div className="space-y-2">
               <Label htmlFor="validUntil">Valid Until * <span className="text-xs text-muted-foreground">(Default: 30 days)</span></Label>
@@ -520,6 +517,8 @@ export function QuotationForm({
               )}
             </div>
           </div>
+
+
         </CardContent>
       </Card>
 
@@ -537,7 +536,7 @@ export function QuotationForm({
                   <th className="p-2 text-left">Product/Service</th>
                   <th className="p-2 text-center w-24">Item Code</th>
                   <th className="p-2 text-center w-32">Quantity</th>
-                  <th className="p-2 text-center w-24">Unit</th>
+                  <th className="p-2 text-center w-36">Unit</th>
                   <th className="p-2 text-right w-36">Unit Price</th>
                   <th className="p-2 text-center w-32">Discount %</th>
                   <th className="p-2 text-right w-36">Amount</th>
@@ -851,17 +850,19 @@ export function QuotationForm({
 
 
       {/* Tax Summary */}
-      {totals && (
-        <TotalsSummary
-          taxableAmount={totals.taxableAmount}
-          cgst={totals.cgst}
-          sgst={totals.sgst}
-          igst={totals.igst}
-          totalAmount={totals.totalAmount}
-          taxBreakdown={totals.taxBreakdown}
-          isInterState={companyState !== selectedClient?.address?.state}
-        />
-      )}
+      {
+        totals && (
+          <TotalsSummary
+            taxableAmount={totals.taxableAmount}
+            cgst={totals.cgst}
+            sgst={totals.sgst}
+            igst={totals.igst}
+            totalAmount={totals.totalAmount}
+            taxBreakdown={totals.taxBreakdown}
+            isInterState={companyState !== selectedClient?.address?.state}
+          />
+        )
+      }
 
       {/* Form Actions */}
       <div className="flex justify-end gap-3 pt-3">
@@ -875,7 +876,7 @@ export function QuotationForm({
           <span className="font-semibold">{quotation ? 'Update Quotation' : 'Create Quotation'}</span>
         </Button>
       </div>
-    </form>
+    </form >
   );
 }
 

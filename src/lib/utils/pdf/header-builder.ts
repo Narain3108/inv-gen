@@ -11,16 +11,26 @@ import { getFontSize } from './helpers';
  * Build 3-column header section
  */
 export const buildHeader = (
-  company: Company, 
-  document: Invoice | Quotation, 
+  company: Company,
+  document: Invoice | Quotation,
   customization?: InvoiceCustomization,
   type: 'invoice' | 'quotation' = 'invoice'
 ): any => {
+  // Customization Flags (default to true if undefined)
   const showLogo = customization?.companyDetails?.showLogo !== false;
-  const title = type === 'invoice' ? 'TAX INVOICE' : 'QUOTATION';
+  const showName = customization?.companyDetails?.showName !== false;
+  const showAddress = customization?.companyDetails?.showAddress !== false;
+  const showGSTIN = customization?.companyDetails?.showGSTIN !== false;
+  const showPhone = customization?.companyDetails?.showPhone !== false;
+  const showEmail = customization?.companyDetails?.showEmail !== false;
+
+  const headerTitle = customization?.header?.title || (type === 'invoice' ? 'TAX INVOICE' : 'QUOTATION');
+  const titleFontSize = customization?.header?.fontSize === 'small' ? 14 : customization?.header?.fontSize === 'large' ? 22 : 18;
+
+  const title = headerTitle;
   const documentNumber = type === 'invoice' ? (document as Invoice).invoiceNumber : (document as Quotation).quotationNumber;
-  const dateLabel = type === 'invoice' ? 'Invoice Date' : 'Date';
-  
+  const dateLabel = customization?.header?.dateLabel || (type === 'invoice' ? 'Invoice Date' : 'Date');
+
   return {
     columns: [
       // Left Column: Logo
@@ -29,19 +39,19 @@ export const buildHeader = (
         stack: [
           showLogo && company.logoUrl
             ? {
-                image: company.logoUrl,
-                width: 80,
-                height: 80,
-                alignment: 'left',
-              }
-            : {
-                text: (company.name || '').substring(0, 2).toUpperCase(),
-                fontSize: 32,
-                bold: true,
-                color: customization?.colorScheme?.primary || '#3b82f6',
-                alignment: 'left',
-                width: 80,
-              }
+              image: company.logoUrl,
+              width: 80,
+              height: 80,
+              alignment: 'left',
+            }
+            : showLogo && !company.logoUrl ? {
+              text: (company.name || '').substring(0, 2).toUpperCase(),
+              fontSize: 32,
+              bold: true,
+              color: customization?.colorScheme?.primary || '#3b82f6',
+              alignment: 'left',
+              width: 80,
+            } : {}
         ],
         alignment: 'left'
       },
@@ -50,14 +60,14 @@ export const buildHeader = (
       {
         width: '45%',
         stack: [
-          { text: company.name || '', fontSize: 12, bold: true, alignment: 'left' },
-          company.address?.street ? { text: company.address.street, fontSize: 9, alignment: 'left' } : {},
-          (company.address?.city || company.address?.state || company.address?.pincode)
+          showName ? { text: company.name || '', fontSize: 12, bold: true, alignment: 'left' } : {},
+          showAddress && company.address?.street ? { text: company.address.street, fontSize: 9, alignment: 'left' } : {},
+          showAddress && (company.address?.city || company.address?.state || company.address?.pincode)
             ? { text: `${company.address?.city || ''}${company.address?.city ? ', ' : ''}${company.address?.state || ''}${company.address?.pincode ? ' - ' + company.address?.pincode : ''}`, fontSize: 9, alignment: 'left' }
             : {},
-          company.gstin ? { text: `GSTIN: ${company.gstin}`, fontSize: 9, alignment: 'left' } : {},
-          company.contact?.email ? { text: `Email: ${company.contact.email}`, fontSize: 9, alignment: 'left' } : {},
-          company.contact?.phone ? { text: `Phone: ${company.contact.phone}`, fontSize: 9, alignment: 'left' } : {},
+          showGSTIN && company.gstin ? { text: `GSTIN: ${company.gstin}`, fontSize: 9, alignment: 'left' } : {},
+          showEmail && company.contact?.email ? { text: `Email: ${company.contact.email}`, fontSize: 9, alignment: 'left' } : {},
+          showPhone && company.contact?.phone ? { text: `Phone: ${company.contact.phone}`, fontSize: 9, alignment: 'left' } : {},
         ],
         alignment: 'center'
       },
@@ -66,8 +76,8 @@ export const buildHeader = (
       {
         width: '35%',
         stack: [
-          { text: title, fontSize: 16, bold: true, alignment: 'right', margin: [0, 5, 0, 2] },
-          { text: `${type === 'invoice' ? 'Invoice No' : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'right' },
+          { text: title, fontSize: titleFontSize, bold: true, alignment: 'right', margin: [0, 5, 0, 2] },
+          customization?.header?.showInvoiceNumber !== false ? { text: `${type === 'invoice' ? (customization?.header?.invoiceNumberLabel || 'Invoice No') : 'Quotation No'}: ${documentNumber || '-'}`, fontSize: 9, bold: true, alignment: 'right' } : {},
           // PO Number and PO Date (only for invoices, only if present)
           ...(type === 'invoice' && (document as Invoice).poNumber ? [
             { text: `PO No: ${(document as Invoice).poNumber}${(document as Invoice).poDate ? ' | Date: ' + formatDate((document as Invoice).poDate!) : ''}`, fontSize: 9, alignment: 'right' }
@@ -89,7 +99,7 @@ export const buildHeader = (
             })()
           ] : []),
           (document as any).referenceNumber ? { text: `Ref: ${(document as any).referenceNumber}`, fontSize: 9, alignment: 'right' } : {},
-          { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'right' },
+          customization?.header?.showDate !== false ? { text: `${dateLabel}: ${formatDate((document as any).date)}`, fontSize: 9, alignment: 'right' } : {},
         ],
         alignment: 'right'
       }
@@ -100,7 +110,7 @@ export const buildHeader = (
 
 // Deprecated builders kept for compatibility if needed, but we will use buildHeader
 export const buildCompanyHeader = (company: Company, customization?: InvoiceCustomization): any => {
-  return {}; 
+  return {};
 };
 
 export const buildInvoiceTitle = (customization?: InvoiceCustomization, type: 'invoice' | 'quotation' = 'invoice'): any => {

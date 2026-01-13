@@ -31,10 +31,10 @@ async function convertCompanyImagesToBase64(company: Company): Promise<Company> 
     try {
       console.log('\n🖼️ LOGO CONVERSION STARTING');
       console.log('Original URL:', company.logoUrl);
-      
+
       const base64Logo = await cloudinaryUrlToBase64(company.logoUrl);
       companyWithImages.logoUrl = base64Logo;
-      
+
       console.log('✅ LOGO CONVERTED');
       console.log('Format:', base64Logo.substring(0, 30));
       console.log('Size:', Math.round(base64Logo.length / 1024), 'KB\n');
@@ -53,10 +53,10 @@ async function convertCompanyImagesToBase64(company: Company): Promise<Company> 
     try {
       console.log('\n✍️ SIGNATURE CONVERSION STARTING');
       console.log('Original URL:', company.signatureUrl);
-      
+
       const base64Signature = await cloudinaryUrlToBase64(company.signatureUrl);
       companyWithImages.signatureUrl = base64Signature;
-      
+
       console.log('✅ SIGNATURE CONVERTED');
       console.log('Format:', base64Signature.substring(0, 30));
       console.log('Size:', Math.round(base64Signature.length / 1024), 'KB\n');
@@ -121,19 +121,19 @@ export async function generateInvoicePDF(data: InvoicePDFData): Promise<void> {
     content.push({ text: '', margin: [0, 4, 0, 0] });
 
     // 3. Items Table (Chunked)
-    content.push(buildFixedItemsTable(chunk, startIndex));
+    content.push(buildFixedItemsTable(chunk, startIndex, customization));
 
     // 4. Footer Section (Only on last page)
     if (isLastPage) {
       // Tax Breakdown & Totals
       content.push(...buildTotalsSection(invoice, customization));
-      
+
       // Horizontal Footer (Bank, Terms, Notes)
       const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
       if (horizontalFooter) {
         content.push(horizontalFooter);
       }
-      
+
       // Signature
       content.push(buildSignature(companyWithImages, customization));
     } else {
@@ -217,13 +217,13 @@ export async function previewInvoicePDF(data: InvoicePDFData): Promise<void> {
     // 2. Billing/Shipping Section
     content.push(buildAddressSection(client, customization, invoice));
 
-    // 3. Items Table
-    content.push(buildFixedItemsTable(chunk, startIndex));
+    // 3. Items Table (Chunked)
+    content.push(buildFixedItemsTable(chunk, startIndex, customization));
 
     // 4. Footer Section
     if (isLastPage) {
       content.push(...buildTotalsSection(invoice, customization));
-      
+
       // Horizontal Footer (Bank, Terms, Notes)
       const horizontalFooter = buildHorizontalFooter(companyWithImages, customization);
       if (horizontalFooter) {

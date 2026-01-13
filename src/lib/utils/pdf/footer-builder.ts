@@ -9,6 +9,7 @@ import { InvoiceCustomization } from '@/types/customization';
  * Build bank details section
  */
 export const buildBankDetails = (company: Company, customization?: InvoiceCustomization): any[] => {
+  // Customization Flag (default to true if undefined)
   const showBankDetails = customization?.companyDetails?.showBankDetails !== false;
 
   if (!company.bankDetails || !showBankDetails) {
@@ -51,9 +52,10 @@ export const buildBankDetails = (company: Company, customization?: InvoiceCustom
 /**
  * Build terms and conditions section
  */
-export const buildTermsAndConditions = (customization?: InvoiceCustomization): any[] => {
+export const buildTermsAndConditions = (customization?: InvoiceCustomization, company?: Company): any[] => {
   const showTerms = customization?.footer?.showTermsAndConditions !== false;
-  const termsText = customization?.footer?.termsText;
+  // Use customization text, or fallback to company terms if empty/undefined
+  const termsText = customization?.footer?.termsText || company?.termsAndConditions;
 
   if (!showTerms || !termsText) {
     return [];
@@ -74,36 +76,23 @@ export const buildTermsAndConditions = (customization?: InvoiceCustomization): a
   ];
 };
 
+// Note: buildNotesSection removed as per user request to not use notes/thank you text.
+
 /**
- * Build notes/thank you section
+ * Build bank details section
  */
-export const buildNotesSection = (customization?: InvoiceCustomization): any[] => {
-  const showNotes = customization?.footer?.showThankYouNote !== false;
-  const notesText = customization?.footer?.thankYouText;
+// ... (keeping existing buildBankDetails)
+// Actually I need to be careful not to delete buildBankDetails or buildTermsAndConditions which are above.
+// I will target the specific lines for buildNotesSection and buildHorizontalFooter updates.
 
-  if (!showNotes || !notesText) {
-    return [];
-  }
-
-  return [
-    {
-      text: 'Notes:',
-      fontSize: 9,
-      bold: true,
-      margin: [0, 5, 0, 2],
-    },
-    {
-      text: notesText,
-      fontSize: 8,
-      margin: [0, 0, 0, 10],
-    },
-  ];
-};
+// Removing buildNotesSection function completely.
+// And updating buildHorizontalFooter.
 
 /**
  * Build signature section
  */
 export const buildSignature = (company: Company, customization?: InvoiceCustomization): any => {
+  // Customization Flag (default to true if undefined)
   const showSignature = customization?.footer?.showSignature !== false;
   const signatureLabel = customization?.footer?.signatureLabel || 'Authorized Signatory';
 
@@ -173,14 +162,13 @@ export const buildSignature = (company: Company, customization?: InvoiceCustomiz
 };
 
 /**
- * Build horizontal footer section (Bank, Terms, Notes side-by-side)
+ * Build horizontal footer section (Bank, Terms side-by-side)
  */
 export const buildHorizontalFooter = (company: Company, customization?: InvoiceCustomization): any => {
   const showBankDetails = customization?.companyDetails?.showBankDetails !== false;
   const showTerms = customization?.footer?.showTermsAndConditions !== false;
-  const termsText = customization?.footer?.termsText;
-  const showNotes = customization?.footer?.showThankYouNote !== false;
-  const notesText = customization?.footer?.thankYouText;
+  // Fallback to company terms if customization is empty
+  const termsText = customization?.footer?.termsText || company.termsAndConditions;
 
   // Ensure a two-column layout: Terms (left) and Bank Details (right).
   // If either is missing, keep an empty placeholder so bank header doesn't span full width.
@@ -215,18 +203,6 @@ export const buildHorizontalFooter = (company: Company, customization?: InvoiceC
   } : { width: '50%', text: '' };
 
   const columns = [leftColumn, rightColumn];
-
-  // Notes Column (optional) - append as third column if present
-  if (showNotes && notesText) {
-    columns.push({
-      width: '*',
-      stack: [
-        { text: 'Notes:', fontSize: 9, bold: true, margin: [0, 0, 0, 2] },
-        { text: notesText, fontSize: 8 },
-      ],
-      margin: [10, 0, 0, 0]
-    });
-  }
 
   if (columns.length === 0) return [];
 
