@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   organization?: never;
   loading: boolean;
-  
+
   // User Actions
   signupUser: (data: any) => Promise<void>;
   loginUser: (email: string, password: string) => Promise<void>;
@@ -37,7 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       // Check for User Session only
       const storedUser = localStorage.getItem('userData');
-      if (storedUser) {
+      const storedToken = localStorage.getItem('userToken');
+
+      // If we have user data but no token, clear the stale data
+      if (storedUser && !storedToken) {
+        console.warn('Found stale userData without token. Clearing...');
+        localStorage.removeItem('userData');
+        setLoading(false);
+        return;
+      }
+
+      if (storedUser && storedToken) {
         try {
           // Verify user session with backend
           try {
@@ -105,11 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginUser = async (email: string, password: string) => {
     try {
-      await authApi.login(email, password);
+      const loginResponse = await authApi.login(email, password);
 
-      // Clear any stale tokens from localStorage to ensure cookie-based auth only
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('userId');
+      // Store the Bearer token for cross-domain API authentication
+      if (loginResponse.token) {
+        localStorage.setItem('userToken', loginResponse.token);
+        if (loginResponse.localId) {
+          localStorage.setItem('userId', loginResponse.localId);
+        }
+      }
 
       // Fetch user profile
       const freshUser = await usersApi.getMe();
@@ -170,11 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // No organization logout - single user session handled via logoutUser
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
       signupUser,
-      loginUser, 
+      loginUser,
       logoutUser,
       logout: logoutUser,
     }}>
