@@ -2,6 +2,7 @@
  * useQuotationActions Hook
  * Extracts all quotation-related action handlers from the Quotations page
  * Following Single Responsibility Principle
+ * Uses React Query mutations for cache consistency
  */
 
 import { useState, useCallback } from 'react';
@@ -10,6 +11,13 @@ import { Quotation, Client, Company, Product, QuotationStatus } from '@/types';
 import { quotationsApi } from '@/lib/api/quotations.api';
 import { invoicesApi } from '@/lib/api/invoices.api';
 import { companiesApi } from '@/lib/api/companies.api';
+import {
+    useCreateQuotationMutation,
+    useUpdateQuotationMutation,
+    useDeleteQuotationMutation,
+    useCreateInvoiceMutation,
+    useUpdateCompanyMutation
+} from '@/hooks/queries';
 import { loadCustomization } from '@/lib/services/customization-service';
 import { generateQuotationPDF, previewQuotationPDF } from '@/lib/utils/pdf-generator';
 import { generateQuotationNumber, generateInvoiceNumber } from '@/lib/utils/numbering-utils';
@@ -72,6 +80,13 @@ export function useQuotationActions({
 }: UseQuotationActionsConfig): UseQuotationActionsReturn {
     const router = useRouter();
 
+    // React Query mutations
+    const createQuotationMutation = useCreateQuotationMutation();
+    const updateQuotationMutation = useUpdateQuotationMutation();
+    const deleteQuotationMutation = useDeleteQuotationMutation();
+    const createInvoiceMutation = useCreateInvoiceMutation();
+    const updateCompanyMutation = useUpdateCompanyMutation();
+
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingQuotation, setEditingQuotation] = useState<Quotation | undefined>();
@@ -114,7 +129,7 @@ export function useQuotationActions({
     }, []);
 
     /**
-     * Submit quotation form
+     * Submit quotation form - uses React Query mutations
      */
     const handleSubmit = useCallback(async (data: any) => {
         if (!selectedCompany || !company) return;
@@ -144,49 +159,54 @@ export function useQuotationActions({
             };
 
             if (editingQuotation?.id) {
-                await quotationsApi.update(editingQuotation.id, quotationData);
-                toast.success('Quotation updated successfully');
+                await updateQuotationMutation.mutateAsync({
+                    id: editingQuotation.id,
+                    data: quotationData,
+                });
+                // Toast handled by mutation
             } else {
-                await quotationsApi.create(quotationData);
+                await createQuotationMutation.mutateAsync(quotationData as any);
 
                 if (!data.quotationNumber?.trim() && company.quotationNumbering) {
                     const newNextNumber = quotations.length + 2;
-                    await companiesApi.update(selectedCompany.id, {
-                        quotationNumbering: { ...company.quotationNumbering, nextNumber: newNextNumber },
+                    await updateCompanyMutation.mutateAsync({
+                        id: selectedCompany.id,
+                        data: {
+                            quotationNumbering: { ...company.quotationNumbering, nextNumber: newNextNumber },
+                        },
                     });
                 }
-
-                toast.success('Quotation created successfully');
+                // Toast handled by mutation
             }
 
             setIsDialogOpen(false);
             setEditingQuotation(undefined);
-            await onRefreshData();
+            // Cache update handled by mutation
         } catch (error) {
             console.error('Error saving quotation:', error);
-            toast.error('Failed to save quotation');
+            // Error toast handled by mutation
         }
-    }, [selectedCompany, company, quotations, editingQuotation, onRefreshData]);
+    }, [selectedCompany, company, quotations, editingQuotation, createQuotationMutation, updateQuotationMutation, updateCompanyMutation]);
 
     /**
-     * Delete quotation
+     * Delete quotation - uses React Query mutation with optimistic update
      */
     const handleDeleteQuotation = useCallback(async () => {
         if (!deleteQuotation) return;
 
-        const previousQuotations = [...quotations];
-        onQuotationsChange(quotations.filter(q => q.id !== deleteQuotation.id));
         setDeleteQuotation(null);
-        toast.success('Quotation deleted successfully');
 
         try {
-            await quotationsApi.delete(deleteQuotation.id, deleteQuotation.companyId);
+            await deleteQuotationMutation.mutateAsync({
+                id: deleteQuotation.id,
+                companyId: deleteQuotation.companyId,
+            });
+            // Toast and cache update handled by mutation
         } catch (error) {
             console.error('Error deleting quotation:', error);
-            toast.error('Failed to delete quotation');
-            onQuotationsChange(previousQuotations);
+            // Error toast handled by mutation
         }
-    }, [deleteQuotation, quotations, onQuotationsChange]);
+    }, [deleteQuotation, deleteQuotationMutation]);
 
     /**
      * View quotation PDF preview
@@ -249,7 +269,7 @@ export function useQuotationActions({
                         nextNumber: nextSequence  // Force our calculated sequence
                     }
                 };
-                suggestedNumber = generateInvoiceNumber(tempCompany, 0); // count 0 forces use of nextNumber
+                suggestedNumber = generateInvoiceNumber(tempCompany as Company, 0); // count 0 forces use of nextNumber
 
                 console.log('📊 Count-based numbering:', { totalCount, nextSequence, suggestedNumber });
             } catch (e) {
@@ -276,6 +296,9 @@ export function useQuotationActions({
 
     /**
      * Confirm convert to invoice
+     */
+    /**
+     * Confirm convert to invoice - uses React Query mutations
      */
     const confirmConvertToInvoice = useCallback(async () => {
         if (!convertingQuotation || !invoiceNumber.trim() || !selectedCompany) {
@@ -316,13 +339,11 @@ export function useQuotationActions({
                 payments: [],
             };
 
-            const newInvoice = await invoicesApi.create(invoiceData);
+            const newInvoice = await createInvoiceMutation.mutateAsync(invoiceData as any);
 
-            // Update company invoice numbering counter to ensure next number is correct
+            // Update company invoice numbering counter
             if (selectedCompany.invoiceNumbering) {
                 try {
-                    // Try to extract number from the used invoice number to auto-advance correctly (e.g. INV-034 -> 35)
-                    // This handles cases where user manually corrected the number
                     const match = invoiceNumber.trim().match(/(\d+)$/);
                     let newNextNumber = (selectedCompany.invoiceNumbering.nextNumber || 1) + 1;
 
@@ -333,33 +354,37 @@ export function useQuotationActions({
                         }
                     }
 
-                    await companiesApi.update(selectedCompany.id, {
-                        invoiceNumbering: { ...selectedCompany.invoiceNumbering, nextNumber: newNextNumber },
+                    await updateCompanyMutation.mutateAsync({
+                        id: selectedCompany.id,
+                        data: {
+                            invoiceNumbering: { ...selectedCompany.invoiceNumbering, nextNumber: newNextNumber },
+                        },
                     });
                 } catch (err) {
                     console.error("Failed to update invoice numbering:", err);
-                    // Don't block the UI flow for this, as invoice is already created
                 }
             }
 
-            await quotationsApi.partialUpdate(convertingQuotation.id, {
-                status: 'converted' as QuotationStatus,
-                convertedToInvoiceId: newInvoice.id,
-            }, convertingQuotation.companyId);
+            await updateQuotationMutation.mutateAsync({
+                id: convertingQuotation.id,
+                data: {
+                    status: 'converted' as QuotationStatus,
+                    convertedToInvoiceId: newInvoice.id,
+                },
+            });
 
             toast.success('Quotation converted to invoice successfully');
             setConvertingQuotation(null);
             setInvoiceNumber('');
-            await onRefreshData();
             router.push('/invoices/invoices');
         } catch (error) {
             console.error('Error converting quotation:', error);
             toast.error('Failed to convert quotation to invoice');
         }
-    }, [convertingQuotation, invoiceNumber, selectedCompany, onRefreshData, router]);
+    }, [convertingQuotation, invoiceNumber, selectedCompany, router, createInvoiceMutation, updateQuotationMutation, updateCompanyMutation]);
 
     /**
-     * Update quotation status
+     * Update quotation status - uses React Query mutation
      */
     const handleUpdateStatus = useCallback(async (quotation: Quotation, status: QuotationStatus) => {
         try {
@@ -368,14 +393,17 @@ export function useQuotationActions({
                 toast.error('Use "Convert to Invoice" to change status to converted');
                 return;
             }
-            await quotationsApi.updateStatus(quotation.id, validStatus as any, quotation.companyId);
+            await updateQuotationMutation.mutateAsync({
+                id: quotation.id,
+                data: { status: validStatus as any },
+            });
             toast.success(`Quotation marked as ${status}`);
-            await onRefreshData();
+            // Cache update handled by mutation
         } catch (error) {
             console.error('Error updating quotation status:', error);
             toast.error('Failed to update quotation status');
         }
-    }, [onRefreshData]);
+    }, [updateQuotationMutation]);
 
     return {
         // Dialog state

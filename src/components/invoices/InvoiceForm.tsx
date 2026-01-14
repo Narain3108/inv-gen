@@ -28,6 +28,7 @@ import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
+import { invoicesApi } from '@/lib/api/invoices.api';
 import SerialManager from '@/components/shared/SerialManager';
 import { OutOfStockDialog } from '@/components/shared/OutOfStockDialog';
 import {
@@ -215,14 +216,26 @@ export function InvoiceForm({
 
   // Auto-fill invoice number for new invoices
   useEffect(() => {
-    if (!invoice && company) {
-      console.log('Auto-filling invoice number, company config:', company.invoiceNumbering);
-      console.log('Current invoice count:', invoiceCount);
-      const autoNumber = generateInvoiceNumber(company, invoiceCount);
-      console.log('Generated invoice number:', autoNumber);
-      setValue('invoiceNumber', autoNumber);
-    }
-  }, [invoice, company, invoiceCount, setValue]);
+    const fetchNextNumber = async () => {
+      if (!invoice && companyId) {
+        try {
+          console.log('Fetching next invoice number from backend...');
+          const { invoice_number } = await invoicesApi.generateNumber(companyId);
+          console.log('Fetched invoice number:', invoice_number);
+          setValue('invoiceNumber', invoice_number);
+        } catch (error) {
+          console.error('Failed to fetch invoice number:', error);
+          // Fallback to local if backend fails
+          if (company) {
+            const autoNumber = generateInvoiceNumber(company, invoiceCount);
+            setValue('invoiceNumber', autoNumber);
+          }
+        }
+      }
+    };
+
+    fetchNextNumber();
+  }, [invoice, companyId, company, invoiceCount, setValue]);
 
   // Update selected client when client ID changes
   useEffect(() => {

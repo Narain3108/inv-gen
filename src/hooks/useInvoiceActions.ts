@@ -2,18 +2,17 @@
  * useInvoiceActions Hook
  * Extracts all invoice-related action handlers from the Invoices page
  * Following Single Responsibility Principle - handles only invoice actions
+ * Uses React Query mutations for cache consistency
  */
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Invoice, Client, Company, Product, PaymentFormData } from '@/types';
 import { invoicesApi } from '@/lib/api/invoices.api';
-import { productsApi } from '@/lib/api/products.api';
-import { clientsApi } from '@/lib/api/clients.api';
-import { companiesApi } from '@/lib/api/companies.api';
+import { useCreateInvoiceMutation, useUpdateInvoiceMutation, useDeleteInvoiceMutation } from '@/hooks/queries';
+import { useUpdateCompanyMutation } from '@/hooks/queries';
 import { loadCustomization } from '@/lib/services/customization-service';
 import { generateInvoicePDF, previewInvoicePDF } from '@/lib/utils/pdf-generator';
-import { generateInvoiceNumber } from '@/lib/utils/numbering-utils';
 import { amountToWords } from '@/lib/utils/number-to-words';
 import { toast } from 'sonner';
 
@@ -73,6 +72,12 @@ export function useInvoiceActions({
 }: UseInvoiceActionsConfig): UseInvoiceActionsReturn {
     const router = useRouter();
 
+    // React Query mutations
+    const createInvoiceMutation = useCreateInvoiceMutation();
+    const updateInvoiceMutation = useUpdateInvoiceMutation();
+    const deleteInvoiceMutation = useDeleteInvoiceMutation();
+    const updateCompanyMutation = useUpdateCompanyMutation();
+
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
@@ -118,6 +123,7 @@ export function useInvoiceActions({
 
     /**
      * Submit invoice form - creates or updates invoice
+     * Now uses React Query mutations for automatic cache updates
      */
     const handleSubmit = useCallback(async (data: any) => {
         if (!selectedCompany || !company) return;
@@ -126,13 +132,9 @@ export function useInvoiceActions({
             // Auto-generate invoice number if not provided
             let invoiceNumber = data.invoiceNumber?.trim();
             if (!invoiceNumber) {
-                try {
-                    const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
-                    invoiceNumber = invoice_number;
-                } catch (e) {
-                    console.error("Failed to generate number from backend, falling back to local", e);
-                    invoiceNumber = generateInvoiceNumber(company, invoices.length);
-                }
+                // Always use backend for number generation (counts actual invoices)
+                const { invoice_number } = await invoicesApi.generateNumber(selectedCompany.id);
+                invoiceNumber = invoice_number;
             }
 
             // Clean up invoice items
@@ -152,66 +154,69 @@ export function useInvoiceActions({
             };
 
             if (editingInvoice?.id) {
-                // Update existing invoice
-                await invoicesApi.partialUpdate(editingInvoice.id, {
-                    ...invoiceData,
-                    paymentStatus: editingInvoice.paymentStatus || 'pending',
-                    amountPaid: editingInvoice.amountPaid || 0,
-                    amountPending: editingInvoice.amountPending ?? invoiceData.totalAmount,
-                    payments: editingInvoice.payments || [],
-                }, editingInvoice.companyId);
-                toast.success('Invoice updated successfully');
+                // Update existing invoice using mutation
+                await updateInvoiceMutation.mutateAsync({
+                    id: editingInvoice.id,
+                    data: {
+                        ...invoiceData,
+                        paymentStatus: editingInvoice.paymentStatus || 'pending',
+                        amountPaid: editingInvoice.amountPaid || 0,
+                        amountPending: editingInvoice.amountPending ?? invoiceData.totalAmount,
+                        payments: editingInvoice.payments || [],
+                    },
+                    companyId: editingInvoice.companyId,
+                });
+                // Toast handled by mutation onSuccess
             } else {
-                // Create new invoice
-                await invoicesApi.create({
+                // Create new invoice using mutation
+                await createInvoiceMutation.mutateAsync({
                     ...invoiceData,
                     paymentStatus: 'pending',
                     amountPaid: 0,
                     amountPending: invoiceData.totalAmount,
                     payments: [],
-                });
+                } as any);
 
                 // Update invoice counter
                 if (!data.invoiceNumber?.trim() && company.invoiceNumbering) {
                     const newNextNumber = invoices.length + 2;
-                    await companiesApi.update(selectedCompany.id, {
-                        invoiceNumbering: { ...company.invoiceNumbering, nextNumber: newNextNumber },
+                    await updateCompanyMutation.mutateAsync({
+                        id: selectedCompany.id,
+                        data: {
+                            invoiceNumbering: { ...company.invoiceNumbering, nextNumber: newNextNumber },
+                        },
                     });
                 }
-
-                // Stock deduction is handled by the backend during invoice creation
-
-
-                toast.success('Invoice created and stock updated successfully');
+                // Toast handled by mutation onSuccess
             }
 
             setIsDialogOpen(false);
-            await onRefreshInvoices();
+            // Note: onRefreshInvoices is no longer needed as React Query handles cache invalidation
         } catch (error) {
             console.error('Error saving invoice:', error);
-            toast.error('Failed to save invoice');
+            // Error toast handled by mutation onError
         }
-    }, [selectedCompany, company, products, invoices, editingInvoice, onRefreshInvoices]);
+    }, [selectedCompany, company, invoices, editingInvoice, createInvoiceMutation, updateInvoiceMutation, updateCompanyMutation]);
 
     /**
-     * Delete invoice
+     * Delete invoice - uses React Query mutation with optimistic update
      */
     const handleDeleteInvoice = useCallback(async () => {
         if (!deleteInvoice?.id) return;
 
-        const previousInvoices = [...invoices];
-        onInvoicesChange(invoices.filter(i => i.id !== deleteInvoice.id));
         setDeleteInvoice(null);
-        toast.success('Invoice deleted successfully');
 
         try {
-            await invoicesApi.delete(deleteInvoice.id, deleteInvoice.companyId);
+            await deleteInvoiceMutation.mutateAsync({
+                id: deleteInvoice.id,
+                companyId: deleteInvoice.companyId,
+            });
+            // Toast and cache update handled by mutation
         } catch (error) {
             console.error('Error deleting invoice:', error);
-            toast.error('Failed to delete invoice');
-            onInvoicesChange(previousInvoices);
+            // Error toast handled by mutation onError
         }
-    }, [deleteInvoice, invoices, onInvoicesChange]);
+    }, [deleteInvoice, deleteInvoiceMutation]);
 
     /**
      * View invoice PDF preview
@@ -282,7 +287,7 @@ export function useInvoiceActions({
     }, []);
 
     /**
-     * Record payment for invoice
+     * Record payment for invoice - uses React Query mutation
      */
     const handleRecordPayment = useCallback(async (paymentData: PaymentFormData) => {
         if (!paymentInvoice?.id) return;
@@ -317,22 +322,26 @@ export function useInvoiceActions({
                 newPaymentStatus = 'pending';
             }
 
-            await invoicesApi.partialUpdate(paymentInvoice.id, {
-                payments: [...currentPayments, newPayment],
-                amountPaid: newAmountPaid,
-                amountPending: newAmountPending <= 0.01 ? 0 : Math.max(0, newAmountPending),
-                paymentStatus: newPaymentStatus,
-            }, paymentInvoice.companyId);
+            await updateInvoiceMutation.mutateAsync({
+                id: paymentInvoice.id,
+                data: {
+                    payments: [...currentPayments, newPayment],
+                    amountPaid: newAmountPaid,
+                    amountPending: newAmountPending <= 0.01 ? 0 : Math.max(0, newAmountPending),
+                    paymentStatus: newPaymentStatus,
+                },
+                companyId: paymentInvoice.companyId,
+            });
 
             toast.success('Payment recorded successfully');
             setIsPaymentDialogOpen(false);
             setPaymentInvoice(null);
-            await onRefreshInvoices();
+            // Cache update handled by mutation
         } catch (error) {
             console.error('Error recording payment:', error);
             toast.error('Failed to record payment');
         }
-    }, [paymentInvoice, onRefreshInvoices]);
+    }, [paymentInvoice, updateInvoiceMutation]);
 
     return {
         // Dialog state
