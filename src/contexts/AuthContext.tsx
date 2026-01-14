@@ -55,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(freshUser);
             // Update local storage with fresh data
             localStorage.setItem('userData', JSON.stringify(freshUser));
+
+            // Prime CSRF token for cookie-based sessions on page load
+            try {
+              await apiClient.initCsrf();
+            } catch (e) {
+              console.warn('Failed to initialize CSRF token on page load:', e);
+              // Non-fatal - will be fetched lazily on first mutating request
+            }
           } catch (verifyError) {
             console.warn('User session invalid:', verifyError);
             localStorage.removeItem('userData');

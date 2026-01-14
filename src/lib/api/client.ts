@@ -43,7 +43,7 @@ function snakeToCamel(obj: any): any {
   return camelObj;
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/+$/,'');
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/+$/, '');
 
 function buildUrl(base: string, endpoint: string) {
   const e = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -82,9 +82,21 @@ class ApiClient {
   // Track in-flight GET requests to dedupe identical requests
   private inFlightRequests: Map<string, Promise<any>> = new Map();
   private csrfToken: string | null = null;
+  // Prevent race conditions in CSRF token fetching
+  private csrfFetchPromise: Promise<void> | null = null;
 
   constructor(baseURL: string) {
-    this.baseURL = (baseURL || '').replace(/\/+$/,'');
+    this.baseURL = (baseURL || '').replace(/\/+$/, '');
+  }
+
+  /**
+   * Check if an error is a CSRF token error that can be retried
+   */
+  private isCsrfError(status: number, message: string): boolean {
+    return status === 403 &&
+      (message.toLowerCase().includes('csrf') ||
+        message.includes('CSRF token required') ||
+        message.includes('Invalid CSRF token'));
   }
 
   private async handleResponse<T>(response: Response, requestInit?: RequestInit): Promise<T> {
@@ -92,7 +104,7 @@ class ApiClient {
       const errorData = await response.json().catch(() => ({}));
       // FastAPI uses 'detail', others might use 'message'
       let errorMessage = errorData.detail || errorData.message || response.statusText;
-      
+
       // Handle Pydantic validation errors (array of objects)
       if (Array.isArray(errorMessage)) {
         errorMessage = errorMessage
@@ -101,14 +113,14 @@ class ApiClient {
       } else if (typeof errorMessage === 'object') {
         errorMessage = JSON.stringify(errorMessage);
       }
-      
-      // If 403 with CSRF error, clear cached token for retry
-      if (response.status === 403 && typeof window !== 'undefined' && 
-          (errorMessage.includes('CSRF') || errorMessage.includes('csrf'))) {
-        console.warn('[apiClient] CSRF token invalid, will refresh on next request');
+
+      // If 403 with CSRF error, clear cached token (retry will be handled by caller)
+      if (this.isCsrfError(response.status, errorMessage) && typeof window !== 'undefined') {
+        console.warn('[apiClient] CSRF token invalid, clearing for refresh');
         this.csrfToken = null;
+        this.csrfFetchPromise = null;
       }
-      
+
       // If unauthorized, clear client session to avoid repeated failing calls
       if (response.status === 401 && typeof window !== 'undefined') {
         try {
@@ -164,31 +176,33 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    // Determine auth method: prefer Bearer token if available, otherwise use cookie
+    // Always include auth headers when available
     if (typeof window !== 'undefined') {
       const userToken = localStorage.getItem('userToken');
-      
+
+      // Always include Bearer token if available (works cross-domain)
       if (userToken) {
-        // Bearer token auth - no CSRF needed
         headers['Authorization'] = `Bearer ${userToken}`;
-        
+
         // Optional: send user ID for additional validation
         const userId = localStorage.getItem('userId');
         if (userId) {
           headers['x-user-id'] = userId;
         }
-      } else {
-        // Cookie-based auth - CSRF required for state-changing methods
-        if (includeCsrf) {
-          try {
-            await this.ensureCsrfToken();
-            if (this.csrfToken) {
-              headers['X-CSRF-Token'] = this.csrfToken;
-            }
-          } catch (e) {
-            console.warn('[apiClient] Failed to fetch CSRF token:', e);
-            // ignore CSRF fetch failures here; calls will fail server-side if required
+      }
+
+      // ALWAYS include CSRF token when available for state-changing methods
+      // This is needed because backend checks cookies first, and if cookie exists,
+      // CSRF is required even if Bearer token is also present
+      if (includeCsrf) {
+        try {
+          await this.ensureCsrfToken();
+          if (this.csrfToken) {
+            headers['X-CSRF-Token'] = this.csrfToken;
           }
+        } catch (e) {
+          console.warn('[apiClient] Failed to fetch CSRF token:', e);
+          // ignore CSRF fetch failures here; calls will fail server-side if required
         }
       }
     }
@@ -201,7 +215,7 @@ class ApiClient {
 
   private async ensureCsrfToken(forceRefresh = false): Promise<void> {
     if (this.csrfToken && !forceRefresh) return;
-    
+
     // Don't fetch CSRF token if user is not authenticated (no token = no user session)
     if (typeof window !== 'undefined') {
       const userToken = localStorage.getItem('userToken');
@@ -210,27 +224,42 @@ class ApiClient {
         return;
       }
     }
-    
-    // Fetch CSRF token endpoint; it relies on cookie auth (credentials: include)
-    try {
-      const url = buildUrl(this.baseURL, '/auth/csrf-token');
-      const resp = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (!resp.ok) {
-        console.warn('[apiClient] Failed to fetch CSRF token:', resp.status, resp.statusText);
-        return;
-      }
-      const data = await resp.json().catch(() => null);
-      if (data && data.csrfToken) {
-        this.csrfToken = data.csrfToken;
-        console.debug('[apiClient] CSRF token obtained:', this.csrfToken);
-      }
-    } catch (e) {
-      console.error('[apiClient] Error fetching CSRF token:', e);
+
+    // If already fetching, wait for that promise (prevent race conditions)
+    if (this.csrfFetchPromise) {
+      await this.csrfFetchPromise;
+      return;
     }
+
+    // Fetch CSRF token endpoint; it relies on cookie auth (credentials: include)
+    this.csrfFetchPromise = (async () => {
+      try {
+        const url = buildUrl(this.baseURL, '/auth/csrf-token');
+        const resp = await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}`,
+          },
+        });
+        if (!resp.ok) {
+          console.warn('[apiClient] Failed to fetch CSRF token:', resp.status, resp.statusText);
+          return;
+        }
+        const data = await resp.json().catch(() => null);
+        if (data && data.csrfToken) {
+          this.csrfToken = data.csrfToken;
+          console.debug('[apiClient] CSRF token obtained');
+        }
+      } catch (e) {
+        console.error('[apiClient] Error fetching CSRF token:', e);
+      } finally {
+        this.csrfFetchPromise = null;
+      }
+    })();
+
+    await this.csrfFetchPromise;
   }
 
   // Public helper: allow callers to prime CSRF token after cookie login
@@ -245,7 +274,7 @@ class ApiClient {
 
   async get<T>(endpoint: string, params?: Record<string, any>, transformCase = false): Promise<T> {
     const url = new URL(buildUrl(this.baseURL, endpoint));
-    
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -299,12 +328,30 @@ class ApiClient {
       console.debug('[apiClient] POST', url, bodyData);
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: await this.getHeaders(),
-      body: JSON.stringify(bodyData),
-      credentials: 'include', // Send cookies
-    });
+    const makeRequest = async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: await this.getHeaders(),
+        body: JSON.stringify(bodyData),
+        credentials: 'include',
+      });
+      return response;
+    };
+
+    let response = await makeRequest();
+
+    // If CSRF error, refresh token and retry once
+    if (response.status === 403) {
+      const errorData = await response.clone().json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || '';
+      if (this.isCsrfError(403, errorMessage)) {
+        console.warn('[apiClient] CSRF error on POST, refreshing token and retrying...');
+        this.csrfToken = null;
+        this.csrfFetchPromise = null;
+        await this.ensureCsrfToken(true);
+        response = await makeRequest();
+      }
+    }
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
@@ -317,7 +364,7 @@ class ApiClient {
   async put<T>(endpoint: string, data?: any, transformCase = false, params?: Record<string, any>): Promise<T> {
     const bodyData = transformCase && data ? camelToSnake(data) : data;
     const url = new URL(buildUrl(this.baseURL, endpoint));
-    
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -325,17 +372,35 @@ class ApiClient {
         }
       });
     }
-    
+
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] PUT', url.toString(), bodyData);
     }
 
-    const response = await fetch(url.toString(), {
-      method: 'PUT',
-      headers: await this.getHeaders(),
-      body: JSON.stringify(bodyData),
-      credentials: 'include', // Send cookies
-    });
+    const makeRequest = async () => {
+      const response = await fetch(url.toString(), {
+        method: 'PUT',
+        headers: await this.getHeaders(),
+        body: JSON.stringify(bodyData),
+        credentials: 'include',
+      });
+      return response;
+    };
+
+    let response = await makeRequest();
+
+    // If CSRF error, refresh token and retry once
+    if (response.status === 403) {
+      const errorData = await response.clone().json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || '';
+      if (this.isCsrfError(403, errorMessage)) {
+        console.warn('[apiClient] CSRF error on PUT, refreshing token and retrying...');
+        this.csrfToken = null;
+        this.csrfFetchPromise = null;
+        await this.ensureCsrfToken(true);
+        response = await makeRequest();
+      }
+    }
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
@@ -352,12 +417,30 @@ class ApiClient {
       console.debug('[apiClient] PATCH', url, bodyData);
     }
 
-    const response = await fetch(url, {
-      method: 'PATCH',
-      headers: await this.getHeaders(),
-      body: JSON.stringify(bodyData),
-      credentials: 'include', // Send cookies
-    });
+    const makeRequest = async () => {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: await this.getHeaders(),
+        body: JSON.stringify(bodyData),
+        credentials: 'include',
+      });
+      return response;
+    };
+
+    let response = await makeRequest();
+
+    // If CSRF error, refresh token and retry once
+    if (response.status === 403) {
+      const errorData = await response.clone().json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || '';
+      if (this.isCsrfError(403, errorMessage)) {
+        console.warn('[apiClient] CSRF error on PATCH, refreshing token and retrying...');
+        this.csrfToken = null;
+        this.csrfFetchPromise = null;
+        await this.ensureCsrfToken(true);
+        response = await makeRequest();
+      }
+    }
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
@@ -369,7 +452,7 @@ class ApiClient {
 
   async delete<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
     const url = new URL(buildUrl(this.baseURL, endpoint));
-    
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -377,16 +460,34 @@ class ApiClient {
         }
       });
     }
-    
+
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
       console.debug('[apiClient] DELETE', url.toString());
     }
 
-    const response = await fetch(url.toString(), {
-      method: 'DELETE',
-      headers: await this.getHeaders(),
-      credentials: 'include', // Send cookies
-    });
+    const makeRequest = async () => {
+      const response = await fetch(url.toString(), {
+        method: 'DELETE',
+        headers: await this.getHeaders(),
+        credentials: 'include',
+      });
+      return response;
+    };
+
+    let response = await makeRequest();
+
+    // If CSRF error, refresh token and retry once
+    if (response.status === 403) {
+      const errorData = await response.clone().json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || '';
+      if (this.isCsrfError(403, errorMessage)) {
+        console.warn('[apiClient] CSRF error on DELETE, refreshing token and retrying...');
+        this.csrfToken = null;
+        this.csrfFetchPromise = null;
+        await this.ensureCsrfToken(true);
+        response = await makeRequest();
+      }
+    }
 
     const result = await this.handleResponse<T>(response);
     if (typeof window !== 'undefined' && (window as any).DEBUG_API) {
@@ -406,17 +507,34 @@ class ApiClient {
       });
     }
 
-    const headers = await this.getHeaders({}, true);
-    // Remove Content-Type when sending FormData so browser sets correct boundary
-    if (headers && (headers as any)['Content-Type']) delete (headers as any)['Content-Type'];
+    const makeRequest = async () => {
+      const headers = await this.getHeaders({}, true);
+      // Remove Content-Type when sending FormData so browser sets correct boundary
+      if (headers && (headers as any)['Content-Type']) delete (headers as any)['Content-Type'];
 
-    const response = await fetch(buildUrl(this.baseURL, endpoint), {
-      method: 'POST',
-      body: formData,
-      credentials: 'include', // Send cookies
-      headers,
-      // Don't set Content-Type header - browser will set it with boundary
-    });
+      const response = await fetch(buildUrl(this.baseURL, endpoint), {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers,
+      });
+      return response;
+    };
+
+    let response = await makeRequest();
+
+    // If CSRF error, refresh token and retry once
+    if (response.status === 403) {
+      const errorData = await response.clone().json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || '';
+      if (this.isCsrfError(403, errorMessage)) {
+        console.warn('[apiClient] CSRF error on uploadFile, refreshing token and retrying...');
+        this.csrfToken = null;
+        this.csrfFetchPromise = null;
+        await this.ensureCsrfToken(true);
+        response = await makeRequest();
+      }
+    }
 
     return this.handleResponse<T>(response);
   }
