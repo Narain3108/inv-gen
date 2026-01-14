@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Users, TrendingUp } from 'lucide-react';
 import { ROLES } from '@/lib/constants';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface UserListProps {
   users: User[];
@@ -23,13 +24,11 @@ interface UserListProps {
 export function UserList({ users, onEdit, onAnalysis }: UserListProps) {
   if (users.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center p-12">
-        <Users className="h-16 w-16 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-semibold">No Users Yet</h3>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Create your first user to get started.
-        </p>
-      </Card>
+      <EmptyState
+        title="No Users Yet"
+        description="Create your first user to get started."
+        icon={Users}
+      />
     );
   }
 

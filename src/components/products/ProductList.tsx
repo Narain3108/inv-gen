@@ -20,6 +20,7 @@ import {
 import { Edit, MoreVertical, Package, Search, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface ProductListProps {
   products: Product[];
@@ -82,15 +83,12 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
 
   if (products.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center p-8 sm:p-12 border-2 border-primary/10 dark:border-primary/20 bg-gradient-to-br from-muted/30 to-transparent dark:from-muted/20">
-        <div className="p-4 sm:p-5 rounded-full bg-gradient-to-br from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 mb-4">
-          <Package className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground" />
-        </div>
-        <h3 className="mt-4 text-lg sm:text-xl font-bold text-foreground">No Products Yet</h3>
-        <p className="mt-2 text-center text-sm sm:text-base text-muted-foreground max-w-sm">
-          Get started by creating your first product or service.
-        </p>
-      </Card>
+      <EmptyState
+        title="No Products Yet"
+        description="Get started by creating your first product or service catalog item."
+        icon={Package}
+      // Original didn't have a button
+      />
     );
   }
 
@@ -197,7 +195,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                   </td>
                   <td className="p-4 text-center">
                     {product.type === 'product' && typeof product.stock === 'number' ? (
-                      <Badge 
+                      <Badge
                         variant={product.stock === 0 ? 'destructive' : product.stock < 10 ? 'secondary' : 'outline'}
                         className={product.stock < 10 && product.stock > 0 ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-800 dark:text-orange-400 border-orange-300 dark:border-orange-500/30' : ''}
                       >
@@ -209,26 +207,26 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                   </td>
                   <td className="p-4 text-center">
                     {user?.role !== 'employee' && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="dark:bg-popover">
-                        <DropdownMenuItem onClick={() => onEdit(product)} className="dark:hover:bg-muted/50">
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onDelete(product)}
-                          className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="dark:bg-popover">
+                          <DropdownMenuItem onClick={() => onEdit(product)} className="dark:hover:bg-muted/50">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDelete(product)}
+                            className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </td>
                 </tr>
@@ -241,7 +239,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
       {/* Mobile Card View - Visible on mobile only */}
       <div className="lg:hidden space-y-3">
         {filteredProducts.map((product) => (
-          <Card 
+          <Card
             key={product.id}
             className="p-4 border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 transition-all duration-300 hover-lift bg-gradient-to-r from-muted/30 to-transparent dark:from-muted/20 hover:from-muted/50 dark:hover:from-muted/30"
           >
@@ -263,26 +261,26 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                   )}
                 </div>
                 {user?.role !== 'employee' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="dark:bg-popover">
-                    <DropdownMenuItem onClick={() => onEdit(product)} className="dark:hover:bg-muted/50">
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDelete(product)}
-                      className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="dark:bg-popover">
+                      <DropdownMenuItem onClick={() => onEdit(product)} className="dark:hover:bg-muted/50">
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onDelete(product)}
+                        className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
 
@@ -315,7 +313,7 @@ export function ProductList({ products, onEdit, onDelete }: ProductListProps) {
                 {product.type === 'product' && typeof product.stock === 'number' && (
                   <div>
                     <span className="text-muted-foreground block mb-1">Stock</span>
-                    <Badge 
+                    <Badge
                       variant={product.stock === 0 ? 'destructive' : product.stock < 10 ? 'secondary' : 'outline'}
                       className={`text-xs ${product.stock < 10 && product.stock > 0 ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-800 dark:text-orange-400 border-orange-300 dark:border-orange-500/30' : ''}`}
                     >

@@ -6,10 +6,17 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { AppDataProvider } from '@/contexts/AppDataContext';
 import { QueryProvider } from '@/lib/query';
 import { Toaster } from 'sonner';
+import { useCompaniesSync } from '@/hooks/useCompanies';
+
+function StateSync() {
+  useCompaniesSync();
+  return null;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
+      <StateSync />
       <ThemeProvider>
         <AuthProvider>
           <AppDataProvider>

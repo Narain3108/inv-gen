@@ -6,6 +6,7 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { Company } from '@/types';
 import { useCompaniesQuery, useUpdateCompanyMutation } from '@/hooks/queries';
@@ -64,12 +65,14 @@ export function useCompaniesSync() {
   const store = useCompaniesStore();
 
   // Sync React Query data to Zustand store
-  if (companies && companies !== store.companies) {
-    store.setCompanies(companies);
-  }
-  if (isLoading !== store.loading) {
-    store.setLoading(isLoading);
-  }
+  useEffect(() => {
+    if (companies && companies !== store.companies) {
+      store.setCompanies(companies);
+    }
+    if (isLoading !== store.loading) {
+      store.setLoading(isLoading);
+    }
+  }, [companies, isLoading, store]);
 
   return {
     companies: companies || [],

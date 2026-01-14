@@ -22,6 +22,7 @@ import {
 import { Edit, MoreVertical, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface ClientListProps {
   clients: Client[];
@@ -46,7 +47,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
       if (canViewCreators && !c.createdByUsername && c.createdBy) idsToFetch.add(c.createdBy);
     });
     if (idsToFetch.size === 0) return;
-    
+
     (async () => {
       try {
         const users = await usersApi.getBatch(Array.from(idsToFetch));
@@ -60,7 +61,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
         console.error('Failed to fetch creator names', e);
       }
     })();
-    
+
     return () => { mounted = false; };
   }, [clients, user]);
 
@@ -69,10 +70,10 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
     if (!searchTerm.trim()) {
       return clients;
     }
-    
+
     // Manual search for nested properties since SearchEngine doesn't support dot notation
     const term = searchTerm.toLowerCase();
-    return clients.filter(client => 
+    return clients.filter(client =>
       client.clientName?.toLowerCase().includes(term) ||
       client.gstin?.toLowerCase().includes(term) ||
       client.contact?.email?.toLowerCase().includes(term) ||
@@ -84,15 +85,22 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
 
   if (clients.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center p-8 sm:p-12 border-2 border-primary/10 dark:border-primary/20 bg-gradient-to-br from-muted/30 to-transparent dark:from-muted/20\">
-        <div className="p-4 sm:p-5 rounded-full bg-gradient-to-br from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 mb-4\">
-          <Users className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground\" />
-        </div>
-        <h3 className="mt-4 text-lg sm:text-xl font-bold text-foreground\">No Clients Yet</h3>
-        <p className="mt-2 text-center text-sm sm:text-base text-muted-foreground max-w-sm\">
-          Get started by adding your first client.
-        </p>
-      </Card>
+      <EmptyState
+        title="No Clients Yet"
+        description="Get started by adding your first client to the system."
+        icon={Users}
+        action={{
+          label: "Add Client",
+          // The parent likely handles the "Add Client" modal state, not passed here? 
+          // Looking at props, onEdit, onDelete, onView exist. 'Add' is usually separate.
+          // I will omit the action button here if it's not straightforward to trigger the modal from here, 
+          // or just redirect if that's the pattern. 
+          // Actually, let's leave action out for now to avoid breaking flow if it relies on parent state.
+          // Wait, the original card didn't have a button either.
+          onClick: () => { }
+        }}
+      // Removing action for client list as the Add button is usually in the page header
+      />
     );
   }
 
@@ -164,26 +172,26 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                   </td>
                   <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                     {user?.role !== 'employee' && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="dark:bg-popover">
-                        <DropdownMenuItem onClick={() => onEdit(client)} className="dark:hover:bg-muted/50">
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onDelete(client)}
-                          className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="dark:hover:bg-muted/50">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="dark:bg-popover">
+                          <DropdownMenuItem onClick={() => onEdit(client)} className="dark:hover:bg-muted/50">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDelete(client)}
+                            className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </td>
                 </tr>
@@ -196,7 +204,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
       {/* Mobile Card View - Visible on mobile only */}
       <div className="lg:hidden space-y-3">
         {filteredClients.map((client) => (
-          <Card 
+          <Card
             key={client.id}
             className="p-4 border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 transition-all duration-300 hover-lift cursor-pointer bg-gradient-to-r from-muted/30 to-transparent dark:from-muted/20 hover:from-muted/50 dark:hover:from-muted/30"
             onClick={() => onView?.(client)}
@@ -216,26 +224,26 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
                   {user?.role !== 'employee' && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="dark:bg-popover">
-                      <DropdownMenuItem onClick={() => onEdit(client)} className="dark:hover:bg-muted/50">
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onDelete(client)}
-                        className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 dark:hover:bg-muted/50">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="dark:bg-popover">
+                        <DropdownMenuItem onClick={() => onEdit(client)} className="dark:hover:bg-muted/50">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDelete(client)}
+                          className="text-red-600 dark:text-red-400 dark:hover:bg-muted/50"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               </div>

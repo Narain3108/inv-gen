@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
 import { useEffect } from 'react';
 import { ROLES } from '@/lib/constants';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface QuotationListProps {
   quotations: Quotation[];
@@ -143,13 +144,12 @@ export function QuotationList({
 
   if (quotations.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center p-12">
-        <FileText className="h-16 w-16 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-semibold">No Quotations Yet</h3>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Create your first quotation to provide estimates to clients.
-        </p>
-      </Card>
+      <EmptyState
+        title="No Quotations Yet"
+        description="Create your first quotation and start sending estimates to your clients."
+        icon={FileText}
+      // No direct action button as per pattern, often handled by parent or page header
+      />
     );
   }
 

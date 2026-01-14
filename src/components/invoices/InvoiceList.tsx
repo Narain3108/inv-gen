@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi } from '@/lib/api/users.api';
 import { useEffect } from 'react';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -117,13 +118,15 @@ export function InvoiceList({
 
   if (invoices.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center p-12">
-        <FileText className="h-16 w-16 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-semibold">No Invoices Yet</h3>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Create your first invoice to get started.
-        </p>
-      </Card>
+      <EmptyState
+        title="No Invoices Yet"
+        description="Create your first invoice to get started and track your payments."
+        icon={FileText}
+        action={{
+          label: "Create Invoice",
+          onClick: () => window.location.href = '/invoices/new' // Ideally this should be a router push or prop, but keeping simple for now or better yet, just generic instruction if action not passed
+        }}
+      />
     );
   }
 

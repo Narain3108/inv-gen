@@ -14,6 +14,7 @@ import { Edit, Trash2, Package } from 'lucide-react';
 import { formatDate } from '@/utils/formatters';
 import { usersApi } from '@/lib/api/users.api';
 import { useAuth } from '@/hooks/useAuth';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface CategoryListProps {
   categories: ProductCategory[];
@@ -60,15 +61,11 @@ export function CategoryList({ categories, onEdit, onDelete, loading }: Category
 
   if (categories.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Package className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Product Categories</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            Create your first product category to organize products and auto-fill GST rates.
-          </p>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="No Product Categories"
+        description="Create your first product category to organize products and auto-fill GST rates."
+        icon={Package}
+      />
     );
   }
 
@@ -117,7 +114,7 @@ export function CategoryList({ categories, onEdit, onDelete, loading }: Category
                 <Package className="h-3.5 w-3.5" />
                 <span>{category.products.length} product(s)</span>
               </div>
-              
+
               {/* Show product list */}
               {category.products.length > 0 && (
                 <div className="mt-3 space-y-1">
