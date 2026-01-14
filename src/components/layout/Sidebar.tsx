@@ -88,20 +88,20 @@ const navItems: NavItem[] = [
 
 // Admin-only navigation items
 const adminNavItems: NavItem[] = [
-  // {
-  //   title: 'Services',
-  //   href: '/invoices/services',
-  //   icon: Wrench,
-  // },
+  {
+    title: 'Services',
+    href: '/invoices/services',
+    icon: Wrench,
+  },
 ];
 
 // Employee-only navigation items
 const employeeNavItems: NavItem[] = [
-  // {
-  //   title: 'Assigned Tasks',
-  //   href: '/invoices/my-tasks',
-  //   icon: ClipboardList,
-  // },
+  {
+    title: 'Assigned Tasks',
+    href: '/invoices/my-tasks',
+    icon: ClipboardList,
+  },
 ];
 
 const superAdminNavItems: NavItem[] = [

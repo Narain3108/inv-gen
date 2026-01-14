@@ -213,55 +213,57 @@ function CreateServiceContent() {
                         <CardTitle>Call Details</CardTitle>
                         <CardDescription>Information about the service call</CardDescription>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="client">Client *</Label>
-                            <Select
-                                value={form.clientId}
-                                onValueChange={(value) => setForm({ ...form, clientId: value })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a client" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {clients.map((client) => (
-                                        <SelectItem key={client.id} value={client.id}>
-                                            {client.clientName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1">
+                                <Label htmlFor="client">Client *</Label>
+                                <Select
+                                    value={form.clientId}
+                                    onValueChange={(value) => setForm({ ...form, clientId: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a client" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {clients.map((client) => (
+                                            <SelectItem key={client.id} value={client.id}>
+                                                {client.clientName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="w-full md:w-[220px]">
+                                <Label htmlFor="serviceType">Service Type *</Label>
+                                <Select
+                                    value={form.serviceType}
+                                    onValueChange={(value) => setForm({ ...form, serviceType: value as ServiceType })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {serviceTypeOptions.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="w-full md:w-[200px]">
+                                <Label htmlFor="callDate">Call Date *</Label>
+                                <Input
+                                    type="date"
+                                    value={form.callDate ? new Date(form.callDate).toISOString().split('T')[0] : ''}
+                                    onChange={(e) => setForm({ ...form, callDate: new Date(e.target.value) })}
+                                />
+                            </div>
                         </div>
 
                         <div>
-                            <Label htmlFor="serviceType">Service Type *</Label>
-                            <Select
-                                value={form.serviceType}
-                                onValueChange={(value) => setForm({ ...form, serviceType: value as ServiceType })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {serviceTypeOptions.map((opt) => (
-                                        <SelectItem key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label htmlFor="callDate">Call Date *</Label>
-                            <Input
-                                type="date"
-                                value={form.callDate ? new Date(form.callDate).toISOString().split('T')[0] : ''}
-                                onChange={(e) => setForm({ ...form, callDate: new Date(e.target.value) })}
-                            />
-                        </div>
-
-                        <div className="md:col-span-2">
                             <Label htmlFor="problemDescription">Problem Description * (max 50 words)</Label>
                             <Textarea
                                 id="problemDescription"
@@ -272,7 +274,7 @@ function CreateServiceContent() {
                             />
                         </div>
 
-                        <div className="md:col-span-2">
+                        <div>
                             <Label htmlFor="initialSolution">Initial Solution (Optional)</Label>
                             <Textarea
                                 id="initialSolution"
