@@ -122,10 +122,6 @@ export function InvoiceList({
         title="No Invoices Yet"
         description="Create your first invoice to get started and track your payments."
         icon={FileText}
-        action={{
-          label: "Create Invoice",
-          onClick: () => window.location.href = '/invoices/new' // Ideally this should be a router push or prop, but keeping simple for now or better yet, just generic instruction if action not passed
-        }}
       />
     );
   }

@@ -89,17 +89,6 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
         title="No Clients Yet"
         description="Get started by adding your first client to the system."
         icon={Users}
-        action={{
-          label: "Add Client",
-          // The parent likely handles the "Add Client" modal state, not passed here? 
-          // Looking at props, onEdit, onDelete, onView exist. 'Add' is usually separate.
-          // I will omit the action button here if it's not straightforward to trigger the modal from here, 
-          // or just redirect if that's the pattern. 
-          // Actually, let's leave action out for now to avoid breaking flow if it relies on parent state.
-          // Wait, the original card didn't have a button either.
-          onClick: () => { }
-        }}
-      // Removing action for client list as the Add button is usually in the page header
       />
     );
   }
