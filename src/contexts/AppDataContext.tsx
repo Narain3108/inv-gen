@@ -169,6 +169,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     if (isPublicPage) return;
 
     if (user) {
+      // CRITICAL: Check if user has a valid token before making API calls
+      const userToken = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
+      if (!userToken) {
+        console.warn('⚠️ User exists but no token found. Skipping data load.');
+        return;
+      }
+
       const hasUserChanged = user.id !== prevUserId;
 
       if (hasUserChanged) {

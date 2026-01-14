@@ -112,20 +112,33 @@ class ApiClient {
       // If unauthorized, clear client session to avoid repeated failing calls
       if (response.status === 401 && typeof window !== 'undefined') {
         try {
-          console.warn('[apiClient] 401 Unauthorized received. Clearing local session and redirecting to login.');
-          localStorage.removeItem('userData');
-          localStorage.removeItem('userToken');
-          localStorage.removeItem('orgData');
-          localStorage.removeItem('orgToken');
-          this.csrfToken = null;
-          // Give caller a chance to handle before redirecting in SPA environments
-          setTimeout(() => {
-            try {
-              window.location.href = '/auth/login';
-            } catch (e) {
-              // ignore
-            }
-          }, 200);
+          const currentPath = window.location.pathname;
+          // Only log and redirect if not already on an auth page
+          if (!currentPath.startsWith('/auth')) {
+            console.warn('[apiClient] 401 Unauthorized received. Clearing local session and redirecting to login.');
+            localStorage.removeItem('userData');
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('orgData');
+            localStorage.removeItem('orgToken');
+            this.csrfToken = null;
+            // Give caller a chance to handle before redirecting in SPA environments
+            setTimeout(() => {
+              try {
+                if (!window.location.pathname.startsWith('/auth')) {
+                  window.location.href = '/auth/login';
+                }
+              } catch (e) {
+                // ignore
+              }
+            }, 200);
+          } else {
+            // Just clear tokens if already on auth page
+            localStorage.removeItem('userData');
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('orgData');
+            localStorage.removeItem('orgToken');
+            this.csrfToken = null;
+          }
         } catch (e) {
           // ignore
         }
@@ -188,6 +201,15 @@ class ApiClient {
 
   private async ensureCsrfToken(forceRefresh = false): Promise<void> {
     if (this.csrfToken && !forceRefresh) return;
+    
+    // Don't fetch CSRF token if user is not authenticated (no token = no user session)
+    if (typeof window !== 'undefined') {
+      const userToken = localStorage.getItem('userToken');
+      if (!userToken) {
+        console.debug('[apiClient] Skipping CSRF token fetch - user not authenticated');
+        return;
+      }
+    }
     
     // Fetch CSRF token endpoint; it relies on cookie auth (credentials: include)
     try {
