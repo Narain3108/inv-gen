@@ -36,6 +36,7 @@ interface ClientFormProps {
 export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
+  const [hasGST, setHasGST] = useState(!!client?.gstin); // Initialize based on existing GSTIN
 
   // Form default values
   const defaultValues = client ? {
@@ -210,37 +211,77 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
               <CardTitle>Client Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* GSTIN (Optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="gstin">GSTIN (Optional)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="gstin"
-                    {...register('gstin')}
-                    placeholder="22AAAAA0000A1Z5"
-                    maxLength={15}
-                    autoComplete="off"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleFetchGSTIN}
-                    disabled={isFetchingGSTIN || !gstin}
-                  >
-                    {isFetchingGSTIN ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
-                  </Button>
+              {/* GST Registration Status */}
+              <div className="space-y-3">
+                <Label>Does the client have GST registration?</Label>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="gst-yes"
+                      name="hasGST"
+                      checked={hasGST}
+                      onChange={() => {
+                        setHasGST(true);
+                      }}
+                      className="h-4 w-4 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="gst-yes" className="font-normal cursor-pointer">
+                      Yes
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="gst-no"
+                      name="hasGST"
+                      checked={!hasGST}
+                      onChange={() => {
+                        setHasGST(false);
+                        setValue('gstin', ''); // Clear GSTIN when selecting No
+                      }}
+                      className="h-4 w-4 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="gst-no" className="font-normal cursor-pointer">
+                      No
+                    </Label>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Leave empty for unregistered clients or B2C customers
-                </p>
-                {errors.gstin && (
-                  <p className="text-sm text-red-500">{errors.gstin.message}</p>
-                )}
               </div>
+
+              {/* GSTIN Input - Only shown when hasGST is true */}
+              {hasGST && (
+                <div className="space-y-2">
+                  <Label htmlFor="gstin">GSTIN *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="gstin"
+                      {...register('gstin')}
+                      placeholder="22AAAAA0000A1Z5"
+                      maxLength={15}
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleFetchGSTIN}
+                      disabled={isFetchingGSTIN || !gstin}
+                    >
+                      {isFetchingGSTIN ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Click the search icon to auto-fill details from GSTIN
+                  </p>
+                  {errors.gstin && (
+                    <p className="text-sm text-red-500">{errors.gstin.message}</p>
+                  )}
+                </div>
+              )}
 
               {/* Client Name */}
               <div className="space-y-2">
