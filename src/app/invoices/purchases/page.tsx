@@ -249,7 +249,7 @@ export default function PurchaseHistoryPage() {
 
         {/* Details Dialog */}
         <Dialog open={!!selectedBill} onOpenChange={(open) => !open && setSelectedBill(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Purchase Bill: {(selectedBill as any)?.invoiceNumber || (selectedBill as any)?.billNumber || (selectedBill as any)?.invoice_number || ''}</DialogTitle>
             </DialogHeader>

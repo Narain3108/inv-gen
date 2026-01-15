@@ -343,7 +343,7 @@ export default function UsersPage() {
         />
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedUser ? 'Edit User' : 'Create New User'}</DialogTitle>
               <DialogDescription>
@@ -369,7 +369,7 @@ export default function UsersPage() {
 
         {/* Employee Analysis Dialog */}
         <Dialog open={isAnalysisOpen} onOpenChange={setIsAnalysisOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Performance Analysis</DialogTitle>
               <DialogDescription>

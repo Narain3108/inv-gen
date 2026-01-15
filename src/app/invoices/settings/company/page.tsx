@@ -138,7 +138,7 @@ export default function CompanySettingsPage() {
         if (obj === null || obj === undefined) return undefined;
         if (typeof obj !== 'object') return obj;
         if (Array.isArray(obj)) return obj.map(removeUndefined);
-        
+
         const cleaned: any = {};
         for (const [key, value] of Object.entries(obj)) {
           if (value !== undefined) {
@@ -180,16 +180,16 @@ export default function CompanySettingsPage() {
         // Update existing company
         console.log('Updating company:', editingCompany.id, cleanedData);
         const updatedCompany = await companiesApi.update(editingCompany.id, cleanedData);
-        
+
         updateCompanyInStore(editingCompany.id, updatedCompany); // Update global store
         await refreshCompanies(); // Refresh AppDataContext
-        
+
         // CRITICAL FIX: Update selectedCompany if it's the one being edited
         if (selectedCompany?.id === editingCompany.id) {
           console.log('✅ Updating selected company with new images');
           setSelectedCompany(updatedCompany);
         }
-        
+
         toast.success('Company updated successfully');
       } else {
         // Only super_admin can create new companies
@@ -203,12 +203,12 @@ export default function CompanySettingsPage() {
         console.log('Created company with ID:', newCompany.id);
         addCompany(newCompany); // Add to global store
         await refreshCompanies(); // Refresh AppDataContext
-        
+
         // Set as selected if it's the first company
         if (companies.length === 0) {
           setSelectedCompany(newCompany);
         }
-        
+
         toast.success('Company created successfully');
       }
 
@@ -225,24 +225,24 @@ export default function CompanySettingsPage() {
   }
 
   if (isLoading && companies.length === 0) {
-      return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                 <PageHeader
-                    title="Company Management"
-                    description="Manage your business profiles and settings"
-                >
-                    {user?.role === 'super_admin' && (
-                        <Button onClick={handleCreateCompany}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Company
-                        </Button>
-                    )}
-                </PageHeader>
-                <TableSkeleton />
-            </div>
-        </DashboardLayout>
-      );
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <PageHeader
+            title="Company Management"
+            description="Manage your business profiles and settings"
+          >
+            {user?.role === 'super_admin' && (
+              <Button onClick={handleCreateCompany}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Company
+              </Button>
+            )}
+          </PageHeader>
+          <TableSkeleton />
+        </div>
+      </DashboardLayout>
+    );
   }
 
   if (isLoading) {
@@ -261,72 +261,72 @@ export default function CompanySettingsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">{/*...rest of content...*/}
-          <PageHeader
-            icon={Building2}
-            title="Company Management"
-            description="Manage your company profiles and details"
-          >
-            {user?.role === 'super_admin' && (
-              <Button onClick={handleCreateCompany}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Company
-              </Button>
-            )}
-          </PageHeader>
-
-          {companies.length === 0 && !isLoading && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Welcome! Let's get started.</h3>
-              <p className="text-yellow-700 dark:text-yellow-300">
-                You need to create a company profile before you can start creating invoices. 
-                Please click the "Add Company" button or fill out the form that just opened.
-              </p>
-            </div>
+        <PageHeader
+          icon={Building2}
+          title="Company Management"
+          description="Manage your company profiles and details"
+        >
+          {user?.role === 'super_admin' && (
+            <Button onClick={handleCreateCompany}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Company
+            </Button>
           )}
+        </PageHeader>
 
-          <CompanyList
-            companies={user?.role === 'super_admin' ? companies : companies.filter(c => (user?.allowedCompanyIds || []).includes(c.id))}
-            selectedCompanyId={selectedCompany?.id}
-            onSelect={setSelectedCompany}
-            onEdit={handleEditCompany}
-            onDelete={handleDeleteCompany}
-            canEdit={user?.role === 'super_admin' || user?.role === 'admin'}
-            canDelete={user?.role === 'super_admin'}
-          />
+        {companies.length === 0 && !isLoading && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
+            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Welcome! Let's get started.</h3>
+            <p className="text-yellow-700 dark:text-yellow-300">
+              You need to create a company profile before you can start creating invoices.
+              Please click the "Add Company" button or fill out the form that just opened.
+            </p>
+          </div>
+        )}
 
-          {/* Company Form Dialog */}
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingCompany ? 'Edit Company' : 'Create New Company'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingCompany
-                    ? 'Update your company information below.'
-                    : 'Add a new company to your account.'}
-                </DialogDescription>
-              </DialogHeader>
-              <CompanyForm
-                company={editingCompany}
-                onSubmit={handleSubmit}
-                onCancel={() => {
-                  setIsFormOpen(false);
-                  setEditingCompany(undefined);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+        <CompanyList
+          companies={user?.role === 'super_admin' ? companies : companies.filter(c => (user?.allowedCompanyIds || []).includes(c.id))}
+          selectedCompanyId={selectedCompany?.id}
+          onSelect={setSelectedCompany}
+          onEdit={handleEditCompany}
+          onDelete={handleDeleteCompany}
+          canEdit={user?.role === 'super_admin' || user?.role === 'admin'}
+          canDelete={user?.role === 'super_admin'}
+        />
 
-          {/* Delete Confirmation */}
-          <ConfirmDialog
-            open={deleteConfirmOpen}
-            onOpenChange={setDeleteConfirmOpen}
-            onConfirm={confirmDelete}
-            title="Delete Company"
-            description="Are you sure you want to delete this company? This action cannot be undone and will also delete all associated products, clients, and invoices."
-          />
-        </div>
-      </DashboardLayout>
+        {/* Company Form Dialog */}
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingCompany ? 'Edit Company' : 'Create New Company'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingCompany
+                  ? 'Update your company information below.'
+                  : 'Add a new company to your account.'}
+              </DialogDescription>
+            </DialogHeader>
+            <CompanyForm
+              company={editingCompany}
+              onSubmit={handleSubmit}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setEditingCompany(undefined);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={confirmDelete}
+          title="Delete Company"
+          description="Are you sure you want to delete this company? This action cannot be undone and will also delete all associated products, clients, and invoices."
+        />
+      </div>
+    </DashboardLayout>
   );
 }

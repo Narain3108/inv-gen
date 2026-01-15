@@ -300,7 +300,7 @@ function InvoicesContent() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={actions.isDialogOpen} onOpenChange={actions.setIsDialogOpen}>
-        <DialogContent className="max-w-[98vw] w-[98vw] h-[98vh] max-h-[98vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {actions.editingInvoice ? 'Edit Invoice' : 'New Invoice'}

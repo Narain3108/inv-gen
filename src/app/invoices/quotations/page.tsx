@@ -199,7 +199,7 @@ function QuotationsContent() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={actions.isDialogOpen} onOpenChange={actions.setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {actions.editingQuotation ? 'Edit Quotation' : 'Create New Quotation'}

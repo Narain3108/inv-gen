@@ -1,26 +1,32 @@
 /**
  * Company Form Component
  * Form for creating/editing company details
+ * 
+ * Follows SOLID principles:
+ * - Single Responsibility: Form logic separated into tab content components
+ * - Open/Closed: Tab content can be extended without modifying core structure
+ * - DRY: Uses shared TabFormLayout component
  */
 
 'use client';
 
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useState, useMemo } from 'react';
+import { useForm, UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { companyFormSchema } from '@/lib/validations';
 import { Company } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Link as LinkIcon } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { INDIAN_STATES } from '@/lib/constants';
 import { fetchGSTINDetails } from '@/lib/api/gst-api';
 import { z } from 'zod';
 import { ImageUpload } from '@/components/shared/ImageUpload';
 import { NumberingConfig } from '@/components/shared/NumberingConfig';
+import { TabFormLayout, TabConfig } from '@/components/shared/TabFormLayout';
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 
@@ -30,153 +36,30 @@ interface CompanyFormProps {
   onCancel?: () => void;
 }
 
-export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string>(company?.logoUrl || '');
-  const [signatureUrl, setSignatureUrl] = useState<string>(company?.signatureUrl || '');
+// ============================================================================
+// Tab Content Components (Single Responsibility Principle)
+// ============================================================================
 
-  const [invoicePrefix, setInvoicePrefix] = useState(company?.invoiceNumbering?.prefix || '');
-  const [invoiceSuffix, setInvoiceSuffix] = useState(company?.invoiceNumbering?.suffix || '');
-  const [invoiceOrder, setInvoiceOrder] = useState(company?.invoiceNumbering?.order || 'prefix,number,suffix');
+interface TabContentProps {
+  form: UseFormReturn<CompanyFormData>;
+  company?: Company;
+}
 
-  const [quotationPrefix, setQuotationPrefix] = useState(company?.quotationNumbering?.prefix || '');
-  const [quotationSuffix, setQuotationSuffix] = useState(company?.quotationNumbering?.suffix || '');
-  const [quotationOrder, setQuotationOrder] = useState(company?.quotationNumbering?.order || 'prefix,number,suffix');
-
-  const [servicePrefix, setServicePrefix] = useState(company?.serviceNumbering?.prefix || '');
-  const [serviceSuffix, setServiceSuffix] = useState(company?.serviceNumbering?.suffix || '');
-  const [serviceOrder, setServiceOrder] = useState(company?.serviceNumbering?.order || 'prefix,number,suffix');
-
-
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<CompanyFormData>({
-    resolver: zodResolver(companyFormSchema) as any,
-    defaultValues: company ? {
-      name: company.name,
-      // Ensure gstin/pan default to empty string to avoid null reference issues
-      gstin: company.gstin || '',
-      pan: company.pan || '',
-      website: company.website || '',
-      logoUrl: company.logoUrl || '',
-      address: company.address || {
-        country: 'India',
-        street: '',
-        city: '',
-        state: '',
-        pincode: '',
-      },
-      contact: company.contact || { phone: '', email: '' },
-      bankDetails: company.bankDetails || {},
-      termsAndConditions: company.termsAndConditions || '',
-      additionalNotes: company.additionalNotes || '',
-    } : {
-      address: {
-        country: 'India',
-      },
-      termsAndConditions: '',
-      additionalNotes: '',
-    } as any,
-  });
-
-  const gstin = watch('gstin');
-
-  // Auto-fetch GSTIN details
-  const handleFetchGSTIN = async () => {
-    const gst = (gstin ?? '').toString().trim().toUpperCase();
-    if (!gst || gst.length !== 15) {
-      toast.error('Please enter a valid 15-character GSTIN');
-      return;
-    }
-
-    // set normalized GSTIN back to form so value and validation are consistent
-    setValue('gstin', gst);
-
-    setIsFetchingGSTIN(true);
-    try {
-      const details = await fetchGSTINDetails(gst);
-      if (details) {
-        setValue('name', details.legalName);
-        setValue('address.state', details.stateName);
-        setValue('address.pincode', details.pincode);
-        toast.success('GSTIN details fetched successfully');
-      } else {
-        toast.error('Failed to fetch GSTIN details');
-      }
-    } catch (error) {
-      toast.error('Error fetching GSTIN details');
-    } finally {
-      setIsFetchingGSTIN(false);
-    }
-  };
-
-  const handleFormSubmit = async (data: CompanyFormData) => {
-    setIsLoading(true);
-    try {
-      // Explicitly construct payload to match backend schema
-      const companyData = {
-        name: data.name,
-        gstin: data.gstin || null,
-        pan: data.pan || null,
-        address: data.address,
-        contact: data.contact,
-        bankDetails: data.bankDetails || null,
-        logoUrl: logoUrl || null,
-        signatureUrl: signatureUrl || null,
-        website: data.website || null,
-        termsAndConditions: data.termsAndConditions || null,
-        additionalNotes: data.additionalNotes || null,
-        invoiceNumbering: {
-          prefix: invoicePrefix,
-          suffix: invoiceSuffix,
-          order: invoiceOrder,
-        },
-        quotationNumbering: {
-          prefix: quotationPrefix,
-          suffix: quotationSuffix,
-          order: quotationOrder,
-        },
-        serviceNumbering: {
-          prefix: servicePrefix,
-          suffix: serviceSuffix,
-          order: serviceOrder,
-        },
-      };
-
-      await onSubmit(companyData as any);
-      toast.success(company ? 'Company updated successfully' : 'Company created successfully');
-    } catch (error: any) {
-      console.error('Error saving company:', error);
-      const errorMessage = error.response?.data?.detail
-        ? (Array.isArray(error.response.data.detail)
-          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
-          : error.response.data.detail)
-        : 'Failed to save company';
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+/** Basic Information Tab Content */
+function BasicInfoTab({ form, company }: TabContentProps & {
+  onFetchGSTIN: () => void;
+  isFetchingGSTIN: boolean;
+}) {
+  const { register, formState: { errors }, watch, setValue } = form;
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* Basic Information */}
+    <div className="space-y-6">
+      {/* Company Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>Company Details</CardTitle>
         </CardHeader>
-
-
         <CardContent className="space-y-4">
-
-
-
           {/* GSTIN */}
           <div className="space-y-2">
             <Label htmlFor="gstin">GSTIN (Optional)</Label>
@@ -191,10 +74,10 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleFetchGSTIN}
-                disabled={isFetchingGSTIN}
+                onClick={arguments[0].onFetchGSTIN}
+                disabled={arguments[0].isFetchingGSTIN}
               >
-                {isFetchingGSTIN ? (
+                {arguments[0].isFetchingGSTIN ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Fetching...
@@ -364,22 +247,30 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
 
-      {/* Bank Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bank Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.bankName">Bank Name</Label>
-            <Input
-              id="bankDetails.bankName"
-              {...register('bankDetails.bankName')}
-              placeholder="HDFC Bank"
-            />
-          </div>
+/** Bank Details Tab Content */
+function BankDetailsTab({ form }: TabContentProps) {
+  const { register, formState: { errors } } = form;
 
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Bank Details</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="bankDetails.bankName">Bank Name</Label>
+          <Input
+            id="bankDetails.bankName"
+            {...register('bankDetails.bankName')}
+            placeholder="HDFC Bank"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="bankDetails.accountNumber">Account Number</Label>
             <Input
@@ -398,7 +289,9 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
               className="uppercase"
             />
           </div>
+        </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="bankDetails.accountHolderName">Account Holder Name</Label>
             <Input
@@ -416,60 +309,100 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
               placeholder="Andheri East"
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.upiId">UPI ID</Label>
-            <Input
-              id="bankDetails.upiId"
-              {...register('bankDetails.upiId')}
-              placeholder="company@upi"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <div className="space-y-2">
+          <Label htmlFor="bankDetails.upiId">UPI ID</Label>
+          <Input
+            id="bankDetails.upiId"
+            {...register('bankDetails.upiId')}
+            placeholder="company@upi"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-      {/* Invoice Numbering Configuration */}
+/** Settings Tab Content (Numbering Configurations) */
+interface SettingsTabProps {
+  invoicePrefix: string;
+  invoiceSuffix: string;
+  invoiceOrder: string;
+  quotationPrefix: string;
+  quotationSuffix: string;
+  quotationOrder: string;
+  servicePrefix: string;
+  serviceSuffix: string;
+  serviceOrder: string;
+  company?: Company;
+  setInvoicePrefix: (v: string) => void;
+  setInvoiceSuffix: (v: string) => void;
+  setInvoiceOrder: (v: string) => void;
+  setQuotationPrefix: (v: string) => void;
+  setQuotationSuffix: (v: string) => void;
+  setQuotationOrder: (v: string) => void;
+  setServicePrefix: (v: string) => void;
+  setServiceSuffix: (v: string) => void;
+  setServiceOrder: (v: string) => void;
+}
+
+function SettingsTab(props: SettingsTabProps) {
+  return (
+    <div className="space-y-6">
       <NumberingConfig
         title="Invoice Numbering"
         description="Configure how invoice numbers are generated automatically"
-        prefix={invoicePrefix}
-        suffix={invoiceSuffix}
-        order={invoiceOrder}
-        nextNumber={company?.invoiceNumbering?.nextNumber || 1}
-        onPrefixChange={setInvoicePrefix}
-        onSuffixChange={setInvoiceSuffix}
-        onOrderChange={setInvoiceOrder}
+        prefix={props.invoicePrefix}
+        suffix={props.invoiceSuffix}
+        order={props.invoiceOrder}
+        nextNumber={props.company?.invoiceNumbering?.nextNumber || 1}
+        onPrefixChange={props.setInvoicePrefix}
+        onSuffixChange={props.setInvoiceSuffix}
+        onOrderChange={props.setInvoiceOrder}
       />
 
-      {/* Quotation Numbering Configuration */}
       <NumberingConfig
         title="Quotation Numbering"
         description="Configure how quotation numbers are generated automatically"
-        prefix={quotationPrefix}
-        suffix={quotationSuffix}
-        order={quotationOrder}
-        nextNumber={company?.quotationNumbering?.nextNumber || 1}
-        onPrefixChange={setQuotationPrefix}
-        onSuffixChange={setQuotationSuffix}
-        onOrderChange={setQuotationOrder}
+        prefix={props.quotationPrefix}
+        suffix={props.quotationSuffix}
+        order={props.quotationOrder}
+        nextNumber={props.company?.quotationNumbering?.nextNumber || 1}
+        onPrefixChange={props.setQuotationPrefix}
+        onSuffixChange={props.setQuotationSuffix}
+        onOrderChange={props.setQuotationOrder}
       />
 
-      {/* Service Numbering Configuration */}
       <NumberingConfig
         title="Service Numbering"
         description="Configure how service numbers are generated automatically"
-        prefix={servicePrefix}
-        suffix={serviceSuffix}
-        order={serviceOrder}
-        nextNumber={company?.serviceNumbering?.nextNumber || 1}
-        onPrefixChange={setServicePrefix}
-        onSuffixChange={setServiceSuffix}
-        onOrderChange={setServiceOrder}
+        prefix={props.servicePrefix}
+        suffix={props.serviceSuffix}
+        order={props.serviceOrder}
+        nextNumber={props.company?.serviceNumbering?.nextNumber || 1}
+        onPrefixChange={props.setServicePrefix}
+        onSuffixChange={props.setServiceSuffix}
+        onOrderChange={props.setServiceOrder}
       />
+    </div>
+  );
+}
 
+/** Branding Tab Content */
+interface BrandingTabProps extends TabContentProps {
+  logoUrl: string;
+  signatureUrl: string;
+  setLogoUrl: (url: string) => void;
+  setSignatureUrl: (url: string) => void;
+}
 
+function BrandingTab({ form, logoUrl, signatureUrl, setLogoUrl, setSignatureUrl }: BrandingTabProps) {
+  const { register, setValue, formState: { errors } } = form;
 
-      {/* Terms and Conditions */}
+  return (
+    <div className="space-y-6">
+      {/* Terms and Notes */}
       <Card>
         <CardHeader>
           <CardTitle>Invoice Defaults</CardTitle>
@@ -506,13 +439,17 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
             </p>
             {errors.additionalNotes && (
               <p className="text-sm text-red-500">{errors.additionalNotes.message}</p>
-
-
             )}
           </div>
         </CardContent>
+      </Card>
+
+      {/* Image Uploads */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Company Branding</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
-          {/* Company Logo Upload */}
           <ImageUpload
             label="Company Logo"
             currentImageUrl={logoUrl}
@@ -526,7 +463,6 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
             }}
           />
 
-          {/* Company Signature Upload */}
           <ImageUpload
             label="Authorized Signature"
             currentImageUrl={signatureUrl}
@@ -541,28 +477,244 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
           />
         </CardContent>
       </Card>
+    </div>
+  );
+}
 
+// ============================================================================
+// Main Form Component
+// ============================================================================
 
+type TabKey = 'basic' | 'bank' | 'settings' | 'branding';
 
+export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingGSTIN, setIsFetchingGSTIN] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('basic');
 
-      {/* Form Actions */}
-      <div className="flex justify-end gap-4">
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
-        <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>{company ? 'Update Company' : 'Create Company'}</>
-          )}
-        </Button>
-      </div>
+  // Image URLs
+  const [logoUrl, setLogoUrl] = useState<string>(company?.logoUrl || '');
+  const [signatureUrl, setSignatureUrl] = useState<string>(company?.signatureUrl || '');
+
+  // Numbering Configuration States
+  const [invoicePrefix, setInvoicePrefix] = useState(company?.invoiceNumbering?.prefix || '');
+  const [invoiceSuffix, setInvoiceSuffix] = useState(company?.invoiceNumbering?.suffix || '');
+  const [invoiceOrder, setInvoiceOrder] = useState(company?.invoiceNumbering?.order || 'prefix,number,suffix');
+
+  const [quotationPrefix, setQuotationPrefix] = useState(company?.quotationNumbering?.prefix || '');
+  const [quotationSuffix, setQuotationSuffix] = useState(company?.quotationNumbering?.suffix || '');
+  const [quotationOrder, setQuotationOrder] = useState(company?.quotationNumbering?.order || 'prefix,number,suffix');
+
+  const [servicePrefix, setServicePrefix] = useState(company?.serviceNumbering?.prefix || '');
+  const [serviceSuffix, setServiceSuffix] = useState(company?.serviceNumbering?.suffix || '');
+  const [serviceOrder, setServiceOrder] = useState(company?.serviceNumbering?.order || 'prefix,number,suffix');
+
+  const form = useForm<CompanyFormData>({
+    resolver: zodResolver(companyFormSchema) as any,
+    defaultValues: company ? {
+      name: company.name,
+      gstin: company.gstin || '',
+      pan: company.pan || '',
+      website: company.website || '',
+      logoUrl: company.logoUrl || '',
+      address: company.address || { country: 'India', street: '', city: '', state: '', pincode: '' },
+      contact: company.contact || { phone: '', email: '' },
+      bankDetails: company.bankDetails || {},
+      termsAndConditions: company.termsAndConditions || '',
+      additionalNotes: company.additionalNotes || '',
+    } : {
+      address: { country: 'India' },
+      termsAndConditions: '',
+      additionalNotes: '',
+    } as any,
+  });
+
+  const { handleSubmit, trigger, watch, setValue } = form;
+
+  // Tab navigation order and validation fields per tab
+  const tabsOrder: TabKey[] = ['basic', 'bank', 'settings', 'branding'];
+  const fieldsPerTab: Record<TabKey, string[]> = {
+    basic: ['name', 'gstin', 'pan', 'address.street', 'address.city', 'address.state', 'address.pincode', 'contact.phone', 'contact.email'],
+    bank: ['bankDetails.bankName', 'bankDetails.accountNumber', 'bankDetails.ifscCode'],
+    settings: [],
+    branding: ['termsAndConditions', 'additionalNotes'],
+  };
+
+  // Auto-fetch GSTIN details
+  const handleFetchGSTIN = async () => {
+    const gstin = (watch('gstin') ?? '').toString().trim().toUpperCase();
+    if (!gstin || gstin.length !== 15) {
+      toast.error('Please enter a valid 15-character GSTIN');
+      return;
+    }
+
+    setValue('gstin', gstin);
+    setIsFetchingGSTIN(true);
+    try {
+      const details = await fetchGSTINDetails(gstin);
+      if (details) {
+        setValue('name', details.legalName);
+        setValue('address.state', details.stateName);
+        setValue('address.pincode', details.pincode);
+        toast.success('GSTIN details fetched successfully');
+      } else {
+        toast.error('Failed to fetch GSTIN details');
+      }
+    } catch (error) {
+      toast.error('Error fetching GSTIN details');
+    } finally {
+      setIsFetchingGSTIN(false);
+    }
+  };
+
+  // Navigate to next tab with validation
+  const goToNext = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const currentFields = fieldsPerTab[activeTab] || [];
+    const valid = await trigger(currentFields as any);
+    if (!valid) {
+      toast.error('Please fix errors on this tab before proceeding');
+      return;
+    }
+
+    const idx = tabsOrder.indexOf(activeTab);
+    if (idx >= 0 && idx < tabsOrder.length - 1) {
+      setActiveTab(tabsOrder[idx + 1]);
+    }
+  };
+
+  // Navigate to previous tab
+  const goBack = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const idx = tabsOrder.indexOf(activeTab);
+    if (idx > 0) {
+      setActiveTab(tabsOrder[idx - 1]);
+    }
+  };
+
+  // Submit handler
+  const handleFormSubmit = async (data: CompanyFormData) => {
+    setIsLoading(true);
+    try {
+      const companyData = {
+        name: data.name,
+        gstin: data.gstin || null,
+        pan: data.pan || null,
+        address: data.address,
+        contact: data.contact,
+        bankDetails: data.bankDetails || null,
+        logoUrl: logoUrl || null,
+        signatureUrl: signatureUrl || null,
+        website: data.website || null,
+        termsAndConditions: data.termsAndConditions || null,
+        additionalNotes: data.additionalNotes || null,
+        invoiceNumbering: { prefix: invoicePrefix, suffix: invoiceSuffix, order: invoiceOrder },
+        quotationNumbering: { prefix: quotationPrefix, suffix: quotationSuffix, order: quotationOrder },
+        serviceNumbering: { prefix: servicePrefix, suffix: serviceSuffix, order: serviceOrder },
+      };
+
+      await onSubmit(companyData as any);
+      toast.success(company ? 'Company updated successfully' : 'Company created successfully');
+    } catch (error: any) {
+      console.error('Error saving company:', error);
+      const errorMessage = error.response?.data?.detail
+        ? (Array.isArray(error.response.data.detail)
+          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
+          : error.response.data.detail)
+        : 'Failed to save company';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Build tabs configuration
+  const tabs: TabConfig[] = useMemo(() => [
+    {
+      key: 'basic',
+      label: 'Basic Info',
+      content: (
+        <BasicInfoTab
+          form={form}
+          company={company}
+          onFetchGSTIN={handleFetchGSTIN}
+          isFetchingGSTIN={isFetchingGSTIN}
+        />
+      ),
+      fieldsToValidate: fieldsPerTab.basic,
+    },
+    {
+      key: 'bank',
+      label: 'Bank Details',
+      content: <BankDetailsTab form={form} company={company} />,
+      fieldsToValidate: fieldsPerTab.bank,
+    },
+    {
+      key: 'settings',
+      label: 'Settings',
+      content: (
+        <SettingsTab
+          invoicePrefix={invoicePrefix}
+          invoiceSuffix={invoiceSuffix}
+          invoiceOrder={invoiceOrder}
+          quotationPrefix={quotationPrefix}
+          quotationSuffix={quotationSuffix}
+          quotationOrder={quotationOrder}
+          servicePrefix={servicePrefix}
+          serviceSuffix={serviceSuffix}
+          serviceOrder={serviceOrder}
+          company={company}
+          setInvoicePrefix={setInvoicePrefix}
+          setInvoiceSuffix={setInvoiceSuffix}
+          setInvoiceOrder={setInvoiceOrder}
+          setQuotationPrefix={setQuotationPrefix}
+          setQuotationSuffix={setQuotationSuffix}
+          setQuotationOrder={setQuotationOrder}
+          setServicePrefix={setServicePrefix}
+          setServiceSuffix={setServiceSuffix}
+          setServiceOrder={setServiceOrder}
+        />
+      ),
+      fieldsToValidate: fieldsPerTab.settings,
+    },
+    {
+      key: 'branding',
+      label: 'Branding',
+      content: (
+        <BrandingTab
+          form={form}
+          company={company}
+          logoUrl={logoUrl}
+          signatureUrl={signatureUrl}
+          setLogoUrl={setLogoUrl}
+          setSignatureUrl={setSignatureUrl}
+        />
+      ),
+      fieldsToValidate: fieldsPerTab.branding,
+    },
+  ], [form, company, isFetchingGSTIN, logoUrl, signatureUrl, invoicePrefix, invoiceSuffix, invoiceOrder, quotationPrefix, quotationSuffix, quotationOrder, servicePrefix, serviceSuffix, serviceOrder]);
+
+  return (
+    <form onSubmit={handleSubmit(handleFormSubmit)}>
+      <TabFormLayout
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as TabKey)}
+        onNext={goToNext}
+        onBack={goBack}
+        isLoading={isLoading}
+        submitLabel={company ? 'Update Company' : 'Create Company'}
+        onCancel={onCancel}
+      />
     </form>
   );
 }
+
+export default CompanyForm;

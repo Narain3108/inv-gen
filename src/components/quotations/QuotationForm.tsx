@@ -1,8 +1,6 @@
 /**
- * Quotation Form Component
- * Comprehensive form for creating/editing quotations (estimates)
+ * Quotation Form Component (Tabbed Version)
  */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,873 +9,182 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { quotationFormSchema } from '@/lib/validations';
 import { Quotation, Product, Client, InvoiceItem, Company, Address } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Calculator, FileText, MapPin } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Loader2, Plus, Trash2, FileText, Package, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, formatClientDropdownLabel } from '@/utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 import { SearchableClientDropdown } from '@/components/shared';
 import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
-import { TotalsSummary } from '@/components/forms/shared';
+import { TotalsSummary, ShippingAddressSection, ShippingAddressMode } from '@/components/forms/shared';
 
 type QuotationFormData = z.infer<typeof quotationFormSchema>;
+type TabKey = 'header' | 'items' | 'summary';
 
 interface QuotationFormProps {
-  quotation?: Quotation;
-  companyId: string;
-  company?: Company;
-  products: Product[];
-  clients: Client[];
-  companyState: string;
-  quotationCount?: number;
-  onSubmit: (data: QuotationFormData) => Promise<void>;
-  onCancel?: () => void;
-  onClientAdded?: (client: Client) => void;
+    quotation?: Quotation;
+    companyId: string;
+    company?: Company;
+    products: Product[];
+    clients: Client[];
+    companyState: string;
+    quotationCount?: number;
+    onSubmit: (data: QuotationFormData) => Promise<void>;
+    onCancel?: () => void;
+    onClientAdded?: (client: Client) => void;
 }
 
-export function QuotationForm({
-  quotation,
-  companyId,
-  company,
-  products,
-  clients,
-  companyState,
-  quotationCount = 0,
-  onSubmit,
-  onCancel,
-  onClientAdded,
-}: QuotationFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+export function QuotationForm({ quotation, companyId, company, products, clients, companyState, quotationCount = 0, onSubmit, onCancel, onClientAdded }: QuotationFormProps) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+    const [activeTab, setActiveTab] = useState<TabKey>('header');
+    const [localProducts, setLocalProducts] = useState<Product[]>(products);
+    const [shippingAddressMode, setShippingAddressMode] = useState<ShippingAddressMode>('none');
+    const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
+    const [newShippingAddress, setNewShippingAddress] = useState<Address>({ street: '', city: '', state: '', pincode: '', country: 'India' });
 
-  // Shipping Address State
-  // default behavior changed: do NOT include shipping address unless user opts in
-  const [shippingAddressMode, setShippingAddressMode] = useState<'none' | 'default' | 'select' | 'new'>('none');
-  const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>('default');
-  const [newShippingAddress, setNewShippingAddress] = useState<Address>({
-    street: '',
-    city: '',
-    state: '',
-    pincode: '',
-    country: 'India',
-  });
+    useEffect(() => { setLocalProducts(products); }, [products]);
 
-  // Calculate default valid until date (30 days from today)
-  const getDefaultValidUntil = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString().split('T')[0];
-  };
+    const getDefaultValidUntil = () => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split('T')[0]; };
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    control,
-    clearErrors,
-    formState: { errors },
-  } = useForm<QuotationFormData>({
-    resolver: zodResolver(quotationFormSchema) as any,
-    defaultValues: quotation ? {
-      quotationNumber: quotation.quotationNumber,
-      clientId: quotation.clientId,
-      date: quotation.date ? (typeof quotation.date === 'string' ? new Date(quotation.date).toISOString().split('T')[0] : quotation.date.toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
-      validUntil: quotation.validUntil ? (typeof quotation.validUntil === 'string' ? new Date(quotation.validUntil).toISOString().split('T')[0] : quotation.validUntil.toISOString().split('T')[0]) : getDefaultValidUntil(),
-      items: quotation.items.map((item) => ({
-        productId: item.productId || '',
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount || 0,
-      })),
-    } : {
-      date: new Date().toISOString().split('T')[0],
-      validUntil: getDefaultValidUntil(),
-      items: [{ productId: '' }],
-    } as any,
-  });
+    const { register, handleSubmit, setValue, watch, control, clearErrors, trigger, formState: { errors } } = useForm<QuotationFormData>({
+        resolver: zodResolver(quotationFormSchema) as any,
+        defaultValues: quotation ? {
+            quotationNumber: quotation.quotationNumber, clientId: quotation.clientId,
+            date: typeof quotation.date === 'string' ? quotation.date.split('T')[0] : new Date().toISOString().split('T')[0],
+            validUntil: typeof quotation.validUntil === 'string' ? quotation.validUntil.split('T')[0] : getDefaultValidUntil(),
+            items: quotation.items.map(i => ({ productId: i.productId || '', quantity: i.quantity, unitPrice: i.unitPrice, discount: i.discount || 0 })),
+        } : { date: new Date().toISOString().split('T')[0], validUntil: getDefaultValidUntil(), items: [{ productId: '' }] } as any,
+    });
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'items',
-  });
+    const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+    const watchItems = watch('items');
+    const watchClientId = watch('clientId');
 
-  const watchItems = watch('items');
-  const watchClientId = watch('clientId');
+    useEffect(() => { if (!quotation && company) setValue('quotationNumber', generateQuotationNumber(company, quotationCount)); }, [quotation, company, quotationCount, setValue]);
 
-  // Auto-fill quotation number for new quotations
-  useEffect(() => {
-    if (!quotation && company) {
-      console.log('Auto-filling quotation number, company config:', company.quotationNumbering);
-      console.log('Current quotation count:', quotationCount);
-      const autoNumber = generateQuotationNumber(company, quotationCount);
-      console.log('Generated quotation number:', autoNumber);
-      setValue('quotationNumber', autoNumber);
-    }
-  }, [quotation, company, quotationCount, setValue]);
+    useEffect(() => {
+        if (watchClientId) { setSelectedClient(clients.find(c => c.id === watchClientId) || null); setShippingAddressMode('none'); }
+        else setSelectedClient(null);
+    }, [watchClientId, clients]);
 
-  // Update selected client when client ID changes
-  useEffect(() => {
-    if (watchClientId) {
-      const client = clients.find(c => c.id === watchClientId);
-      setSelectedClient(client || null);
-      // Reset shipping address selection
-      setShippingAddressMode('default');
-      setSelectedAddressIndex('default');
-      setNewShippingAddress({
-        street: '',
-        city: '',
-        state: '',
-        pincode: '',
-        country: 'India',
-      });
-    } else {
-      setSelectedClient(null);
-    }
-  }, [watchClientId, clients]);
-
-  // Handle product selection for an item
-  const handleProductSelect = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      setValue(`items.${index}.productId`, productId);
-      setValue(`items.${index}.unitPrice`, product.price);
-      setValue(`items.${index}.unit`, product.unit);
-    }
-  };
-
-  // Calculate totals
-  const calculateTotals = () => {
-    if (!watchItems || !selectedClient) return null;
-
-    const validItems = watchItems.filter((item: any) => item.productId && item.quantity > 0 && item.unitPrice >= 0);
-    if (validItems.length === 0) return null;
-
-    let totalTaxableAmount = 0;
-    let totalCgst = 0;
-    let totalSgst = 0;
-    let totalIgst = 0;
-    let totalCess = 0;
-
-    const isInterState = companyState !== selectedClient.address.state;
-
-    const processedItems: InvoiceItem[] = validItems.map((item: any) => {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) return null;
-
-      const quantity = Number(item.quantity) || 0;
-      const unitPrice = Number(item.unitPrice) || 0;
-      const discount = Number(item.discount) || 0;
-
-      const baseAmount = quantity * unitPrice;
-      const discountAmount = (baseAmount * discount) / 100;
-      const taxableAmount = baseAmount - discountAmount;
-
-      let cgst = 0;
-      let sgst = 0;
-      let igst = 0;
-      let cess = 0;
-
-      if (isInterState) {
-        igst = (taxableAmount * product.gstRate) / 100;
-      } else {
-        const halfRate = product.gstRate / 2;
-        cgst = (taxableAmount * halfRate) / 100;
-        sgst = (taxableAmount * halfRate) / 100;
-      }
-
-      if (product.cessRate) {
-        cess = (taxableAmount * product.cessRate) / 100;
-      }
-
-      const lineTotal = taxableAmount + cgst + sgst + igst + cess;
-
-      totalTaxableAmount += taxableAmount;
-      totalCgst += cgst;
-      totalSgst += sgst;
-      totalIgst += igst;
-      totalCess += cess;
-
-      const quotationItem: any = {
-        productId: product.id,
-        description: product.productName,
-        productDescription: product.description || '',
-        hsn: product.hsn,
-        quantity,
-        unit: item.unit || product.unit,
-        unitPrice,
-        discount,
-        gstRate: product.gstRate,
-        cessRate: product.cessRate || 0,
-        taxableAmount,
-        cgst,
-        sgst,
-        igst,
-        cess,
-        lineTotal,
-      };
-
-      // Only add itemCode if product has one
-      if (product.itemCode) {
-        quotationItem.itemCode = product.itemCode;
-      }
-
-      return quotationItem;
-    }).filter(Boolean) as InvoiceItem[];
-
-    const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
-    const grandTotal = totalTaxableAmount + totalTax;
-
-    // Calculate tax breakdown by GST rate
-    const taxBreakdown = calculateTaxBreakdown(
-      validItems.map(item => ({
-        amount: Number(item.unitPrice) || 0,
-        quantity: Number(item.quantity) || 0,
-        gstRate: products.find(p => p.id === item.productId)?.gstRate || 0,
-        discount: Number(item.discount) || 0,
-      })),
-      companyState,
-      selectedClient.address.state
-    );
-
-    return {
-      items: processedItems,
-      taxableAmount: totalTaxableAmount,
-      cgst: totalCgst,
-      sgst: totalSgst,
-      igst: totalIgst,
-      totalAmount: grandTotal,
-      totalAmountInWords: '',
-      taxBreakdown, // Add GST breakdown by rate
+    const handleProductSelect = (index: number, productId: string) => {
+        const p = localProducts.find(pr => pr.id === productId);
+        if (p) { setValue(`items.${index}.productId`, productId); setValue(`items.${index}.unitPrice`, p.price); setValue(`items.${index}.unit`, p.unit); }
     };
-  };
 
-  const totals = calculateTotals();
+    const calculateTotals = () => {
+        if (!watchItems || !selectedClient) return null;
+        const validItems = watchItems.filter((i: any) => i.productId && i.quantity > 0 && i.unitPrice >= 0);
+        if (validItems.length === 0) return null;
+        let taxableAmt = 0, cgst = 0, sgst = 0, igst = 0;
+        const isInter = companyState !== selectedClient.address.state;
+        const items = validItems.map((item: any) => {
+            const p = localProducts.find(pr => pr.id === item.productId); if (!p) return null;
+            const qty = Number(item.quantity), price = Number(item.unitPrice), disc = Number(item.discount) || 0;
+            const base = qty * price, discAmt = (base * disc) / 100, taxable = base - discAmt;
+            let c = 0, s = 0, i = 0;
+            if (isInter) i = (taxable * p.gstRate) / 100; else { c = s = (taxable * p.gstRate / 2) / 100; }
+            taxableAmt += taxable; cgst += c; sgst += s; igst += i;
+            return { productId: p.id, description: p.productName, hsn: p.hsn, quantity: qty, unit: item.unit || p.unit, unitPrice: price, discount: disc, gstRate: p.gstRate, taxableAmount: taxable, cgst: c, sgst: s, igst: i, lineTotal: taxable + c + s + i } as InvoiceItem;
+        }).filter(Boolean) as InvoiceItem[];
+        return { items, taxableAmount: taxableAmt, cgst, sgst, igst, totalAmount: taxableAmt + cgst + sgst + igst, taxBreakdown: calculateTaxBreakdown(validItems.map((i: any) => ({ amount: Number(i.unitPrice), quantity: Number(i.quantity), gstRate: localProducts.find(p => p.id === i.productId)?.gstRate || 0, discount: Number(i.discount) || 0 })), companyState, selectedClient.address.state) };
+    };
 
-  const handleFormSubmit = async (data: QuotationFormData) => {
-    if (!totals || totals.items.length === 0) {
-      toast.error('Please add valid items to the quotation');
-      return;
-    }
+    const totals = calculateTotals();
+    const tabsOrder: TabKey[] = ['header', 'items', 'summary'];
+    const goToNext = async (e?: React.MouseEvent) => { e?.preventDefault(); if (await trigger(['clientId', 'quotationNumber', 'date', 'validUntil'] as any)) { const i = tabsOrder.indexOf(activeTab); if (i < 2) setActiveTab(tabsOrder[i + 1]); } else toast.error('Fix errors first'); };
+    const goBack = (e?: React.MouseEvent) => { e?.preventDefault(); const i = tabsOrder.indexOf(activeTab); if (i > 0) setActiveTab(tabsOrder[i - 1]); };
 
-    // Determine Shipping Address - only include when user opts in (shippingAddressMode !== 'none')
-    let finalShippingAddress: Address | undefined = undefined;
-
-    if (shippingAddressMode === 'default') {
-      finalShippingAddress = selectedClient?.shippingAddress || selectedClient?.address;
-    } else if (shippingAddressMode === 'select' && selectedClient?.shippingAddresses) {
-      const index = parseInt(selectedAddressIndex);
-      if (!isNaN(index) && selectedClient.shippingAddresses[index]) {
-        finalShippingAddress = selectedClient.shippingAddresses[index];
-      }
-    } else if (shippingAddressMode === 'new') {
-      // Validate new address
-      if (!newShippingAddress.street || !newShippingAddress.city || !newShippingAddress.state || !newShippingAddress.pincode) {
-        toast.error('Please fill in all shipping address fields');
-        return;
-      }
-      finalShippingAddress = newShippingAddress;
-
-      // Update client with new address
-      if (selectedClient) {
+    const handleFormSubmit = async (data: QuotationFormData) => {
+        if (!totals) { toast.error('Add valid items'); return; }
+        let shipAddr: Address | undefined;
+        if (shippingAddressMode === 'default') shipAddr = selectedClient?.shippingAddress || selectedClient?.address;
+        else if (shippingAddressMode === 'select' && selectedClient?.shippingAddresses) { const idx = parseInt(selectedAddressIndex); if (!isNaN(idx)) shipAddr = selectedClient.shippingAddresses[idx]; }
+        else if (shippingAddressMode === 'new') { if (!newShippingAddress.street || !newShippingAddress.city) { toast.error('Fill shipping fields'); return; } shipAddr = newShippingAddress; }
+        setIsLoading(true);
         try {
-          const updatedAddresses = [...(selectedClient.shippingAddresses || []), newShippingAddress];
-          await clientsApi.update(selectedClient.id, { shippingAddresses: updatedAddresses });
-        } catch (err) {
-          console.error('Failed to update client shipping addresses', err);
-          toast.warning('Failed to save new shipping address to client profile');
-        }
-      }
-    }
+            await onSubmit({ quotationNumber: data.quotationNumber, clientId: data.clientId, date: data.date, validUntil: data.validUntil, companyId, shippingAddress: shippingAddressMode === 'none' ? null : shipAddr, items: totals.items, taxableAmount: totals.taxableAmount, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, totalAmount: totals.totalAmount, taxBreakdown: totals.taxBreakdown, status: 'pending' } as any);
+            toast.success(quotation ? 'Quotation updated' : 'Quotation created');
+        } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setIsLoading(false); }
+    };
 
-    setIsLoading(true);
-    try {
-      const quotationData = {
-        quotationNumber: data.quotationNumber,
-        clientId: data.clientId,
-        date: data.date,
-        validUntil: data.validUntil,
-        companyId,
-        shippingAddress: shippingAddressMode === 'none' ? null : finalShippingAddress,
-        items: totals.items,
-        taxableAmount: totals.taxableAmount,
-        cgst: totals.cgst,
-        sgst: totals.sgst,
-        igst: totals.igst,
-        totalAmount: totals.totalAmount,
-        totalAmountInWords: totals.totalAmountInWords,
-        taxBreakdown: totals.taxBreakdown,
-        status: 'draft',
-      };
+    return (
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 animate-fade-in">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="header" className="gap-2"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Header</span></TabsTrigger>
+                    <TabsTrigger value="items" className="gap-2"><Package className="h-4 w-4" /><span className="hidden sm:inline">Items</span></TabsTrigger>
+                    <TabsTrigger value="summary" className="gap-2"><ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">Summary</span></TabsTrigger>
+                </TabsList>
 
-      await onSubmit(quotationData as any);
-      toast.success(quotation ? 'Quotation updated successfully' : 'Quotation created successfully');
-    } catch (error: any) {
-      console.error('Error saving quotation:', error);
-      const errorMessage = error.response?.data?.detail
-        ? (Array.isArray(error.response.data.detail)
-          ? error.response.data.detail.map((e: any) => e.msg).join(', ')
-          : error.response.data.detail)
-        : 'Failed to save quotation';
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+                <TabsContent value="header" className="mt-4 space-y-4">
+                    <Card><CardHeader><CardTitle className="text-lg">Quotation Details</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>Quotation Number</Label><Input {...register('quotationNumber')} /><p className="text-xs text-muted-foreground">Auto-filled</p>{errors.quotationNumber && <p className="text-sm text-red-500">{errors.quotationNumber.message}</p>}</div>
+                                <SearchableClientDropdown clients={clients} selectedClientId={watch('clientId') || ''} onClientSelect={(id) => setValue('clientId', id)} onClientAdded={(c) => { setValue('clientId', c.id); clearErrors('clientId'); onClientAdded?.(c); }} label="Client" required error={errors.clientId?.message} companyId={companyId} placeholder="Select client..." />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label>Date *</Label><Input type="date" {...register('date')} />{errors.date && <p className="text-sm text-red-500">{errors.date.message}</p>}</div>
+                                <div className="space-y-2"><Label>Valid Until *</Label><Input type="date" {...register('validUntil')} /><p className="text-xs text-muted-foreground">Default: 30 days</p></div>
+                            </div>
+                            {selectedClient && <ShippingAddressSection client={selectedClient} mode={shippingAddressMode} onModeChange={setShippingAddressMode} selectedAddressIndex={selectedAddressIndex} onSelectedAddressChange={setSelectedAddressIndex} newAddress={newShippingAddress} onNewAddressChange={setNewShippingAddress} />}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-  return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3 animate-fade-in">
-      {/* Quotation Details */}
-      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
-        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
-          <CardTitle className="flex items-center gap-2 text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            <FileText className="h-5 w-5 text-primary" />
-            Quotation Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 pb-4 pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Quotation Number */}
-            <div className="space-y-2">
-              <Label htmlFor="quotationNumber">Quotation Number</Label>
-              <Input
-                id="quotationNumber"
-                {...register('quotationNumber')}
-                placeholder="QUO0001"
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-filled, editable
-              </p>
-              {errors.quotationNumber && (
-                <p className="text-sm text-red-500">{errors.quotationNumber.message}</p>
-              )}
-            </div>
+                <TabsContent value="items" className="mt-4 space-y-4">
+                    <Card><CardHeader><CardTitle className="text-lg">Line Items</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="hidden lg:block"><table className="w-full"><thead className="border-b"><tr className="text-sm text-muted-foreground"><th className="p-2 text-left w-64">Product</th><th className="p-2 w-16">Qty</th><th className="p-2 w-24">Unit</th><th className="p-2 w-28 text-right">Price</th><th className="p-2 w-16">Disc%</th><th className="p-2 w-28 text-right">Amount</th><th className="p-2 w-10"></th></tr></thead>
+                                <tbody>{fields.map((f, i) => {
+                                    const it = watchItems?.[i], p = it?.productId ? localProducts.find(pr => pr.id === it.productId) : null, amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
+                                    return (<tr key={f.id} className="border-b"><td className="p-2"><Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select></td>
+                                        <td className="p-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
+                                        <td className="p-2"><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center text-sm" />} /></td>
+                                        <td className="p-2"><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-right" />} /></td>
+                                        <td className="p-2"><Controller control={control} name={`items.${i}.discount`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
+                                        <td className="p-2 text-right font-medium">{formatCurrency(amt)}</td>
+                                        <td className="p-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></td></tr>);
+                                })}</tbody></table></div>
+                            <div className="lg:hidden space-y-4">{fields.map((f, i) => {
+                                const it = watchItems?.[i], amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
+                                return (<Card key={f.id} className="relative"><CardContent className="pt-6 space-y-3"><div className="absolute top-2 right-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
+                                    <Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Product" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select>
+                                    <div className="grid grid-cols-3 gap-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))} placeholder="Qty" className="text-center" />} /><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} placeholder="Unit" className="text-center" />} /><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} placeholder="Price" className="text-right" />} /></div>
+                                    <div className="text-right font-bold">{formatCurrency(amt)}</div></CardContent></Card>);
+                            })}</div>
+                            <Button type="button" variant="outline" onClick={() => append({ productId: '' } as any)} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-            {/* Client Selection */}
-            <div>
-              <SearchableClientDropdown
-                clients={clients}
-                selectedClientId={watch('clientId') || ''}
-                onClientSelect={(clientId) => setValue('clientId', clientId)}
-                onClientAdded={(newClient) => {
-                  // Set the newly created client as selected
-                  setValue('clientId', newClient.id);
-                  // Clear any validation errors
-                  clearErrors('clientId');
-                  // Call parent callback to refresh clients list
-                  onClientAdded?.(newClient);
-                }}
-                label="Client"
-                required
-                error={errors.clientId?.message}
-                companyId={companyId}
-                placeholder="Search or select client..."
-              />
-            </div>
+                <TabsContent value="summary" className="mt-4 space-y-4">
+                    <Card><CardHeader><CardTitle className="text-lg">Review</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            {selectedClient && <div className="p-4 bg-muted/30 rounded-lg"><h4 className="font-semibold">Client</h4><p className="text-sm">{selectedClient.clientName}</p><p className="text-sm text-muted-foreground">{selectedClient.address.city}, {selectedClient.address.state}</p></div>}
+                            {totals ? <TotalsSummary taxableAmount={totals.taxableAmount} cgst={totals.cgst} sgst={totals.sgst} igst={totals.igst} totalAmount={totals.totalAmount} taxBreakdown={totals.taxBreakdown} isInterState={companyState !== selectedClient?.address?.state} /> : <p className="text-center py-8 text-muted-foreground">No items</p>}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
 
-            {/* Shipping Address Selection (opt-in) */}
-            {selectedClient && (
-              <div className="col-span-1 md:col-span-2 space-y-3 border rounded-md p-3 bg-muted/20">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> Shipping Address
-                  </Label>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">Include</span>
-                    <Switch
-                      checked={shippingAddressMode !== 'none'}
-                      onCheckedChange={(v: boolean) => setShippingAddressMode(v ? 'default' : 'none')}
-                      aria-label="Include Shipping Address"
-                    />
-                  </div>
+            <div className="flex justify-between pt-4 border-t">
+                <div>{activeTab !== 'header' && <Button type="button" variant="outline" onClick={goBack}>Back</Button>}</div>
+                <div className="flex gap-3">
+                    {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>}
+                    {activeTab !== 'summary' ? <Button type="button" onClick={goToNext}>Next</Button> : <Button type="submit" disabled={isLoading || !totals} className="bg-gradient-to-r from-primary to-accent text-white">{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{quotation ? 'Update' : 'Create'} Quotation</Button>}
                 </div>
-
-                {shippingAddressMode === 'none' && (
-                  <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
-                    <p className="italic">Shipping address will not be included in this quotation.</p>
-                  </div>
-                )}
-
-                {shippingAddressMode !== 'none' && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Mode</Label>
-                      <Select
-                        value={shippingAddressMode}
-                        onValueChange={(val: any) => setShippingAddressMode(val)}
-                      >
-                        <SelectTrigger className="w-[180px] h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default Address</SelectItem>
-                          {selectedClient.shippingAddresses && selectedClient.shippingAddresses.length > 0 && (
-                            <SelectItem value="select">Select Saved Address</SelectItem>
-                          )}
-                          <SelectItem value="new">Add New Address</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {shippingAddressMode === 'default' && (
-                      <div className="text-sm text-muted-foreground p-2 bg-background rounded border">
-                        {selectedClient.shippingAddress ? (
-                          <>
-                            <p>{selectedClient.shippingAddress.street}</p>
-                            <p>{selectedClient.shippingAddress.city}, {selectedClient.shippingAddress.state} - {selectedClient.shippingAddress.pincode}</p>
-                            <p>{selectedClient.shippingAddress.country}</p>
-                          </>
-                        ) : (
-                          <p className="italic">Using billing address as shipping address</p>
-                        )}
-                      </div>
-                    )}
-
-                    {shippingAddressMode === 'select' && selectedClient.shippingAddresses && (
-                      <Select
-                        value={selectedAddressIndex}
-                        onValueChange={setSelectedAddressIndex}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an address" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {selectedClient.shippingAddresses.map((addr, idx) => (
-                            <SelectItem key={idx} value={idx.toString()}>
-                              {addr.street}, {addr.city}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    {shippingAddressMode === 'new' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Street"
-                          value={newShippingAddress.street}
-                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, street: e.target.value })}
-                          className="col-span-2"
-                        />
-                        <Input
-                          placeholder="City"
-                          value={newShippingAddress.city}
-                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, city: e.target.value })}
-                        />
-                        <Input
-                          placeholder="State"
-                          value={newShippingAddress.state}
-                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, state: e.target.value })}
-                        />
-                        <Input
-                          placeholder="Pincode"
-                          value={newShippingAddress.pincode}
-                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, pincode: e.target.value })}
-                        />
-                        <Input
-                          placeholder="Country"
-                          value={newShippingAddress.country}
-                          onChange={(e) => setNewShippingAddress({ ...newShippingAddress, country: e.target.value })}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Quotation Date */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Quotation Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                {...register('date')}
-              />
-              {errors.date && (
-                <p className="text-sm text-red-500">{errors.date.message}</p>
-              )}
             </div>
-            {/* Valid Until Date */}
-            <div className="space-y-2">
-              <Label htmlFor="validUntil">Valid Until * <span className="text-xs text-muted-foreground">(Default: 30 days)</span></Label>
-              <Input
-                id="validUntil"
-                type="date"
-                {...register('validUntil')}
-              />
-              {errors.validUntil && (
-                <p className="text-sm text-red-500">{errors.validUntil.message}</p>
-              )}
-            </div>
-          </div>
-
-
-        </CardContent>
-      </Card>
-
-      {/* Quotation Items */}
-      <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow duration-200 hover-lift">
-        <CardHeader className="pb-3 pt-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b">
-          <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Items</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 pb-4 pt-4">
-          {/* Desktop View */}
-          <div className="hidden lg:block">
-            <table className="w-full">
-              <thead className="border-b">
-                <tr className="text-sm text-muted-foreground">
-                  <th className="p-2 text-left">Product/Service</th>
-                  <th className="p-2 text-center w-24">Item Code</th>
-                  <th className="p-2 text-center w-32">Quantity</th>
-                  <th className="p-2 text-center w-36">Unit</th>
-                  <th className="p-2 text-right w-36">Unit Price</th>
-                  <th className="p-2 text-center w-32">Discount %</th>
-                  <th className="p-2 text-right w-36">Amount</th>
-                  <th className="p-2 w-16"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field, index) => {
-                  const item = watchItems?.[index];
-                  const product = item?.productId ? products.find(p => p.id === item.productId) : null;
-                  const quantity = Number(item?.quantity) || 0;
-                  const unitPrice = Number(item?.unitPrice) || 0;
-                  const discount = Number(item?.discount) || 0;
-                  const amount = quantity * unitPrice * (1 - discount / 100);
-
-                  return (
-                    <tr key={field.id} className="border-b">
-                      <td className="p-2">
-                        <Select
-                          value={item?.productId || ''}
-                          onValueChange={(value) => handleProductSelect(index, value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.productName} ({product.hsn})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="p-2 text-center">
-                        {product?.itemCode ? (
-                          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                            {product.itemCode}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="p-2">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.quantity` as const}
-                          defaultValue={item?.quantity ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unit` as const}
-                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
-                          render={({ field }) => (
-                            <>
-                              <Input
-                                list={`unit-options-${index}`}
-                                {...field}
-                                className="text-center w-full text-sm"
-                                placeholder="Unit"
-                              />
-                              <datalist id={`unit-options-${index}`}>
-                                <option value="Nos" />
-                                <option value="Pcs" />
-                                <option value="Kgs" />
-                                <option value="Gms" />
-                                <option value="Ltrs" />
-                                <option value="Mtrs" />
-                                <option value="Hrs" />
-                                <option value="Days" />
-                                <option value="Box" />
-                                <option value="Set" />
-                              </datalist>
-                            </>
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 text-right">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unitPrice` as const}
-                          defaultValue={item?.unitPrice ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-right w-full text-base font-medium"
-                              placeholder="0.00"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Controller
-                          control={control}
-                          name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? 0}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-center w-full text-base font-medium"
-                            />
-                          )}
-                        />
-                      </td>
-                      <td className="p-2 text-right font-medium text-base">
-                        {formatCurrency(amount)}
-                      </td>
-                      <td className="p-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile View */}
-          <div className="space-y-4 lg:hidden">
-            {fields.map((field, index) => {
-              const item = watchItems?.[index];
-              const product = item?.productId ? products.find(p => p.id === item.productId) : null;
-              const quantity = Number(item?.quantity) || 0;
-              const unitPrice = Number(item?.unitPrice) || 0;
-              const discount = Number(item?.discount) || 0;
-              const amount = quantity * unitPrice * (1 - discount / 100);
-
-              return (
-                <Card key={field.id} className="relative">
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="absolute top-2 right-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        disabled={fields.length <= 1}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Product/Service</Label>
-                      <Select
-                        value={item?.productId || ''}
-                        onValueChange={(value) => handleProductSelect(index, value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.productName} ({product.hsn})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Quantity</Label>
-                        <Controller
-                          control={control}
-                          name={`items.${index}.quantity` as const}
-                          defaultValue={item?.quantity ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="1"
-                              min="1"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))}
-                              className="text-center text-lg font-semibold"
-                            />
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Unit</Label>
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unit` as const}
-                          defaultValue={item?.unit ?? product?.unit ?? 'Nos'}
-                          render={({ field }) => (
-                            <>
-                              <Input
-                                list={`unit-options-mobile-${index}`}
-                                {...field}
-                                className="text-center text-lg font-semibold"
-                                placeholder="Unit"
-                              />
-                              <datalist id={`unit-options-mobile-${index}`}>
-                                <option value="Nos" />
-                                <option value="Pcs" />
-                                <option value="Kgs" />
-                                <option value="Gms" />
-                                <option value="Ltrs" />
-                                <option value="Mtrs" />
-                                <option value="Hrs" />
-                                <option value="Days" />
-                                <option value="Box" />
-                                <option value="Set" />
-                              </datalist>
-                            </>
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font medium">Unit Price</Label>
-                        <Controller
-                          control={control}
-                          name={`items.${index}.unitPrice` as const}
-                          defaultValue={item?.unitPrice ?? ''}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-right text-lg font-semibold"
-                              placeholder="0.00"
-                            />
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Discount %</Label>
-                        <Controller
-                          control={control}
-                          name={`items.${index}.discount` as const}
-                          defaultValue={item?.discount ?? 0}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              {...field}
-                              value={field.value ?? ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                              className="text-center text-lg font-semibold"
-                            />
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Amount</Label>
-                        <div className="h-10 flex items-center justify-center border rounded-md bg-primary/5 px-3">
-                          <span className="font-bold text-lg text-primary">{formatCurrency(amount)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => append({ productId: '' } as any)}
-            className="w-full"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
-        </CardContent>
-      </Card>
-
-
-      {/* Tax Summary */}
-      {
-        totals && (
-          <TotalsSummary
-            taxableAmount={totals.taxableAmount}
-            cgst={totals.cgst}
-            sgst={totals.sgst}
-            igst={totals.igst}
-            totalAmount={totals.totalAmount}
-            taxBreakdown={totals.taxBreakdown}
-            isInterState={companyState !== selectedClient?.address?.state}
-          />
-        )
-      }
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-3">
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} className="hover:scale-105 transition-transform">
-            Cancel
-          </Button>
-        )}
-        <Button type="submit" disabled={isLoading || !totals} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200">
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <span className="font-semibold">{quotation ? 'Update Quotation' : 'Create Quotation'}</span>
-        </Button>
-      </div>
-    </form >
-  );
+        </form>
+    );
 }
 
 export default QuotationForm;
