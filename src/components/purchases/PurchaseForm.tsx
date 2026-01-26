@@ -26,7 +26,7 @@ import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { TotalsSummary } from '@/components/forms/shared';
 
 const purchaseItemSchema = z.object({ productId: z.string().optional(), productName: z.string().optional(), description: z.string().min(1), hsn: z.string().min(1), quantity: z.coerce.number().int().min(1), unit: z.string().min(1), unitPrice: z.coerce.number().min(0), discount: z.coerce.number().min(0).default(0), gstRate: z.coerce.number().min(0), cessRate: z.coerce.number().min(0).optional(), itemCode: z.string().optional() });
-const purchaseFormSchema = z.object({ invoiceNumber: z.string().min(1), referenceNumber: z.string().optional(), poNumber: z.string().optional(), poDate: z.string().optional(), ewayNumber: z.string().optional(), date: z.string().min(1), clientId: z.string().min(1), items: z.array(purchaseItemSchema).min(1), attachmentUrl: z.string().optional() });
+const purchaseFormSchema = z.object({ invoiceNumber: z.string().min(1), referenceNumber: z.string().optional(), poNumber: z.string().optional(), poDate: z.string().optional(), ewayNumber: z.string().optional(), date: z.string().min(1), clientId: z.string().min(1), items: z.array(purchaseItemSchema).min(1), attachmentUrl: z.string().nullish() });
 type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
 type TabKey = 'header' | 'items' | 'summary';
 
@@ -92,25 +92,122 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
         return { items, taxableAmount: taxableAmt, cgst, sgst, igst, totalAmount: taxableAmt + cgst + sgst + igst, taxBreakdown: calculateTaxBreakdown(valid.map((i: any) => ({ amount: Number(i.unitPrice), quantity: Number(i.quantity), gstRate: Number(i.gstRate), discount: Number(i.discount) || 0 })), companyState, clientState) };
     };
 
+
     const totals = calculateTotals();
     const tabsOrder: TabKey[] = ['header', 'items', 'summary'];
-    const goToNext = async (e?: React.MouseEvent) => { e?.preventDefault(); if (await trigger(['clientId', 'invoiceNumber', 'date'] as any)) { const i = tabsOrder.indexOf(activeTab); if (i < 2) setActiveTab(tabsOrder[i + 1]); } else toast.error('Fix errors'); };
-    const goBack = (e?: React.MouseEvent) => { e?.preventDefault(); const i = tabsOrder.indexOf(activeTab); if (i > 0) setActiveTab(tabsOrder[i - 1]); };
+
+    const goToNext = async (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        const isValid = await trigger(['clientId', 'invoiceNumber', 'date'] as any);
+        if (isValid) {
+            const currentIndex = tabsOrder.indexOf(activeTab);
+            if (currentIndex < 2) {
+                setActiveTab(tabsOrder[currentIndex + 1]);
+            }
+        } else {
+            toast.error('Please fix validation errors');
+        }
+    };
+
+    const goBack = (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        const currentIndex = tabsOrder.indexOf(activeTab);
+        if (currentIndex > 0) {
+            setActiveTab(tabsOrder[currentIndex - 1]);
+        }
+    };
 
     const handleFormSubmit = async (data: PurchaseFormData) => {
-        if (!totals) { toast.error('Add valid items'); return; }
-        let hasErr = false; const errs: Record<string, string> = {};
-        watchItems.forEach((item: any, idx: number) => { const p = localProducts.find(pr => pr.id === item.productId); if (p?.hasSerialNumber) { const key = fields[idx]?.id, sn = key ? (serialNumbers[key] || []) : [], qty = Number(item.quantity); if (sn.length !== qty) { if (key) errs[key] = `Need ${qty} serials`; hasErr = true; } } });
-        if (hasErr) { toast.error('Fill serial numbers'); return; }
+        console.log('=== handleFormSubmit CALLED ===');
+        console.log('Form data received:', data);
+
+        if (!totals) {
+            console.log('ERROR: totals is null/undefined');
+            toast.error('Please add valid items to the purchase');
+            return;
+        }
+
+        // Validate serial numbers for products that require them
+        let hasErrors = false;
+        const errors: Record<string, string> = {};
+
+        watchItems.forEach((item: any, idx: number) => {
+            const product = localProducts.find(pr => pr.id === item.productId);
+            if (product?.hasSerialNumber) {
+                const fieldKey = fields[idx]?.id;
+                const serialNums = fieldKey ? (serialNumbers[fieldKey] || []) : [];
+                const quantity = Number(item.quantity);
+
+                if (serialNums.length !== quantity) {
+                    if (fieldKey) {
+                        errors[fieldKey] = `Need ${quantity} serial numbers`;
+                    }
+                    hasErrors = true;
+                }
+            }
+        });
+
+        if (hasErrors) {
+            toast.error('Please fill in all required serial numbers');
+            return;
+        }
+
         setIsLoading(true);
         try {
-            await onSubmit({ bill_number: data.invoiceNumber, reference_number: data.referenceNumber || null, po_number: data.poNumber || null, po_date: data.poDate ? new Date(data.poDate).toISOString() : null, eway_number: data.ewayNumber || null, client_id: data.clientId, date: new Date(data.date).toISOString(), company_id: companyId, items: totals.items, taxable_amount: totals.taxableAmount, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, total_amount: totals.totalAmount, tax_breakdown: totals.taxBreakdown, status: 'draft', payment_status: 'unpaid', attachment_url: attachmentUrl });
-            toast.success(purchase ? 'Purchase updated' : 'Purchase created');
-        } catch (e: any) { toast.error(e.response?.data?.detail || 'Failed'); } finally { setIsLoading(false); }
+            await onSubmit({
+                bill_number: data.invoiceNumber,
+                reference_number: data.referenceNumber || null,
+                po_number: data.poNumber || null,
+                po_date: data.poDate ? new Date(data.poDate).toISOString() : null,
+                eway_number: data.ewayNumber || null,
+                client_id: data.clientId,
+                date: new Date(data.date).toISOString(),
+                company_id: companyId,
+                items: totals.items,
+                taxable_amount: totals.taxableAmount,
+                cgst: totals.cgst,
+                sgst: totals.sgst,
+                igst: totals.igst,
+                total_amount: totals.totalAmount,
+                tax_breakdown: totals.taxBreakdown,
+                status: 'draft',
+                payment_status: 'unpaid',
+                attachment_url: attachmentUrl
+            });
+            toast.success(purchase ? 'Purchase bill updated successfully' : 'Purchase bill created successfully');
+        } catch (e: any) {
+            toast.error(e.response?.data?.detail || 'Failed to save purchase bill');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handle form validation errors - show user-friendly message
+    const onFormError = (validationErrors: any) => {
+        console.error('Form validation errors:', validationErrors);
+        console.log('Current form values:', watch());
+        console.log('Form errors from formState:', errors);
+        console.log('Is form valid?', Object.keys(errors).length === 0);
+
+        // Check if items array is the issue
+        const items = watch('items');
+        console.log('Items array:', items);
+
+        const firstError = Object.values(validationErrors)[0] as any;
+        if (firstError?.message) {
+            toast.error(`Validation Error: ${firstError.message}`);
+        } else if (firstError?.root?.message) {
+            toast.error(`Validation Error: ${firstError.root.message}`);
+        } else if (Object.keys(validationErrors).length === 0) {
+            // Empty errors object - might be items array issue
+            toast.error('Form validation failed. Please ensure all required fields are filled.');
+        } else {
+            toast.error('Please fix all validation errors before submitting');
+        }
     };
 
     return (
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 animate-fade-in">
+        <form onSubmit={handleSubmit(handleFormSubmit, onFormError)} className="space-y-4 animate-fade-in">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="header" className="gap-2"><FileText className="h-4 w-4" /><span className="hidden sm:inline">Header</span></TabsTrigger>
