@@ -11,6 +11,7 @@ import { PurchaseBill, PurchaseItem } from '@/lib/api/purchases.api';
 import { Product, Client, Company } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -220,14 +221,14 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <SearchableClientDropdown clients={clients} selectedClientId={watch('clientId') || ''} onClientSelect={(id) => setValue('clientId', id)} onClientAdded={(c) => { setValue('clientId', c.id); clearErrors('clientId'); onClientAdded?.(c); }} label="Vendor" required error={errors.clientId?.message} companyId={companyId} placeholder="Select vendor..." />
-                                <div className="space-y-2"><Label>Bill Number *</Label><Input {...register('invoiceNumber')} placeholder="Enter" />{errors.invoiceNumber && <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>}</div>
-                                <div className="space-y-2"><Label>Bill Date *</Label><Input type="date" {...register('date')} />{errors.date && <p className="text-sm text-red-500">{errors.date.message}</p>}</div>
+                                <FloatingLabelInput id="invoiceNumber" label="Bill Number *" {...register('invoiceNumber')} error={errors.invoiceNumber?.message} />
+                                <FloatingLabelInput id="date" type="date" label="Bill Date *" {...register('date')} error={errors.date?.message} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-2"><Label>PO Number</Label><Input {...register('poNumber')} placeholder="Optional" /></div>
-                                <div className="space-y-2"><Label>PO Date</Label><Input type="date" {...register('poDate')} /></div>
-                                <div className="space-y-2"><Label>E-way</Label><Input {...register('ewayNumber')} placeholder="Optional" /></div>
-                                <div className="space-y-2"><Label>Reference</Label><Input {...register('referenceNumber')} placeholder="Optional" /></div>
+                                <FloatingLabelInput id="poNumber" label="PO Number" {...register('poNumber')} />
+                                <FloatingLabelInput id="poDate" type="date" label="PO Date" {...register('poDate')} />
+                                <FloatingLabelInput id="ewayNumber" label="E-way" {...register('ewayNumber')} />
+                                <FloatingLabelInput id="referenceNumber" label="Reference" {...register('referenceNumber')} />
                             </div>
                             <div className="pt-4 border-t"><DocumentUpload label="Bill Document" currentDocumentUrl={attachmentUrl} onDocumentUploaded={setAttachmentUrl} onDocumentRemoved={() => setAttachmentUrl(undefined)} /></div>
                         </CardContent>

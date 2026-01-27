@@ -6,7 +6,7 @@
 'use client';
 
 import React from 'react';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,14 +27,12 @@ export function AddressesTab({ customization, onUpdate }: AddressesTabProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="billingLabel">Billing Address Label</Label>
-                            <Input
-                                id="billingLabel"
-                                value={customization.addresses.billingLabel}
-                                onChange={(e) => onUpdate('addresses.billingLabel', e.target.value)}
-                            />
-                        </div>
+                        <FloatingLabelInput
+                            id="billingLabel"
+                            label="Billing Address Label"
+                            value={customization.addresses.billingLabel}
+                            onChange={(e) => onUpdate('addresses.billingLabel', e.target.value)}
+                        />
                         <div className="flex items-center justify-between pt-8">
                             <Label>Show Billing Address</Label>
                             <Switch
@@ -45,14 +43,12 @@ export function AddressesTab({ customization, onUpdate }: AddressesTabProps) {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="shippingLabel">Shipping Address Label</Label>
-                            <Input
-                                id="shippingLabel"
-                                value={customization.addresses.shippingLabel}
-                                onChange={(e) => onUpdate('addresses.shippingLabel', e.target.value)}
-                            />
-                        </div>
+                        <FloatingLabelInput
+                            id="shippingLabel"
+                            label="Shipping Address Label"
+                            value={customization.addresses.shippingLabel}
+                            onChange={(e) => onUpdate('addresses.shippingLabel', e.target.value)}
+                        />
                         <div className="flex items-center justify-between pt-8">
                             <Label>Show Shipping Address</Label>
                             <Switch

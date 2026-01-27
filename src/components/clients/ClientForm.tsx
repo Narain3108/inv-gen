@@ -12,10 +12,11 @@ import { clientFormSchema } from '@/lib/validations';
 import { FieldValidators } from '@/lib/modules/form-handling';
 import { Client } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Search } from 'lucide-react';
@@ -129,7 +130,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
     }
   };
 
-  const tabsOrder = ['basic', 'contact', 'address', 'bank'] as const;
+  const tabsOrder = ['basic', 'address', 'bank'] as const;
   type TabKey = typeof tabsOrder[number];
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
 
@@ -142,8 +143,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
 
     // Validate fields relevant to the current tab before moving
     const fieldsForTab: Record<TabKey, string[]> = {
-      basic: ['clientName', 'gstin', 'pan'],
-      contact: ['contact.phone', 'contact.email', 'contact.website'],
+      basic: ['clientName', 'gstin', 'pan', 'contact.phone', 'contact.email'],
       address: ['address.street', 'address.city', 'address.state', 'address.pincode'],
       bank: ['bankDetails.bankName', 'bankDetails.accountNumber', 'bankDetails.ifscCode'],
     };
@@ -182,13 +182,16 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             {errors.clientName && <li>Client Name: {errors.clientName.message}</li>}
             {errors.gstin && <li>GSTIN: {errors.gstin.message}</li>}
             {errors.pan && <li>PAN: {errors.pan.message}</li>}
+            {errors.contact?.phone && <li>Phone: {errors.contact.phone.message}</li>}
+            {errors.contact?.email && <li>Email: {errors.contact.email.message}</li>}
             {errors.address?.street && <li>Street: {errors.address.street.message}</li>}
             {errors.address?.city && <li>City: {errors.address.city.message}</li>}
             {errors.address?.state && <li>State: {errors.address.state.message}</li>}
             {errors.address?.pincode && <li>Pincode: {errors.address.pincode.message}</li>}
-            {errors.contact?.phone && <li>Phone: {errors.contact.phone.message}</li>}
-            {errors.contact?.email && <li>Email: {errors.contact.email.message}</li>}
-            {errors.contact?.website && <li>Website: {errors.contact.website.message}</li>}
+            {errors.billingAddress?.street && <li>Billing Street: {errors.billingAddress.street.message}</li>}
+            {errors.billingAddress?.city && <li>Billing City: {errors.billingAddress.city.message}</li>}
+            {errors.billingAddress?.state && <li>Billing State: {errors.billingAddress.state.message}</li>}
+            {errors.billingAddress?.pincode && <li>Billing Pincode: {errors.billingAddress.pincode.message}</li>}
             {errors.billingAddress?.street && <li>Billing Street: {errors.billingAddress.street.message}</li>}
             {errors.billingAddress?.city && <li>Billing City: {errors.billingAddress.city.message}</li>}
             {errors.billingAddress?.state && <li>Billing State: {errors.billingAddress.state.message}</li>}
@@ -200,7 +203,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
         <TabsList>
           <TabsTrigger value="basic">Basic</TabsTrigger>
-          <TabsTrigger value="contact">Contact</TabsTrigger>
           <TabsTrigger value="address">Address</TabsTrigger>
           <TabsTrigger value="bank">Bank</TabsTrigger>
         </TabsList>
@@ -212,155 +214,92 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             </CardHeader>
             <CardContent className="space-y-4">
               {/* GST Registration Status */}
-              <div className="space-y-3">
-                <Label>Does the client have GST registration?</Label>
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="gst-yes"
-                      name="hasGST"
-                      checked={hasGST}
-                      onChange={() => {
-                        setHasGST(true);
-                      }}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="gst-yes" className="font-normal cursor-pointer">
-                      Yes
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="gst-no"
-                      name="hasGST"
-                      checked={!hasGST}
-                      onChange={() => {
-                        setHasGST(false);
-                        setValue('gstin', ''); // Clear GSTIN when selecting No
-                      }}
-                      className="h-4 w-4 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="gst-no" className="font-normal cursor-pointer">
-                      No
-                    </Label>
-                  </div>
-                </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="hasGST"
+                  checked={hasGST}
+                  onChange={(e) => {
+                    setHasGST(e.target.checked);
+                    if (!e.target.checked) {
+                      setValue('gstin', ''); // Clear GSTIN when unchecking
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                />
+                <Label htmlFor="hasGST" className="font-normal cursor-pointer">
+                  GST registered
+                </Label>
               </div>
 
               {/* GSTIN Input - Only shown when hasGST is true */}
               {hasGST && (
-                <div className="space-y-2">
-                  <Label htmlFor="gstin">GSTIN *</Label>
-                  <div className="flex gap-2">
-                    <Input
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <FloatingLabelInput
                       id="gstin"
+                      label="GSTIN *"
                       {...register('gstin')}
-                      placeholder="22AAAAA0000A1Z5"
                       maxLength={15}
                       autoComplete="off"
+                      error={errors.gstin?.message}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleFetchGSTIN}
-                      disabled={isFetchingGSTIN || !gstin}
-                    >
-                      {isFetchingGSTIN ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Search className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Click the search icon to auto-fill details from GSTIN
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Click the search icon to auto-fill details from GSTIN
-                  </p>
-                  {errors.gstin && (
-                    <p className="text-sm text-red-500">{errors.gstin.message}</p>
-                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleFetchGSTIN}
+                    disabled={isFetchingGSTIN || !gstin}
+                    className="mt-1"
+                  >
+                    {isFetchingGSTIN ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               )}
 
               {/* Client Name */}
-              <div className="space-y-2">
-                <Label htmlFor="clientName">Client Name *</Label>
-                <Input
-                  id="clientName"
-                  {...register('clientName')}
-                  placeholder="Enter client name"
-                  autoComplete="off"
-                />
-                {errors.clientName && (
-                  <p className="text-sm text-red-500">{errors.clientName.message}</p>
-                )}
-              </div>
+              <FloatingLabelInput
+                id="clientName"
+                label="Client Name *"
+                {...register('clientName')}
+                autoComplete="off"
+                error={errors.clientName?.message}
+              />
 
               {/* PAN (Optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="pan">PAN (Optional)</Label>
-                <Input
-                  id="pan"
-                  {...register('pan')}
-                  placeholder="AAAAA0000A"
-                  maxLength={10}
-                />
-                {errors.pan && (
-                  <p className="text-sm text-red-500">{errors.pan.message}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <FloatingLabelInput
+                id="pan"
+                label="PAN (Optional)"
+                {...register('pan')}
+                maxLength={10}
+                error={errors.pan?.message}
+              />
 
-        <TabsContent value="contact">
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
               {/* Phone */}
-              <div className="space-y-2">
-                <Label htmlFor="contact.phone">Phone *</Label>
-                <Input
-                  id="contact.phone"
-                  {...register('contact.phone')}
-                  placeholder="+91 98765 43210"
-                  autoComplete="off"
-                />
-                {errors.contact?.phone && (
-                  <p className="text-sm text-red-500">{errors.contact.phone.message}</p>
-                )}
-              </div>
+              <FloatingLabelInput
+                id="contact.phone"
+                label="Phone *"
+                {...register('contact.phone')}
+                autoComplete="off"
+                error={errors.contact?.phone?.message}
+              />
 
               {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="contact.email">Email *</Label>
-                <Input
-                  id="contact.email"
-                  type="email"
-                  {...register('contact.email')}
-                  placeholder="client@example.com"
-                  autoComplete="off"
-                />
-                {errors.contact?.email && (
-                  <p className="text-sm text-red-500">{errors.contact.email.message}</p>
-                )}
-              </div>
-
-              {/* Website (Optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="contact.website">Website (Optional)</Label>
-                <Input
-                  id="contact.website"
-                  {...register('contact.website')}
-                  placeholder="https://example.com"
-                />
-                {errors.contact?.website && (
-                  <p className="text-sm text-red-500">{errors.contact.website.message}</p>
-                )}
-              </div>
+              <FloatingLabelInput
+                id="contact.email"
+                type="email"
+                label="Email *"
+                {...register('contact.email')}
+                autoComplete="off"
+                error={errors.contact?.email?.message}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -372,69 +311,48 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Street */}
-              <div className="space-y-2">
-                <Label htmlFor="address.street">Street Address *</Label>
-                <Textarea
-                  id="address.street"
-                  {...register('address.street')}
-                  placeholder="Building, Street, Area"
-                  rows={2}
-                />
-                {errors.address?.street && (
-                  <p className="text-sm text-red-500">{errors.address.street.message}</p>
-                )}
-              </div>
+              <FloatingLabelTextarea
+                id="address.street"
+                label="Street Address *"
+                {...register('address.street')}
+                rows={2}
+                error={errors.address?.street?.message}
+              />
 
               {/* City and State */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="address.city">City *</Label>
-                  <Input
-                    id="address.city"
-                    {...register('address.city')}
-                    placeholder="City"
-                  />
-                  {errors.address?.city && (
-                    <p className="text-sm text-red-500">{errors.address.city.message}</p>
-                  )}
-                </div>
+                <FloatingLabelInput
+                  id="address.city"
+                  label="City *"
+                  {...register('address.city')}
+                  error={errors.address?.city?.message}
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="address.state">State *</Label>
-                  <Select
-                    value={watch('address.state') || ''}
-                    onValueChange={(value) => setValue('address.state', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INDIAN_STATES.map((state) => (
-                        <SelectItem key={state.code} value={state.value}>
-                          {state.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.address?.state && (
-                    <p className="text-sm text-red-500">{errors.address.state.message}</p>
-                  )}
-                </div>
+                <FloatingLabelSelect
+                  id="address.state"
+                  label="State *"
+                  value={watch('address.state') || ''}
+                  onValueChange={(value: string) => setValue('address.state', value)}
+                  error={errors.address?.state?.message}
+                >
+                  <SelectContent>
+                    {INDIAN_STATES.map((state) => (
+                      <SelectItem key={state.code} value={state.value}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </FloatingLabelSelect>
               </div>
 
               {/* Pincode */}
-              <div className="space-y-2">
-                <Label htmlFor="address.pincode">Pincode *</Label>
-                <Input
-                  id="address.pincode"
-                  {...register('address.pincode')}
-                  placeholder="400001"
-                  maxLength={6}
-                />
-                {errors.address?.pincode && (
-                  <p className="text-sm text-red-500">{errors.address.pincode.message}</p>
-                )}
-              </div>
+              <FloatingLabelInput
+                id="address.pincode"
+                label="Pincode *"
+                {...register('address.pincode')}
+                maxLength={6}
+                error={errors.address?.pincode?.message}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -446,73 +364,48 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Bank Name */}
-              <div className="space-y-2">
-                <Label htmlFor="bankDetails.bankName">Bank Name</Label>
-                <Input
-                  id="bankDetails.bankName"
-                  {...register('bankDetails.bankName')}
-                  placeholder="State Bank of India"
-                />
-                {errors.bankDetails?.bankName && (
-                  <p className="text-sm text-red-500">{errors.bankDetails.bankName.message}</p>
-                )}
-              </div>
+              <FloatingLabelInput
+                id="bankDetails.bankName"
+                label="Bank Name"
+                {...register('bankDetails.bankName')}
+                error={errors.bankDetails?.bankName?.message}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 {/* Account Number */}
-                <div className="space-y-2">
-                  <Label htmlFor="bankDetails.accountNumber">Account Number</Label>
-                  <Input
-                    id="bankDetails.accountNumber"
-                    {...register('bankDetails.accountNumber')}
-                    placeholder="1234567890"
-                  />
-                  {errors.bankDetails?.accountNumber && (
-                    <p className="text-sm text-red-500">{errors.bankDetails.accountNumber.message}</p>
-                  )}
-                </div>
+                <FloatingLabelInput
+                  id="bankDetails.accountNumber"
+                  label="Account Number"
+                  {...register('bankDetails.accountNumber')}
+                  error={errors.bankDetails?.accountNumber?.message}
+                />
 
                 {/* IFSC Code */}
-                <div className="space-y-2">
-                  <Label htmlFor="bankDetails.ifscCode">IFSC Code</Label>
-                  <Input
-                    id="bankDetails.ifscCode"
-                    {...register('bankDetails.ifscCode')}
-                    placeholder="SBIN0001234"
-                    maxLength={11}
-                  />
-                  {errors.bankDetails?.ifscCode && (
-                    <p className="text-sm text-red-500">{errors.bankDetails.ifscCode.message}</p>
-                  )}
-                </div>
+                <FloatingLabelInput
+                  id="bankDetails.ifscCode"
+                  label="IFSC Code"
+                  {...register('bankDetails.ifscCode')}
+                  maxLength={11}
+                  error={errors.bankDetails?.ifscCode?.message}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {/* Account Holder Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="bankDetails.accountHolderName">Account Holder Name</Label>
-                  <Input
-                    id="bankDetails.accountHolderName"
-                    {...register('bankDetails.accountHolderName')}
-                    placeholder="Account holder name"
-                  />
-                  {errors.bankDetails?.accountHolderName && (
-                    <p className="text-sm text-red-500">{errors.bankDetails.accountHolderName.message}</p>
-                  )}
-                </div>
+                <FloatingLabelInput
+                  id="bankDetails.accountHolderName"
+                  label="Account Holder Name"
+                  {...register('bankDetails.accountHolderName')}
+                  error={errors.bankDetails?.accountHolderName?.message}
+                />
 
                 {/* UPI ID */}
-                <div className="space-y-2">
-                  <Label htmlFor="bankDetails.upiId">UPI ID</Label>
-                  <Input
-                    id="bankDetails.upiId"
-                    {...register('bankDetails.upiId')}
-                    placeholder="client@upi"
-                  />
-                  {errors.bankDetails?.upiId && (
-                    <p className="text-sm text-red-500">{errors.bankDetails.upiId.message}</p>
-                  )}
-                </div>
+                <FloatingLabelInput
+                  id="bankDetails.upiId"
+                  label="UPI ID"
+                  {...register('bankDetails.upiId')}
+                  error={errors.bankDetails?.upiId?.message}
+                />
               </div>
             </CardContent>
           </Card>

@@ -15,10 +15,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { productFormSchema } from '@/lib/validations';
 import { Product } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Search, RefreshCw, Tag } from 'lucide-react';
 import { toast } from 'sonner';
@@ -150,22 +151,18 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Product Type */}
-          <div className="space-y-2">
-            <Label htmlFor="type">Type *</Label>
-            <Select
-              value={watch('type') || 'product'}
-              onValueChange={(value) => setValue('type', value as 'product' | 'service')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="product">Product</SelectItem>
-                <SelectItem value="service">Service</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.type && <p className="text-sm text-red-500">{errors.type.message}</p>}
-          </div>
+          <FloatingLabelSelect
+            id="type"
+            label="Type *"
+            value={watch('type') || 'product'}
+            onValueChange={(value: string) => setValue('type', value as 'product' | 'service')}
+            error={errors.type?.message}
+          >
+            <SelectContent>
+              <SelectItem value="product">Product</SelectItem>
+              <SelectItem value="service">Service</SelectItem>
+            </SelectContent>
+          </FloatingLabelSelect>
 
           {/* Serial Number Toggle */}
           <div className="space-y-2">
@@ -198,127 +195,113 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
           </div>
 
           {/* HSN/SAC Code */}
-          <div className="space-y-2">
-            <Label htmlFor="hsn">{productType === 'product' ? 'HSN Code' : 'SAC Code'} *</Label>
-            <div className="flex gap-2">
-              <Input
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <FloatingLabelInput
                 id="hsn"
+                label={productType === 'product' ? 'HSN Code *' : 'SAC Code *'}
                 {...register('hsn')}
-                placeholder={productType === 'product' ? 'e.g., 12345678' : 'e.g., 998311'}
                 maxLength={8}
+                error={errors.hsn?.message}
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleFetchHSN}
-                disabled={isFetchingHSN || !hsn}
-              >
-                {isFetchingHSN ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                {productType === 'product' ? 'HSN code (4, 6, or 8 digits)' : 'SAC code (6 digits)'}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {productType === 'product' ? 'HSN code (4, 6, or 8 digits)' : 'SAC code (6 digits)'}
-            </p>
-            {errors.hsn && <p className="text-sm text-red-500">{errors.hsn.message}</p>}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleFetchHSN}
+              disabled={isFetchingHSN || !hsn}
+              className="mt-1"
+            >
+              {isFetchingHSN ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            </Button>
           </div>
 
           {/* Product Name */}
-          <div className="space-y-2">
-            <Label htmlFor="productName">Name *</Label>
-            <Input
-              id="productName"
-              {...register('productName')}
-              placeholder="Enter product/service name"
-            />
-            {errors.productName && <p className="text-sm text-red-500">{errors.productName.message}</p>}
-          </div>
+          <FloatingLabelInput
+            id="productName"
+            label="Name *"
+            {...register('productName')}
+            error={errors.productName?.message}
+          />
 
           {/* Item Code */}
-          <div className="space-y-2">
-            <Label htmlFor="itemCode">Item Code (Optional)</Label>
-            <div className="flex gap-2">
-              <Input
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <FloatingLabelInput
                 id="itemCode"
+                label="Item Code (Optional)"
                 {...register('itemCode')}
-                placeholder="e.g., 12345"
                 maxLength={5}
                 value={itemCode || ''}
-                onChange={(e) => setValue('itemCode', e.target.value || '')}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('itemCode', e.target.value || '')}
+                error={errors.itemCode?.message}
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setValue('itemCode', generateItemCode())}
-                title="Generate random 5-digit code"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional 5-digit code. Click refresh to auto-generate.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Optional 5-digit code. Click refresh to auto-generate.
-            </p>
-            {errors.itemCode && <p className="text-sm text-red-500">{errors.itemCode.message}</p>}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setValue('itemCode', generateItemCode())}
+              title="Generate random 5-digit code"
+              className="mt-1"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
 
           {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register('description')}
-              placeholder="Enter product description"
-              rows={3}
-            />
-            {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
-          </div>
+          <FloatingLabelTextarea
+            id="description"
+            label="Description"
+            {...register('description')}
+            rows={3}
+            error={errors.description?.message}
+          />
 
           {/* Unit */}
-          <div className="space-y-2">
-            <Label htmlFor="unit">Unit *</Label>
-            <Select
-              value={watch('unit') || 'Nos'}
-              onValueChange={(value) => setValue('unit', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUCT_UNITS.map((unit: string) => (
-                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.unit && <p className="text-sm text-red-500">{errors.unit.message}</p>}
-          </div>
+          <FloatingLabelSelect
+            id="unit"
+            label="Unit *"
+            value={watch('unit') || 'Nos'}
+            onValueChange={(value: string) => setValue('unit', value)}
+            error={errors.unit?.message}
+          >
+            <SelectContent>
+              {PRODUCT_UNITS.map((unit: string) => (
+                <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+              ))}
+            </SelectContent>
+          </FloatingLabelSelect>
 
           {/* Price */}
-          <div className="space-y-2">
-            <Label htmlFor="price">Price (₹) *</Label>
-            <Input
-              id="price"
-              type="number"
-              step="0.01"
-              {...register('price', { valueAsNumber: true })}
-              placeholder="0.00"
-            />
-            {errors.price && <p className="text-sm text-red-500">{errors.price.message}</p>}
-          </div>
+          <FloatingLabelInput
+            id="price"
+            type="number"
+            label="Price (₹) *"
+            step="0.01"
+            {...register('price', { valueAsNumber: true })}
+            error={errors.price?.message}
+          />
 
           {/* Stock (only for products) */}
           {watch('type') === 'product' && (
-            <div className="space-y-2">
-              <Label htmlFor="stock">Stock Quantity</Label>
-              <Input
+            <div>
+              <FloatingLabelInput
                 id="stock"
                 type="number"
+                label="Stock Quantity"
                 step="1"
                 min="0"
                 {...register('stock')}
                 defaultValue={product?.stock ?? ''}
-                placeholder=""
+                error={errors.stock?.message}
               />
-              <p className="text-xs text-muted-foreground">Current available stock</p>
-              {errors.stock && <p className="text-sm text-red-500">{errors.stock.message}</p>}
+              <p className="text-xs text-muted-foreground mt-1">Current available stock</p>
             </div>
           )}
         </CardContent>
@@ -339,40 +322,35 @@ function TaxInfoTab({ form }: { form: UseFormReturn<ProductFormData> }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* GST Rate */}
-        <div className="space-y-2">
-          <Label htmlFor="gstRate">GST Rate (%) *</Label>
-          <Select
-            value={watch('gstRate')?.toString() || '18'}
-            onValueChange={(value) => setValue('gstRate', parseFloat(value))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select GST rate" />
-            </SelectTrigger>
-            <SelectContent>
-              {GST_RATES.map((rate) => (
-                <SelectItem key={rate.value} value={rate.value.toString()}>
-                  {rate.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.gstRate && <p className="text-sm text-red-500">{errors.gstRate.message}</p>}
-        </div>
+        <FloatingLabelSelect
+          id="gstRate"
+          label="GST Rate (%) *"
+          value={watch('gstRate')?.toString() || '18'}
+          onValueChange={(value: string) => setValue('gstRate', parseFloat(value))}
+          error={errors.gstRate?.message}
+        >
+          <SelectContent>
+            {GST_RATES.map((rate) => (
+              <SelectItem key={rate.value} value={rate.value.toString()}>
+                {rate.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </FloatingLabelSelect>
 
         {/* Cess */}
-        <div className="space-y-2">
-          <Label htmlFor="cessRate">Cess (%)</Label>
-          <Input
+        <div>
+          <FloatingLabelInput
             id="cessRate"
             type="number"
+            label="Cess (%)"
             step="0.01"
             {...register('cessRate', { valueAsNumber: true })}
-            placeholder="0.00"
+            error={errors.cessRate?.message}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground mt-1">
             Additional cess percentage, if applicable
           </p>
-          {errors.cessRate && <p className="text-sm text-red-500">{errors.cessRate.message}</p>}
         </div>
       </CardContent>
     </Card>

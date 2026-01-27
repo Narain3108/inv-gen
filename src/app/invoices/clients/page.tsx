@@ -217,11 +217,7 @@ function ClientsContent() {
             <DialogTitle>
               {editingClient ? 'Edit Client' : 'Add New Client'}
             </DialogTitle>
-            <DialogDescription>
-              {editingClient
-                ? 'Update the client details below.'
-                : 'Add a new client to your database.'}
-            </DialogDescription>
+
           </DialogHeader>
           <ClientForm
             client={editingClient}

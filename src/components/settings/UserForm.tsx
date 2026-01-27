@@ -7,15 +7,11 @@ import { z } from 'zod';
 import { User, Company } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, KeyRound } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppData } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
 
@@ -159,22 +155,20 @@ export function UserForm({ user, onSubmit, onCancel, onPasswordChange, available
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-4">
-        <div className="grid gap-2">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" {...register('name')} placeholder="John Doe" />
-          {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
-        </div>
+        <FloatingLabelInput
+          id="name"
+          label="Name *"
+          {...register('name')}
+          error={errors.name?.message}
+        />
 
-        <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            {...register('email')}
-            placeholder="john@example.com"
-            disabled={isEditing}
-          />
-          {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
-        </div>
+        <FloatingLabelInput
+          id="email"
+          label="Email *"
+          {...register('email')}
+          disabled={isEditing}
+          error={errors.email?.message}
+        />
 
         {!isEditing && (
           <div className="grid gap-2">
@@ -260,23 +254,19 @@ export function UserForm({ user, onSubmit, onCancel, onPasswordChange, available
           </div>
         )}
 
-        <div className="grid gap-2">
-          <Label htmlFor="role">Role</Label>
-          <Select
-            onValueChange={(value) => setValue('role', value as any, { shouldDirty: true })}
-            value={selectedRole}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="super_admin">Super Admin</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="employee">Employee</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.role && <p className="text-sm text-red-500">{errors.role.message}</p>}
-        </div>
+        <FloatingLabelSelect
+          id="role"
+          label="Role *"
+          value={selectedRole}
+          onValueChange={(value: string) => setValue('role', value as any, { shouldDirty: true })}
+          error={errors.role?.message}
+        >
+          <SelectContent>
+            <SelectItem value="super_admin">Super Admin</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="employee">Employee</SelectItem>
+          </SelectContent>
+        </FloatingLabelSelect>
 
         {selectedRole !== 'super_admin' && (
           <div className="grid gap-2">

@@ -7,8 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { signupSchema, SignupValues } from '@/lib/validations';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,47 +39,68 @@ export default function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="space-y-4">
+      <div className="space-y-5">
         <h3 className="font-semibold text-lg">Create Account</h3>
 
-        <div className="space-y-2">
-          <Label htmlFor="username">Username</Label>
-          <Input id="username" placeholder="johndoe" {...register('username')} disabled={isLoading} />
-          {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
+        <FloatingLabelInput
+          id="username"
+          label="Username"
+          {...register('username')}
+          disabled={isLoading}
+          error={errors.username?.message}
+        />
+
+        <FloatingLabelInput
+          id="name"
+          label="Your Name"
+          {...register('name')}
+          disabled={isLoading}
+          error={errors.name?.message}
+        />
+
+        <FloatingLabelInput
+          id="email"
+          type="email"
+          label="Your Email"
+          {...register('email')}
+          disabled={isLoading}
+          error={errors.email?.message}
+        />
+
+        <div className="relative">
+          <FloatingLabelInput
+            id="password"
+            type={showAdminPassword ? 'text' : 'password'}
+            label="Password"
+            {...register('password')}
+            disabled={isLoading}
+            error={errors.password?.message}
+          />
+          <button
+            type="button"
+            onClick={() => setShowAdminPassword(!showAdminPassword)}
+            className="absolute right-3 top-4 text-gray-500 hover:text-gray-700"
+          >
+            {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="name">Your Name</Label>
-          <Input id="name" placeholder="John Doe" {...register('name')} disabled={isLoading} />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email">Your Email</Label>
-          <Input id="email" type="email" placeholder="john@example.com" {...register('email')} disabled={isLoading} />
-          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Input id="password" type={showAdminPassword ? 'text' : 'password'} placeholder="••••••••" {...register('password')} disabled={isLoading} />
-            <button type="button" onClick={() => setShowAdminPassword(!showAdminPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
-              {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <div className="relative">
-            <Input id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...register('confirmPassword')} disabled={isLoading} />
-            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
-              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
+        <div className="relative">
+          <FloatingLabelInput
+            id="confirmPassword"
+            type={showConfirmPassword ? 'text' : 'password'}
+            label="Confirm Password"
+            {...register('confirmPassword')}
+            disabled={isLoading}
+            error={errors.confirmPassword?.message}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-3 top-4 text-gray-500 hover:text-gray-700"
+          >
+            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </div>
 

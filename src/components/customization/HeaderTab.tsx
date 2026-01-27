@@ -6,10 +6,11 @@
 'use client';
 
 import React from 'react';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvoiceCustomization } from '@/types/customization';
 
@@ -28,42 +29,33 @@ export function HeaderTab({ customization, type, onUpdate }: HeaderTabProps) {
                     <CardDescription>Customize the invoice header and title</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Document Title</Label>
-                        <Input
-                            id="title"
-                            value={customization.header.title}
-                            onChange={(e) => onUpdate('header.title', e.target.value)}
-                            placeholder="TAX INVOICE"
-                        />
-                    </div>
+                    <FloatingLabelInput
+                        id="title"
+                        label="Document Title"
+                        value={customization.header.title}
+                        onChange={(e) => onUpdate('header.title', e.target.value)}
+                    />
 
-                    <div className="space-y-2">
-                        <Label htmlFor="fontSize">Title Size</Label>
-                        <Select
-                            value={customization.header.fontSize}
-                            onValueChange={(value) => onUpdate('header.fontSize', value)}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="small">Small</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="large">Large</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <FloatingLabelSelect
+                        id="fontSize"
+                        label="Title Size"
+                        value={customization.header.fontSize}
+                        onValueChange={(value: string) => onUpdate('header.fontSize', value)}
+                    >
+                        <SelectContent>
+                            <SelectItem value="small">Small</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="large">Large</SelectItem>
+                        </SelectContent>
+                    </FloatingLabelSelect>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="invoiceNumberLabel">Invoice Number Label</Label>
-                            <Input
-                                id="invoiceNumberLabel"
-                                value={customization.header.invoiceNumberLabel}
-                                onChange={(e) => onUpdate('header.invoiceNumberLabel', e.target.value)}
-                            />
-                        </div>
+                        <FloatingLabelInput
+                            id="invoiceNumberLabel"
+                            label="Invoice Number Label"
+                            value={customization.header.invoiceNumberLabel}
+                            onChange={(e) => onUpdate('header.invoiceNumberLabel', e.target.value)}
+                        />
                         <div className="flex items-center justify-between pt-8">
                             <Label>Show Invoice Number</Label>
                             <Switch
@@ -74,14 +66,12 @@ export function HeaderTab({ customization, type, onUpdate }: HeaderTabProps) {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="dateLabel">Date Label</Label>
-                            <Input
-                                id="dateLabel"
-                                value={customization.header.dateLabel}
-                                onChange={(e) => onUpdate('header.dateLabel', e.target.value)}
-                            />
-                        </div>
+                        <FloatingLabelInput
+                            id="dateLabel"
+                            label="Date Label"
+                            value={customization.header.dateLabel}
+                            onChange={(e) => onUpdate('header.dateLabel', e.target.value)}
+                        />
                         <div className="flex items-center justify-between pt-8">
                             <Label>Show Date</Label>
                             <Switch
@@ -93,14 +83,12 @@ export function HeaderTab({ customization, type, onUpdate }: HeaderTabProps) {
 
                     {type === 'quotation' && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="dueDateLabel">Valid Until Label</Label>
-                                <Input
-                                    id="dueDateLabel"
-                                    value={customization.header.dueDateLabel}
-                                    onChange={(e) => onUpdate('header.dueDateLabel', e.target.value)}
-                                />
-                            </div>
+                            <FloatingLabelInput
+                                id="dueDateLabel"
+                                label="Valid Until Label"
+                                value={customization.header.dueDateLabel}
+                                onChange={(e) => onUpdate('header.dueDateLabel', e.target.value)}
+                            />
                             <div className="flex items-center justify-between pt-8">
                                 <Label>Show Valid Until</Label>
                                 <Switch

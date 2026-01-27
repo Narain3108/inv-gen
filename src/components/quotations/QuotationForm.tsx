@@ -10,6 +10,7 @@ import { quotationFormSchema } from '@/lib/validations';
 import { Quotation, Product, Client, InvoiceItem, Company, Address } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -128,12 +129,18 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                     <Card><CardHeader><CardTitle className="text-lg">Quotation Details</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Quotation Number</Label><Input {...register('quotationNumber')} /><p className="text-xs text-muted-foreground">Auto-filled</p>{errors.quotationNumber && <p className="text-sm text-red-500">{errors.quotationNumber.message}</p>}</div>
+                                <div>
+                                    <FloatingLabelInput id="quotationNumber" label="Quotation Number" {...register('quotationNumber')} error={errors.quotationNumber?.message} />
+                                    <p className="text-xs text-muted-foreground mt-1">Auto-filled</p>
+                                </div>
                                 <SearchableClientDropdown clients={clients} selectedClientId={watch('clientId') || ''} onClientSelect={(id) => setValue('clientId', id)} onClientAdded={(c) => { setValue('clientId', c.id); clearErrors('clientId'); onClientAdded?.(c); }} label="Client" required error={errors.clientId?.message} companyId={companyId} placeholder="Select client..." />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Date *</Label><Input type="date" {...register('date')} />{errors.date && <p className="text-sm text-red-500">{errors.date.message}</p>}</div>
-                                <div className="space-y-2"><Label>Valid Until *</Label><Input type="date" {...register('validUntil')} /><p className="text-xs text-muted-foreground">Default: 30 days</p></div>
+                                <FloatingLabelInput id="date" type="date" label="Date *" {...register('date')} error={errors.date?.message} />
+                                <div>
+                                    <FloatingLabelInput id="validUntil" type="date" label="Valid Until *" {...register('validUntil')} />
+                                    <p className="text-xs text-muted-foreground mt-1">Default: 30 days</p>
+                                </div>
                             </div>
                             {selectedClient && <ShippingAddressSection client={selectedClient} mode={shippingAddressMode} onModeChange={setShippingAddressMode} selectedAddressIndex={selectedAddressIndex} onSelectedAddressChange={setSelectedAddressIndex} newAddress={newShippingAddress} onNewAddressChange={setNewShippingAddress} />}
                         </CardContent>

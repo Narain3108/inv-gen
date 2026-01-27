@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GripVertical, Hash } from 'lucide-react';
 
@@ -94,8 +94,8 @@ export function NumberingConfig({
     .filter(Boolean)
     .join('');
 
-  const defaultPreview = components.length === 0 
-    ? `INV${String(nextNumber).padStart(4, '0')}` 
+  const defaultPreview = components.length === 0
+    ? `INV${String(nextNumber).padStart(4, '0')}`
     : previewNumber || `INV${String(nextNumber).padStart(4, '0')}`;
 
   return (
@@ -106,28 +106,26 @@ export function NumberingConfig({
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor={`${title}-prefix`}>Prefix (Optional)</Label>
-            <Input
+          <div>
+            <FloatingLabelInput
               id={`${title}-prefix`}
+              label="Prefix (Optional)"
               value={prefix}
               onChange={(e) => onPrefixChange(e.target.value)}
-              placeholder="e.g., INV, QUO"
               className="uppercase"
             />
-            <p className="text-xs text-muted-foreground">Text before the number</p>
+            <p className="text-xs text-muted-foreground mt-1">Text before the number</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`${title}-suffix`}>Suffix (Optional)</Label>
-            <Input
+          <div>
+            <FloatingLabelInput
               id={`${title}-suffix`}
+              label="Suffix (Optional)"
               value={suffix}
               onChange={(e) => onSuffixChange(e.target.value)}
-              placeholder="e.g., /2024, -FY24"
               className="uppercase"
             />
-            <p className="text-xs text-muted-foreground">Text after the number</p>
+            <p className="text-xs text-muted-foreground mt-1">Text after the number</p>
           </div>
         </div>
 
@@ -136,7 +134,7 @@ export function NumberingConfig({
             <Label>Component Order</Label>
             <span className="text-xs text-muted-foreground">Drag to reorder</span>
           </div>
-          
+
           <div className="flex flex-wrap gap-2 p-4 bg-muted/30 dark:bg-muted/10 rounded-lg border-2 border-dashed border-muted-foreground/20">
             {components.map((component, index) => (
               <div
@@ -145,9 +143,8 @@ export function NumberingConfig({
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md border-2 cursor-move transition-all hover:scale-105 ${getComponentColor(component)} ${
-                  draggedIndex === index ? 'opacity-50 scale-95' : ''
-                }`}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md border-2 cursor-move transition-all hover:scale-105 ${getComponentColor(component)} ${draggedIndex === index ? 'opacity-50 scale-95' : ''
+                  }`}
               >
                 <GripVertical className="h-4 w-4 opacity-50" />
                 {component === 'number' && <Hash className="h-4 w-4" />}
@@ -170,8 +167,8 @@ export function NumberingConfig({
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            {prefix || suffix 
-              ? 'Auto-generated based on your configuration' 
+            {prefix || suffix
+              ? 'Auto-generated based on your configuration'
               : 'Default format will be used if no prefix/suffix is provided'}
           </p>
         </div>

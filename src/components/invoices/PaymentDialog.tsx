@@ -18,16 +18,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { PaymentMode, Invoice } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { DollarSign, Calendar, CreditCard, FileText, Clock, Hash } from 'lucide-react';
@@ -128,7 +123,7 @@ export function PaymentDialog({
 
   // Round to 2 decimals to avoid floating point issues
   const roundTo2 = (num: number) => Math.round((num || 0) * 100) / 100;
-  
+
   const totalAmount = roundTo2(invoice.totalAmount);
   const amountPaid = roundTo2(invoice.amountPaid || 0);
   const amountPending = roundTo2(invoice.amountPending ?? totalAmount);
@@ -157,7 +152,7 @@ export function PaymentDialog({
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>{isPaid ? 'Payment History' : 'Record Payment'}</DialogTitle>
           <DialogDescription>
-            {isPaid 
+            {isPaid
               ? `Complete payment details for invoice ${invoice.invoiceNumber}`
               : `Record a payment for invoice ${invoice.invoiceNumber}`
             }
@@ -211,10 +206,10 @@ export function PaymentDialog({
                               <span>
                                 {payment.paymentDate
                                   ? formatDate(
-                                      typeof payment.paymentDate === 'string'
-                                        ? new Date(payment.paymentDate)
-                                        : payment.paymentDate
-                                    )
+                                    typeof payment.paymentDate === 'string'
+                                      ? new Date(payment.paymentDate)
+                                      : payment.paymentDate
+                                  )
                                   : 'N/A'}
                               </span>
                             </div>
@@ -238,10 +233,10 @@ export function PaymentDialog({
                         <div className="text-xs text-muted-foreground text-right">
                           {payment.recordedAt
                             ? formatDate(
-                                typeof payment.recordedAt === 'string'
-                                  ? new Date(payment.recordedAt)
-                                  : payment.recordedAt
-                              )
+                              typeof payment.recordedAt === 'string'
+                                ? new Date(payment.recordedAt)
+                                : payment.recordedAt
+                            )
                             : 'N/A'}
                         </div>
                       </div>
@@ -261,142 +256,115 @@ export function PaymentDialog({
             {/* Show form only if not fully paid */}
             {!isPaid && (
               <>
-            {/* Amount */}
-            <div className="space-y-2">
-              <Label htmlFor="amount" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Payment Amount *
-              </Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter payment amount"
-                {...register('amount', { valueAsNumber: true })}
-                className={errors.amount ? 'border-red-500' : ''}
-              />
-              {errors.amount && (
-                <p className="text-sm text-red-500">{errors.amount.message}</p>
-              )}
-              {roundTo2(enteredAmount) > roundTo2(maxAmount) + 0.01 && (
-                <p className="text-sm text-orange-600">
-                  ⚠️ Amount exceeds pending balance ({formatCurrency(maxAmount)})
-                </p>
-              )}
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setValue('amount', maxAmount)}
+                {/* Amount */}
+                <div className="space-y-2">
+                  <FloatingLabelInput
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    label="Payment Amount *"
+                    {...register('amount', { valueAsNumber: true })}
+                    error={errors.amount?.message}
+                  />
+                  {roundTo2(enteredAmount) > roundTo2(maxAmount) + 0.01 && (
+                    <p className="text-sm text-orange-600">
+                      ⚠️ Amount exceeds pending balance ({formatCurrency(maxAmount)})
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setValue('amount', maxAmount)}
+                    >
+                      Full Amount
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setValue('amount', maxAmount / 2)}
+                    >
+                      Half Amount
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Payment Date */}
+                <FloatingLabelInput
+                  id="paymentDate"
+                  type="date"
+                  label="Payment Date *"
+                  {...register('paymentDate')}
+                  error={errors.paymentDate?.message}
+                />
+
+                {/* Payment Mode */}
+                <FloatingLabelSelect
+                  id="paymentMode"
+                  label="Payment Mode"
+                  value={selectedPaymentMode}
+                  onValueChange={(value: string) => setValue('paymentMode', value as PaymentMode)}
                 >
-                  Full Amount
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setValue('amount', maxAmount / 2)}
-                >
-                  Half Amount
-                </Button>
-              </div>
-            </div>          {/* Payment Date */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentDate" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Payment Date *
-            </Label>
-            <Input
-              id="paymentDate"
-              type="date"
-              {...register('paymentDate')}
-              className={errors.paymentDate ? 'border-red-500' : ''}
-            />
-            {errors.paymentDate && (
-              <p className="text-sm text-red-500">{errors.paymentDate.message}</p>
-            )}
-          </div>
+                  <SelectContent>
+                    {paymentModes.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        {mode.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </FloatingLabelSelect>
 
-          {/* Payment Mode */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentMode" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Payment Mode
-            </Label>
-            <Select
-              value={selectedPaymentMode}
-              onValueChange={(value) => setValue('paymentMode', value as PaymentMode)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select payment mode" />
-              </SelectTrigger>
-              <SelectContent>
-                {paymentModes.map((mode) => (
-                  <SelectItem key={mode.value} value={mode.value}>
-                    {mode.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                {/* Reference Number */}
+                <div>
+                  <FloatingLabelInput
+                    id="referenceNumber"
+                    label="Reference Number / Transaction ID"
+                    {...register('referenceNumber')}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Optional: Enter cheque number, transaction ID, or reference
+                  </p>
+                </div>
 
-          {/* Reference Number */}
-          <div className="space-y-2">
-            <Label htmlFor="referenceNumber" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Reference Number / Transaction ID
-            </Label>
-            <Input
-              id="referenceNumber"
-              placeholder="e.g., CHQ123456, UPI/123456789"
-              {...register('referenceNumber')}
-            />
-            <p className="text-xs text-muted-foreground">
-              Optional: Enter cheque number, transaction ID, or reference
-            </p>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Add any additional notes about this payment..."
-              rows={3}
-              {...register('notes')}
-            />
-          </div>
-          </>
+                {/* Notes */}
+                <FloatingLabelTextarea
+                  id="notes"
+                  label="Notes"
+                  rows={3}
+                  {...register('notes')}
+                />
+              </>
             )}
           </form>
         </div>
 
         {!isPaid && (
-        <DialogFooter className="px-6 pb-6 pt-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" form="payment-form" disabled={isSubmitting}>
-            {isSubmitting ? 'Recording...' : 'Record Payment'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="payment-form" disabled={isSubmitting}>
+              {isSubmitting ? 'Recording...' : 'Record Payment'}
+            </Button>
+          </DialogFooter>
         )}
-        
+
         {isPaid && (
-        <DialogFooter className="px-6 pb-6 pt-0">
-          <Button
-            type="button"
-            onClick={handleClose}
-          >
-            Close
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-0">
+            <Button
+              type="button"
+              onClick={handleClose}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

@@ -10,8 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { userLoginSchema, UserLoginValues } from '@/lib/validations';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,45 +47,35 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="bg-muted/50 p-3 rounded-lg text-sm text-center mb-4">
         Sign in to your account
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="email">Your Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="you@example.com"
-          {...register('email')}
-          disabled={isLoading}
-        />
-        {errors.email && (
-          <p className="text-sm text-destructive">{errors.email.message}</p>
-        )}
-      </div>
+      <FloatingLabelInput
+        id="email"
+        type="email"
+        label="Your Email"
+        {...register('email')}
+        disabled={isLoading}
+        error={errors.email?.message}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Your Password</Label>
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            placeholder="••••••••"
-            {...register('password')}
-            disabled={isLoading}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        {errors.password && (
-          <p className="text-sm text-destructive">{errors.password.message}</p>
-        )}
+      <div className="relative">
+        <FloatingLabelInput
+          id="password"
+          type={showPassword ? "text" : "password"}
+          label="Your Password"
+          {...register('password')}
+          disabled={isLoading}
+          error={errors.password?.message}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-3 top-4 text-gray-500 hover:text-gray-700"
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
       </div>
 
       <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold" disabled={isLoading}>
@@ -96,3 +85,4 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
     </form>
   );
 }
+

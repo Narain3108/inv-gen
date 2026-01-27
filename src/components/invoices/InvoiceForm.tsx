@@ -18,6 +18,7 @@ import { Invoice, Product, Client, Company, InvoiceItem, Address } from '@/types
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -561,38 +562,48 @@ export function InvoiceForm({
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                                    <Input id="invoiceNumber" {...register('invoiceNumber')} placeholder="INV0001" />
-                                    <p className="text-xs text-muted-foreground">Auto-filled, editable</p>
-                                    {errors.invoiceNumber && <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>}
+                                <div>
+                                    <FloatingLabelInput
+                                        id="invoiceNumber"
+                                        label="Invoice Number"
+                                        {...register('invoiceNumber')}
+                                        error={errors.invoiceNumber?.message}
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">Auto-filled, editable</p>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="date">Invoice Date *</Label>
-                                    <Input id="date" type="date" {...register('date')} />
-                                    {errors.date && <p className="text-sm text-red-500">{errors.date.message}</p>}
-                                </div>
+                                <FloatingLabelInput
+                                    id="date"
+                                    type="date"
+                                    label="Invoice Date *"
+                                    {...register('date')}
+                                    error={errors.date?.message}
+                                />
                             </div>
 
                             {/* Reference Fields Row */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="poNumber">PO Number</Label>
-                                    <Input id="poNumber" {...register('poNumber')} placeholder="Optional" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="poDate">PO Date</Label>
-                                    <Input id="poDate" type="date" {...register('poDate')} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="ewayNumber">E-way Number</Label>
-                                    <Input id="ewayNumber" {...register('ewayNumber')} placeholder="Optional" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="referenceNumber">Reference</Label>
-                                    <Input id="referenceNumber" {...register('referenceNumber')} placeholder="Optional" />
-                                </div>
+                                <FloatingLabelInput
+                                    id="poNumber"
+                                    label="PO Number"
+                                    {...register('poNumber')}
+                                />
+                                <FloatingLabelInput
+                                    id="poDate"
+                                    type="date"
+                                    label="PO Date"
+                                    {...register('poDate')}
+                                />
+                                <FloatingLabelInput
+                                    id="ewayNumber"
+                                    label="E-way Number"
+                                    {...register('ewayNumber')}
+                                />
+                                <FloatingLabelInput
+                                    id="referenceNumber"
+                                    label="Reference"
+                                    {...register('referenceNumber')}
+                                />
                             </div>
 
                             {selectedClient && (

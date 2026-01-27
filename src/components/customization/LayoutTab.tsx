@@ -6,10 +6,11 @@
 'use client';
 
 import React from 'react';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvoiceCustomization } from '@/types/customization';
 
@@ -28,78 +29,62 @@ export function LayoutTab({ customization, onUpdate }: LayoutTabProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="pageSize">Page Size</Label>
-                            <Select
-                                value={customization.pageSize}
-                                onValueChange={(value) => onUpdate('pageSize', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="A4">A4</SelectItem>
-                                    <SelectItem value="Letter">Letter</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <FloatingLabelSelect
+                            id="pageSize"
+                            label="Page Size"
+                            value={customization.pageSize}
+                            onValueChange={(value: string) => onUpdate('pageSize', value)}
+                        >
+                            <SelectContent>
+                                <SelectItem value="A4">A4</SelectItem>
+                                <SelectItem value="Letter">Letter</SelectItem>
+                            </SelectContent>
+                        </FloatingLabelSelect>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="orientation">Orientation</Label>
-                            <Select
-                                value={customization.orientation}
-                                onValueChange={(value) => onUpdate('orientation', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="portrait">Portrait</SelectItem>
-                                    <SelectItem value="landscape">Landscape</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <FloatingLabelSelect
+                            id="orientation"
+                            label="Orientation"
+                            value={customization.orientation}
+                            onValueChange={(value: string) => onUpdate('orientation', value)}
+                        >
+                            <SelectContent>
+                                <SelectItem value="portrait">Portrait</SelectItem>
+                                <SelectItem value="landscape">Landscape</SelectItem>
+                            </SelectContent>
+                        </FloatingLabelSelect>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
                         <Label className="text-base font-semibold">Margins (in pixels)</Label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="marginTop">Top</Label>
-                                <Input
-                                    id="marginTop"
-                                    type="number"
-                                    value={customization.margins.top}
-                                    onChange={(e) => onUpdate('margins.top', parseInt(e.target.value))}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="marginRight">Right</Label>
-                                <Input
-                                    id="marginRight"
-                                    type="number"
-                                    value={customization.margins.right}
-                                    onChange={(e) => onUpdate('margins.right', parseInt(e.target.value))}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="marginBottom">Bottom</Label>
-                                <Input
-                                    id="marginBottom"
-                                    type="number"
-                                    value={customization.margins.bottom}
-                                    onChange={(e) => onUpdate('margins.bottom', parseInt(e.target.value))}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="marginLeft">Left</Label>
-                                <Input
-                                    id="marginLeft"
-                                    type="number"
-                                    value={customization.margins.left}
-                                    onChange={(e) => onUpdate('margins.left', parseInt(e.target.value))}
-                                />
-                            </div>
+                            <FloatingLabelInput
+                                id="marginTop"
+                                label="Top"
+                                type="number"
+                                value={customization.margins.top}
+                                onChange={(e) => onUpdate('margins.top', parseInt(e.target.value))}
+                            />
+                            <FloatingLabelInput
+                                id="marginRight"
+                                label="Right"
+                                type="number"
+                                value={customization.margins.right}
+                                onChange={(e) => onUpdate('margins.right', parseInt(e.target.value))}
+                            />
+                            <FloatingLabelInput
+                                id="marginBottom"
+                                label="Bottom"
+                                type="number"
+                                value={customization.margins.bottom}
+                                onChange={(e) => onUpdate('margins.bottom', parseInt(e.target.value))}
+                            />
+                            <FloatingLabelInput
+                                id="marginLeft"
+                                label="Left"
+                                type="number"
+                                value={customization.margins.left}
+                                onChange={(e) => onUpdate('margins.left', parseInt(e.target.value))}
+                            />
                         </div>
                     </div>
 

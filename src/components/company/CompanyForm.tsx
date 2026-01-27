@@ -16,8 +16,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { companyFormSchema } from '@/lib/validations';
 import { Company } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,78 +64,61 @@ function BasicInfoTab({ form, company }: TabContentProps & {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* GSTIN */}
-          <div className="space-y-2">
-            <Label htmlFor="gstin">GSTIN (Optional)</Label>
-            <div className="flex gap-2">
-              <Input
+          <div className="flex gap-2 items-start">
+            <div className="flex-1">
+              <FloatingLabelInput
                 id="gstin"
+                label="GSTIN (Optional)"
                 {...register('gstin')}
-                placeholder="22AAAAA0000A1Z5"
                 maxLength={15}
                 className="uppercase"
+                error={errors.gstin?.message}
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={arguments[0].onFetchGSTIN}
-                disabled={arguments[0].isFetchingGSTIN}
-              >
-                {arguments[0].isFetchingGSTIN ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Fetching...
-                  </>
-                ) : (
-                  'Auto-fill'
-                )}
-              </Button>
             </div>
-            {errors.gstin && (
-              <p className="text-sm text-red-500">{errors.gstin.message}</p>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={arguments[0].onFetchGSTIN}
+              disabled={arguments[0].isFetchingGSTIN}
+              className="mt-1"
+            >
+              {arguments[0].isFetchingGSTIN ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Fetching...
+                </>
+              ) : (
+                'Auto-fill'
+              )}
+            </Button>
           </div>
 
           {/* Company Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Legal Name *</Label>
-            <Input
-              id="name"
-              {...register('name')}
-              placeholder="ABC Private Limited"
-            />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name.message}</p>
-            )}
-          </div>
+          <FloatingLabelInput
+            id="name"
+            label="Legal Name *"
+            {...register('name')}
+            error={errors.name?.message}
+          />
 
           {/* PAN */}
-          <div className="space-y-2">
-            <Label htmlFor="pan">PAN</Label>
-            <Input
-              id="pan"
-              {...register('pan')}
-              placeholder="AAAAA0000A"
-              maxLength={10}
-              className="uppercase"
-            />
-            {errors.pan && (
-              <p className="text-sm text-red-500">{errors.pan.message}</p>
-            )}
-          </div>
+          <FloatingLabelInput
+            id="pan"
+            label="PAN"
+            {...register('pan')}
+            maxLength={10}
+            className="uppercase"
+            error={errors.pan?.message}
+          />
 
           {/* Website */}
-          <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
-            <Input
-              id="website"
-              {...register('website')}
-              placeholder="https://example.com"
-              type="url"
-            />
-            {errors.website && (
-              <p className="text-sm text-red-500">{errors.website.message}</p>
-            )}
-          </div>
+          <FloatingLabelInput
+            id="website"
+            label="Website"
+            {...register('website')}
+            type="url"
+            error={errors.website?.message}
+          />
         </CardContent>
       </Card>
 
@@ -142,74 +128,54 @@ function BasicInfoTab({ form, company }: TabContentProps & {
           <CardTitle>Address</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="address.street">Street Address *</Label>
-            <Input
-              id="address.street"
-              {...register('address.street')}
-              placeholder="123, Main Street, Building Name"
+          <FloatingLabelInput
+            id="address.street"
+            label="Street Address *"
+            {...register('address.street')}
+            error={errors.address?.street?.message}
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FloatingLabelInput
+              id="address.city"
+              label="City *"
+              {...register('address.city')}
+              error={errors.address?.city?.message}
             />
-            {errors.address?.street && (
-              <p className="text-sm text-red-500">{errors.address.street.message}</p>
-            )}
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="address.city">City *</Label>
-              <Input
-                id="address.city"
-                {...register('address.city')}
-                placeholder="Mumbai"
-              />
-              {errors.address?.city && (
-                <p className="text-sm text-red-500">{errors.address.city.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address.state">State *</Label>
-              <select
-                id="address.state"
-                {...register('address.state')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Select State</option>
+            <FloatingLabelSelect
+              id="address.state"
+              label="State *"
+              value={watch('address.state') || ''}
+              onValueChange={(value: string) => setValue('address.state', value)}
+              error={errors.address?.state?.message}
+            >
+              <SelectContent>
                 {INDIAN_STATES.map((state) => (
-                  <option key={state.code} value={state.name}>
+                  <SelectItem key={state.code} value={state.name}>
                     {state.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-              {errors.address?.state && (
-                <p className="text-sm text-red-500">{errors.address.state.message}</p>
-              )}
-            </div>
+              </SelectContent>
+            </FloatingLabelSelect>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="address.pincode">Pincode *</Label>
-              <Input
-                id="address.pincode"
-                {...register('address.pincode')}
-                placeholder="400001"
-                maxLength={6}
-              />
-              {errors.address?.pincode && (
-                <p className="text-sm text-red-500">{errors.address.pincode.message}</p>
-              )}
-            </div>
+            <FloatingLabelInput
+              id="address.pincode"
+              label="Pincode *"
+              {...register('address.pincode')}
+              maxLength={6}
+              error={errors.address?.pincode?.message}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="address.country">Country *</Label>
-              <Input
-                id="address.country"
-                {...register('address.country')}
-                defaultValue="India"
-                readOnly
-              />
-            </div>
+            <FloatingLabelInput
+              id="address.country"
+              label="Country *"
+              {...register('address.country')}
+              defaultValue="India"
+              readOnly
+            />
           </div>
         </CardContent>
       </Card>
@@ -220,31 +186,21 @@ function BasicInfoTab({ form, company }: TabContentProps & {
           <CardTitle>Contact Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="contact.phone">Phone *</Label>
-            <Input
-              id="contact.phone"
-              {...register('contact.phone')}
-              placeholder="+91 98765 43210"
-              type="tel"
-            />
-            {errors.contact?.phone && (
-              <p className="text-sm text-red-500">{errors.contact.phone.message}</p>
-            )}
-          </div>
+          <FloatingLabelInput
+            id="contact.phone"
+            label="Phone *"
+            {...register('contact.phone')}
+            type="tel"
+            error={errors.contact?.phone?.message}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="contact.email">Email *</Label>
-            <Input
-              id="contact.email"
-              {...register('contact.email')}
-              placeholder="contact@company.com"
-              type="email"
-            />
-            {errors.contact?.email && (
-              <p className="text-sm text-red-500">{errors.contact.email.message}</p>
-            )}
-          </div>
+          <FloatingLabelInput
+            id="contact.email"
+            label="Email *"
+            {...register('contact.email')}
+            type="email"
+            error={errors.contact?.email?.message}
+          />
         </CardContent>
       </Card>
     </div>
@@ -261,64 +217,46 @@ function BankDetailsTab({ form }: TabContentProps) {
         <CardTitle>Bank Details</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="bankDetails.bankName">Bank Name</Label>
-          <Input
-            id="bankDetails.bankName"
-            {...register('bankDetails.bankName')}
-            placeholder="HDFC Bank"
+        <FloatingLabelInput
+          id="bankDetails.bankName"
+          label="Bank Name"
+          {...register('bankDetails.bankName')}
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <FloatingLabelInput
+            id="bankDetails.accountNumber"
+            label="Account Number"
+            {...register('bankDetails.accountNumber')}
+          />
+
+          <FloatingLabelInput
+            id="bankDetails.ifscCode"
+            label="IFSC Code"
+            {...register('bankDetails.ifscCode')}
+            className="uppercase"
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.accountNumber">Account Number</Label>
-            <Input
-              id="bankDetails.accountNumber"
-              {...register('bankDetails.accountNumber')}
-              placeholder="1234567890"
-            />
-          </div>
+          <FloatingLabelInput
+            id="bankDetails.accountHolderName"
+            label="Account Holder Name"
+            {...register('bankDetails.accountHolderName')}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.ifscCode">IFSC Code</Label>
-            <Input
-              id="bankDetails.ifscCode"
-              {...register('bankDetails.ifscCode')}
-              placeholder="HDFC0001234"
-              className="uppercase"
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.accountHolderName">Account Holder Name</Label>
-            <Input
-              id="bankDetails.accountHolderName"
-              {...register('bankDetails.accountHolderName')}
-              placeholder="ABC Private Limited"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bankDetails.branch">Branch</Label>
-            <Input
-              id="bankDetails.branch"
-              {...register('bankDetails.branch')}
-              placeholder="Andheri East"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="bankDetails.upiId">UPI ID</Label>
-          <Input
-            id="bankDetails.upiId"
-            {...register('bankDetails.upiId')}
-            placeholder="company@upi"
+          <FloatingLabelInput
+            id="bankDetails.branch"
+            label="Branch"
+            {...register('bankDetails.branch')}
           />
         </div>
+
+        <FloatingLabelInput
+          id="bankDetails.upiId"
+          label="UPI ID"
+          {...register('bankDetails.upiId')}
+        />
       </CardContent>
     </Card>
   );
@@ -408,38 +346,30 @@ function BrandingTab({ form, logoUrl, signatureUrl, setLogoUrl, setSignatureUrl 
           <CardTitle>Invoice Defaults</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="termsAndConditions">Terms & Conditions</Label>
-            <textarea
+          <div>
+            <FloatingLabelTextarea
               id="termsAndConditions"
+              label="Terms & Conditions"
               {...register('termsAndConditions')}
-              placeholder="E.g., Payment due within 30 days, Subject to Mumbai jurisdiction, etc."
-              className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               rows={5}
+              error={errors.termsAndConditions?.message}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               These terms will appear on all invoices for this company
             </p>
-            {errors.termsAndConditions && (
-              <p className="text-sm text-red-500">{errors.termsAndConditions.message}</p>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="additionalNotes">Additional Notes</Label>
-            <textarea
+          <div>
+            <FloatingLabelTextarea
               id="additionalNotes"
+              label="Additional Notes"
               {...register('additionalNotes')}
-              placeholder="E.g., Thank you for your business, Contact us for support, etc."
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               rows={3}
+              error={errors.additionalNotes?.message}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               These notes will appear on all invoices for this company
             </p>
-            {errors.additionalNotes && (
-              <p className="text-sm text-red-500">{errors.additionalNotes.message}</p>
-            )}
           </div>
         </CardContent>
       </Card>

@@ -16,10 +16,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { categoryFormSchema } from '@/lib/validations';
 import { ProductCategory } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,48 +50,36 @@ function GeneralTab({ form }: { form: UseFormReturn<CategoryFormData> }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Category Name */}
-        <div className="space-y-2">
-          <Label htmlFor="categoryName">Category Name *</Label>
-          <Input
-            id="categoryName"
-            {...register('categoryName', { required: true })}
-            placeholder="e.g., Electronics, Textiles, Services"
-          />
-          {errors.categoryName && (
-            <p className="text-sm text-red-500">Category name is required</p>
-          )}
-        </div>
+        <FloatingLabelInput
+          id="categoryName"
+          label="Category Name *"
+          {...register('categoryName', { required: true })}
+          error={errors.categoryName ? 'Category name is required' : undefined}
+        />
 
         {/* Description */}
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            {...register('description')}
-            placeholder="Brief description of this category"
-            rows={2}
-          />
-        </div>
+        <FloatingLabelTextarea
+          id="description"
+          label="Description"
+          {...register('description')}
+          rows={2}
+        />
 
         {/* Default GST Rate */}
-        <div className="space-y-2">
-          <Label htmlFor="defaultGstRate">Default GST Rate *</Label>
-          <Select
-            value={watch('defaultGstRate')?.toString()}
-            onValueChange={(value) => setValue('defaultGstRate', Number(value))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select GST rate" />
-            </SelectTrigger>
-            <SelectContent>
-              {GST_RATES.map((rate) => (
-                <SelectItem key={rate.value} value={rate.value.toString()}>
-                  {rate.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <FloatingLabelSelect
+          id="defaultGstRate"
+          label="Default GST Rate *"
+          value={watch('defaultGstRate')?.toString()}
+          onValueChange={(value: string) => setValue('defaultGstRate', Number(value))}
+        >
+          <SelectContent>
+            {GST_RATES.map((rate) => (
+              <SelectItem key={rate.value} value={rate.value.toString()}>
+                {rate.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </FloatingLabelSelect>
       </CardContent>
     </Card>
   );
@@ -130,44 +119,31 @@ function ProductsTab({
             <Card key={field.id} className="p-4">
               <div className="grid grid-cols-12 gap-3 items-start">
                 {/* Product Name */}
-                <div className="col-span-5 space-y-2">
-                  <Label htmlFor={`products.${index}.name`} className="text-xs">
-                    Product Name *
-                  </Label>
-                  <Input
+                <div className="col-span-5">
+                  <FloatingLabelInput
                     id={`products.${index}.name`}
+                    label="Product Name *"
                     {...register(`products.${index}.name` as const, { required: true })}
-                    placeholder="e.g., Laptop, Cotton Shirt"
+                    error={errors.products?.[index]?.name?.message as string}
                   />
-                  {errors.products?.[index]?.name && (
-                    <p className="text-sm text-red-500">{errors.products?.[index]?.name?.message as any}</p>
-                  )}
                 </div>
 
                 {/* HSN Code */}
-                <div className="col-span-3 space-y-2">
-                  <Label htmlFor={`products.${index}.hsn`} className="text-xs">
-                    HSN/SAC Code *
-                  </Label>
-                  <Input
+                <div className="col-span-3">
+                  <FloatingLabelInput
                     id={`products.${index}.hsn`}
+                    label="HSN/SAC Code *"
                     {...register(`products.${index}.hsn` as const, { required: true })}
-                    placeholder="e.g., 8471"
+                    error={errors.products?.[index]?.hsn?.message as string}
                   />
-                  {errors.products?.[index]?.hsn && (
-                    <p className="text-sm text-red-500">{errors.products?.[index]?.hsn?.message as any}</p>
-                  )}
                 </div>
 
                 {/* Item Code */}
-                <div className="col-span-3 space-y-2">
-                  <Label htmlFor={`products.${index}.itemCode`} className="text-xs">
-                    Item Code
-                  </Label>
-                  <Input
+                <div className="col-span-3">
+                  <FloatingLabelInput
                     id={`products.${index}.itemCode`}
+                    label="Item Code"
                     {...register(`products.${index}.itemCode` as const)}
-                    placeholder="Optional"
                   />
                 </div>
 

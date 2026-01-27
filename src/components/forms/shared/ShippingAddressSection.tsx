@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -109,29 +109,34 @@ export function ShippingAddressSection({
                     {/* New Address Form */}
                     {mode === 'new' && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <Input
-                                placeholder="Street"
+                            <FloatingLabelInput
+                                id="shipping-street"
+                                label="Street"
                                 value={newAddress.street}
                                 onChange={(e) => onNewAddressChange({ ...newAddress, street: e.target.value })}
                                 className="col-span-2"
                             />
-                            <Input
-                                placeholder="City"
+                            <FloatingLabelInput
+                                id="shipping-city"
+                                label="City"
                                 value={newAddress.city}
                                 onChange={(e) => onNewAddressChange({ ...newAddress, city: e.target.value })}
                             />
-                            <Input
-                                placeholder="State"
+                            <FloatingLabelInput
+                                id="shipping-state"
+                                label="State"
                                 value={newAddress.state}
                                 onChange={(e) => onNewAddressChange({ ...newAddress, state: e.target.value })}
                             />
-                            <Input
-                                placeholder="Pincode"
+                            <FloatingLabelInput
+                                id="shipping-pincode"
+                                label="Pincode"
                                 value={newAddress.pincode}
                                 onChange={(e) => onNewAddressChange({ ...newAddress, pincode: e.target.value })}
                             />
-                            <Input
-                                placeholder="Country"
+                            <FloatingLabelInput
+                                id="shipping-country"
+                                label="Country"
                                 value={newAddress.country}
                                 onChange={(e) => onNewAddressChange({ ...newAddress, country: e.target.value })}
                             />
