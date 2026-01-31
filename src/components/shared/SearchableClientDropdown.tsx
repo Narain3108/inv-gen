@@ -75,7 +75,7 @@ export function SearchableClientDropdown({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setHighlightedIndex(prev => 
+          setHighlightedIndex(prev =>
             prev < filteredClients.length - 1 ? prev + 1 : prev
           );
           break;
@@ -140,10 +140,10 @@ export function SearchableClientDropdown({
         companyId,
         billingAddress: data.address,
         shippingAddress: data.address, // Default shipping to billing
-        bankDetails: data.bankDetails && 
-          data.bankDetails.bankName && 
-          data.bankDetails.accountNumber && 
-          data.bankDetails.ifscCode && 
+        bankDetails: data.bankDetails &&
+          data.bankDetails.bankName &&
+          data.bankDetails.accountNumber &&
+          data.bankDetails.ifscCode &&
           data.bankDetails.accountHolderName ? {
           accountNumber: data.bankDetails.accountNumber,
           ifscCode: data.bankDetails.ifscCode,
@@ -153,7 +153,7 @@ export function SearchableClientDropdown({
           upiId: data.bankDetails.upiId || undefined,
         } : undefined,
       });
-      
+
       toast.success('Client added successfully');
       // Refresh the global clients list
       await refreshClients();
@@ -167,7 +167,7 @@ export function SearchableClientDropdown({
     }
   };
 
-  const displayValue = selectedClient 
+  const displayValue = selectedClient
     ? formatClientDropdownLabel(selectedClient, { maxLength: 40 })
     : '';
 
@@ -178,11 +178,11 @@ export function SearchableClientDropdown({
           {label} {required && <span className="text-red-500">*</span>}
         </Label>
       )}
-      
+
       <div className="relative">
         <div
           className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer",
+            "flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background cursor-pointer",
             "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
             error && "border-red-500"
           )}
@@ -196,15 +196,15 @@ export function SearchableClientDropdown({
             id="client-search"
             value={isOpen ? searchTerm : displayValue}
             onChange={(e) => {
-                const v = e.target.value;
-                setSearchTerm(v);
-                setHighlightedIndex(-1);
-                // Only open dropdown when user types a non-empty value
-                if (v && v.trim() !== '') setIsOpen(true);
-              }}
-              onFocus={() => {
-                // Do not auto-open on focus to avoid dropdown opening when form mounts
-              }}
+              const v = e.target.value;
+              setSearchTerm(v);
+              setHighlightedIndex(-1);
+              // Only open dropdown when user types a non-empty value
+              if (v && v.trim() !== '') setIsOpen(true);
+            }}
+            onFocus={() => {
+              // Do not auto-open on focus to avoid dropdown opening when form mounts
+            }}
             placeholder={placeholder}
             className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
             autoComplete="off"
@@ -249,7 +249,7 @@ export function SearchableClientDropdown({
                   No clients found
                 </div>
               )}
-              
+
               {/* Add Client Button */}
               <div className="border-t p-2">
                 <Button
@@ -289,7 +289,7 @@ export function SearchableClientDropdown({
             companyId={companyId}
             onSubmit={handleAddClient}
             onCancel={() => setIsAddClientOpen(false)}
-            client={searchTerm.trim() ? { 
+            client={searchTerm.trim() ? {
               clientName: searchTerm.trim(),
               address: { street: '', city: '', state: '', pincode: '', country: 'India' },
               contact: { phone: '', email: '' }

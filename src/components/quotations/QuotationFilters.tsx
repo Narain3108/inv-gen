@@ -30,7 +30,7 @@ export function QuotationFilters({ quotations, onFilterChange, filters }: Quotat
         value={filters.status || 'all'}
         onValueChange={(value) => onFilterChange('status', value)}
       >
-        <SelectTrigger className="w-[170px] bg-background">
+        <SelectTrigger className="w-[170px] bg-card">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>
@@ -48,7 +48,7 @@ export function QuotationFilters({ quotations, onFilterChange, filters }: Quotat
         value={filters.converted || 'all'}
         onValueChange={(value) => onFilterChange('converted', value)}
       >
-        <SelectTrigger className="w-[170px] bg-background">
+        <SelectTrigger className="w-[170px] bg-card">
           <SelectValue placeholder="Conversion Status" />
         </SelectTrigger>
         <SelectContent>
@@ -63,7 +63,7 @@ export function QuotationFilters({ quotations, onFilterChange, filters }: Quotat
         value={filters.validity || 'all'}
         onValueChange={(value) => onFilterChange('validity', value)}
       >
-        <SelectTrigger className="w-[170px] bg-background">
+        <SelectTrigger className="w-[170px] bg-card">
           <SelectValue placeholder="Validity Status" />
         </SelectTrigger>
         <SelectContent>
@@ -81,7 +81,7 @@ export function QuotationFilters({ quotations, onFilterChange, filters }: Quotat
           placeholder="Min Amount"
           value={filters.minAmount || ''}
           onChange={(e) => onFilterChange('minAmount', e.target.value ? parseFloat(e.target.value) : null)}
-          className="w-[130px] bg-background"
+          className="w-[130px] bg-card"
           min="0"
           step="0.01"
         />
@@ -91,7 +91,7 @@ export function QuotationFilters({ quotations, onFilterChange, filters }: Quotat
           placeholder="Max Amount"
           value={filters.maxAmount || ''}
           onChange={(e) => onFilterChange('maxAmount', e.target.value ? parseFloat(e.target.value) : null)}
-          className="w-[130px] bg-background"
+          className="w-[130px] bg-card"
           min="0"
           step="0.01"
         />

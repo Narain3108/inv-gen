@@ -273,14 +273,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
                 error={errors.clientName?.message}
               />
 
-              {/* PAN (Optional) */}
-              <FloatingLabelInput
-                id="pan"
-                label="PAN (Optional)"
-                {...register('pan')}
-                maxLength={10}
-                error={errors.pan?.message}
-              />
+
 
               {/* Phone */}
               <FloatingLabelInput

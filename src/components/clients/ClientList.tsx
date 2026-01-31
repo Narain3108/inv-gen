@@ -102,7 +102,7 @@ export function ClientList({ clients, onEdit, onDelete, onView }: ClientListProp
           placeholder="Search clients..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-10 sm:h-11 dark:border-primary/30 dark:focus:border-primary/50"
+          className="pl-10 h-10 sm:h-11 dark:border-primary/30 dark:focus:border-primary/50 bg-card"
         />
       </div>
 

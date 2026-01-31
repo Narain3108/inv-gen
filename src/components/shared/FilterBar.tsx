@@ -28,10 +28,10 @@ export function FilterBar({
   totalCount,
 }: FilterBarProps) {
   const showResultsCount = resultsCount !== undefined && totalCount !== undefined;
-  
+
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+      <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-lg border shadow-sm">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Filter className="h-4 w-4" />
           <span>Filters</span>
@@ -41,11 +41,11 @@ export function FilterBar({
             </Badge>
           )}
         </div>
-        
+
         <div className="flex-1 flex flex-wrap items-center gap-2">
           {children}
         </div>
-        
+
         {activeFilterCount > 0 && onClearFilters && (
           <Button
             variant="ghost"
@@ -58,7 +58,7 @@ export function FilterBar({
           </Button>
         )}
       </div>
-      
+
       {showResultsCount && (
         <div className="text-sm text-muted-foreground px-1">
           Showing <span className="font-semibold text-foreground">{resultsCount}</span> of{' '}

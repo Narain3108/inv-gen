@@ -45,7 +45,7 @@ export function ClientFilters({ clients, onFilterChange, filters }: ClientFilter
         value={filters.state || 'all'}
         onValueChange={(value) => onFilterChange('state', value)}
       >
-        <SelectTrigger className="w-[180px] bg-background">
+        <SelectTrigger className="w-[180px] bg-card">
           <SelectValue placeholder="All States" />
         </SelectTrigger>
         <SelectContent>
@@ -63,7 +63,7 @@ export function ClientFilters({ clients, onFilterChange, filters }: ClientFilter
         value={filters.city || 'all'}
         onValueChange={(value) => onFilterChange('city', value)}
       >
-        <SelectTrigger className="w-[180px] bg-background">
+        <SelectTrigger className="w-[180px] bg-card">
           <SelectValue placeholder="All Cities" />
         </SelectTrigger>
         <SelectContent>

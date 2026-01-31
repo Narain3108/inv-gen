@@ -163,7 +163,7 @@ export function QuotationList({
             placeholder="Search by quotation number or client..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-card"
           />
         </div>
       </div>

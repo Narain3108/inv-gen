@@ -40,7 +40,7 @@ export default function SearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="pl-10"
+        className="pl-10 bg-card"
       />
     </div>
   );

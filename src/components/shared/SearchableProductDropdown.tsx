@@ -73,7 +73,7 @@ export function SearchableProductDropdown({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setHighlightedIndex(prev => 
+          setHighlightedIndex(prev =>
             prev < filteredProducts.length - 1 ? prev + 1 : prev
           );
           break;
@@ -135,7 +135,7 @@ export function SearchableProductDropdown({
         companyId,
       };
       const newProduct = await productsApi.create(productData);
-      
+
       toast.success('Product added successfully');
       // Refresh the global products list
       await refreshProducts();
@@ -150,7 +150,7 @@ export function SearchableProductDropdown({
     }
   };
 
-  const displayValue = selectedProduct 
+  const displayValue = selectedProduct
     ? selectedProduct.productName
     : selectedProductName || '';
 
@@ -161,11 +161,11 @@ export function SearchableProductDropdown({
           {label} {required && <span className="text-red-500">*</span>}
         </Label>
       )}
-      
+
       <div className="relative">
         <div
           className={cn(
-            "flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer",
+            "flex h-9 w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background cursor-pointer",
             "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
             error && "border-red-500"
           )}
@@ -240,7 +240,7 @@ export function SearchableProductDropdown({
                   No products found
                 </div>
               )}
-              
+
               {/* Add Product Button */}
               <div className="border-t p-2">
                 <Button
@@ -280,7 +280,7 @@ export function SearchableProductDropdown({
             companyId={companyId}
             onSubmit={handleAddProduct}
             onCancel={() => setIsAddProductOpen(false)}
-            product={searchTerm.trim() ? { 
+            product={searchTerm.trim() ? {
               productName: searchTerm.trim(),
               type: 'product',
               unit: 'Nos',

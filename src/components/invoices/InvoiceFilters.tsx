@@ -42,12 +42,12 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
         } else {
           return; // Skip invalid dates
         }
-        
+
         if (isNaN(date.getTime())) return; // Skip invalid dates
-        
+
         const year = date.getFullYear();
         const month = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-        
+
         yearsSet.add(year);
         monthsSet.add(month);
       }
@@ -66,7 +66,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
         value={filters.paymentStatus || 'all'}
         onValueChange={(value) => onFilterChange('paymentStatus', value)}
       >
-        <SelectTrigger className="w-[170px] bg-background">
+        <SelectTrigger className="w-[170px] bg-card">
           <SelectValue placeholder="All Payment Status" />
         </SelectTrigger>
         <SelectContent>
@@ -82,7 +82,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
         value={filters.datePeriod || 'all'}
         onValueChange={(value) => onFilterChange('datePeriod', value)}
       >
-        <SelectTrigger className="w-[170px] bg-background">
+        <SelectTrigger className="w-[170px] bg-card">
           <SelectValue placeholder="All Time" />
         </SelectTrigger>
         <SelectContent>
@@ -102,7 +102,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
           value={filters.month || 'all'}
           onValueChange={(value) => onFilterChange('month', value)}
         >
-          <SelectTrigger className="w-[180px] bg-background">
+          <SelectTrigger className="w-[180px] bg-card">
             <SelectValue placeholder="All Months" />
           </SelectTrigger>
           <SelectContent>
@@ -122,7 +122,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
           value={filters.year || 'all'}
           onValueChange={(value) => onFilterChange('year', value)}
         >
-          <SelectTrigger className="w-[130px] bg-background">
+          <SelectTrigger className="w-[130px] bg-card">
             <SelectValue placeholder="All Years" />
           </SelectTrigger>
           <SelectContent>
@@ -143,7 +143,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
           placeholder="Min Amount"
           value={filters.minAmount || ''}
           onChange={(e) => onFilterChange('minAmount', e.target.value ? parseFloat(e.target.value) : null)}
-          className="w-[130px] bg-background"
+          className="w-[130px] bg-card"
           min="0"
           step="0.01"
         />
@@ -153,7 +153,7 @@ export function InvoiceFilters({ invoices, onFilterChange, filters }: InvoiceFil
           placeholder="Max Amount"
           value={filters.maxAmount || ''}
           onChange={(e) => onFilterChange('maxAmount', e.target.value ? parseFloat(e.target.value) : null)}
-          className="w-[130px] bg-background"
+          className="w-[130px] bg-card"
           min="0"
           step="0.01"
         />
