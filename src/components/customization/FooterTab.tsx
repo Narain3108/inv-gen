@@ -10,7 +10,7 @@ import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvoiceCustomization } from '@/types/customization';
 
 interface FooterTabProps {
@@ -24,7 +24,7 @@ export function FooterTab({ customization, onUpdate }: FooterTabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Footer Settings</CardTitle>
-                    <CardDescription>Customize the footer section</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">

@@ -569,7 +569,7 @@ export function InvoiceForm({
                                         {...register('invoiceNumber')}
                                         error={errors.invoiceNumber?.message}
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Auto-filled, editable</p>
+
                                 </div>
 
                                 <FloatingLabelInput
@@ -634,7 +634,7 @@ export function InvoiceForm({
                                     <thead className="border-b">
                                         <tr className="text-sm text-muted-foreground">
                                             <th className="p-2 text-left w-64">Product/Service</th>
-                                            <th className="p-2 text-center w-24">Code</th>
+
                                             <th className="p-2 text-center w-16">Qty</th>
                                             <th className="p-2 text-center w-24">Unit</th>
                                             <th className="p-2 text-right w-28">Price</th>
@@ -686,11 +686,7 @@ export function InvoiceForm({
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td className="p-2 text-center">
-                                                            {product?.itemCode ? (
-                                                                <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{product.itemCode}</span>
-                                                            ) : <span className="text-xs text-muted-foreground">—</span>}
-                                                        </td>
+
                                                         <td className="p-2">
                                                             <Controller
                                                                 control={control}
@@ -887,11 +883,58 @@ export function InvoiceForm({
                             <CardTitle className="text-lg">Review & Submit</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {/* Header Overview */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="text-muted-foreground block">Invoice #</span>
+                                    <span className="font-semibold">{watch('invoiceNumber')}</span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground block">Date</span>
+                                    <span className="font-semibold">{watch('date')}</span>
+                                </div>
+                                {watch('poNumber') && <div><span className="text-muted-foreground block">PO #</span><span>{watch('poNumber')}</span></div>}
+                                {watch('ewayNumber') && <div><span className="text-muted-foreground block">E-way #</span><span>{watch('ewayNumber')}</span></div>}
+                            </div>
+
+                            {/* Client Summary */}
                             {selectedClient && (
-                                <div className="p-4 bg-muted/30 rounded-lg">
-                                    <h4 className="font-semibold mb-2">Client</h4>
-                                    <p className="text-sm">{selectedClient.clientName}</p>
-                                    <p className="text-sm text-muted-foreground">{selectedClient.address.city}, {selectedClient.address.state}</p>
+                                <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                                    <h4 className="font-semibold mb-2 text-sm flex items-center gap-2"><FileText className="h-3 w-3" /> Client Details</h4>
+                                    <p className="text-sm font-medium">{selectedClient.clientName}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{selectedClient.address.city}, {selectedClient.address.state}</p>
+                                </div>
+                            )}
+
+                            {/* Items Summary Table */}
+                            {watchItems && watchItems.length > 0 && (
+                                <div className="rounded-md border text-xs">
+                                    <div className="grid grid-cols-12 bg-muted/50 p-2 font-medium border-b">
+                                        <div className="col-span-1">#</div>
+                                        <div className="col-span-5">Item</div>
+                                        <div className="col-span-2 text-right">Qty</div>
+                                        <div className="col-span-2 text-right">Price</div>
+                                        <div className="col-span-2 text-right">Total</div>
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto">
+                                        {watchItems.map((item, idx) => {
+                                            const p = localProducts.find(pr => pr.id === item.productId);
+                                            if (!p) return null;
+                                            const total = (item.quantity * item.unitPrice) * (1 - (item.discount || 0) / 100);
+                                            return (
+                                                <div key={idx} className="grid grid-cols-12 p-2 border-b last:border-0 items-center hover:bg-muted/20">
+                                                    <div className="col-span-1 text-muted-foreground">{idx + 1}</div>
+                                                    <div className="col-span-5 truncate font-medium">
+                                                        {p.productName}
+                                                        {p.hasSerialNumber && <span className="ml-1 text-[10px] text-primary bg-primary/10 px-1 rounded">SN</span>}
+                                                    </div>
+                                                    <div className="col-span-2 text-right">{item.quantity} {item.unit}</div>
+                                                    <div className="col-span-2 text-right">{formatCurrency(item.unitPrice)}</div>
+                                                    <div className="col-span-2 text-right font-semibold">{formatCurrency(total)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
 

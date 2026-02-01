@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { productFormSchema } from '@/lib/validations';
 import { useCompany } from '@/hooks/useCompany';
+import { useAppData } from '@/contexts/AppDataContext';
 import { useProductsQuery, useCreateProductMutation, useUpdateProductMutation, useDeleteProductMutation } from '@/hooks/queries';
 import { useFilters, FilterConfig } from '@/hooks/useFilters';
 import { exportToExcel, exportToCSV, formatProductsForExport } from '@/lib/utils/export-utils';
@@ -27,6 +28,7 @@ type ProductFormData = z.infer<typeof productFormSchema>;
 
 function ProductsContent() {
   const { selectedCompany } = useCompany();
+  const { refreshProducts } = useAppData();
 
   // React Query - replaces useAppData for products
   const { data: products = [], isLoading: productsLoading } = useProductsQuery(selectedCompany?.id);
@@ -117,6 +119,9 @@ function ProductsContent() {
         await createProductMutation.mutateAsync(productData);
       }
 
+      // Sync AppDataContext so forms see the new product
+      await refreshProducts();
+
       handleCloseForm();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -132,6 +137,8 @@ function ProductsContent() {
 
     try {
       await deleteProductMutation.mutateAsync({ id: productToDelete.id, companyId: selectedCompany.id });
+      // Sync AppDataContext
+      await refreshProducts();
     } catch (error) {
       // Error handled in mutation
     }

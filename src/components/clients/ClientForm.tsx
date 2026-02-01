@@ -244,9 +244,7 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
                       autoComplete="off"
                       error={errors.gstin?.message}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Click the search icon to auto-fill details from GSTIN
-                    </p>
+
                   </div>
                   <Button
                     type="button"
@@ -272,7 +270,6 @@ export function ClientForm({ client, companyId, onSubmit, onCancel }: ClientForm
                 autoComplete="off"
                 error={errors.clientName?.message}
               />
-
 
 
               {/* Phone */}

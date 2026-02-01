@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { analyticsApi, DashboardAnalytics } from '@/lib/api';
 import { Wrench, Clock, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
@@ -108,15 +108,13 @@ export function ServiceOverviewWidget({ companyId }: ServiceOverviewWidgetProps)
     ];
 
     return (
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
             <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                     <Wrench className="h-4 w-4 text-blue-600" />
                     Service Overview
                 </CardTitle>
-                <CardDescription className="text-xs">
-                    {serviceOverview.total} total services
-                </CardDescription>
+
             </CardHeader>
             <CardContent className="p-4 pt-2 space-y-3">
                 {stats.map((item) => (

@@ -9,7 +9,7 @@
 import React from 'react';
 import { DashboardLayout } from '@/components/layout';
 import PageHeader from '@/components/shared/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DollarSign,
   FileText,
@@ -193,23 +193,19 @@ function DashboardContent() {
 
       {/* Charts and Tables */}
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4 border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+        <Card className="lg:col-span-4 overflow-hidden">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base sm:text-lg">Payment Status</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              Overview of invoice payment statuses
-            </CardDescription>
+
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
             <PaymentStatusChart invoices={getFilteredData(invoices)} />
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3 border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+        <Card className="lg:col-span-3 overflow-hidden">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base sm:text-lg">Top Clients</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              Clients by total invoice value
-            </CardDescription>
+
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
             <TopClients invoices={getFilteredData(invoices)} clients={clients} />
@@ -222,9 +218,7 @@ function DashboardContent() {
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Revenue Trend</CardTitle>
-            <CardDescription>
-              Monthly revenue for the last 6 months
-            </CardDescription>
+
           </CardHeader>
           <CardContent>
             <RevenueChart invoices={invoices} />
@@ -233,9 +227,7 @@ function DashboardContent() {
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>GST Collection</CardTitle>
-            <CardDescription>
-              Tax collection breakdown
-            </CardDescription>
+
           </CardHeader>
           <CardContent>
             <GSTSummary invoices={getFilteredData(invoices)} />
@@ -248,9 +240,7 @@ function DashboardContent() {
         <Card>
           <CardHeader>
             <CardTitle>Quotation Performance</CardTitle>
-            <CardDescription>
-              Quotation conversion and status metrics
-            </CardDescription>
+
           </CardHeader>
           <CardContent>
             <QuotationMetrics quotations={getFilteredData(quotations)} />

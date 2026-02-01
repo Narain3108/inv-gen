@@ -11,7 +11,7 @@ import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SelectContent, SelectItem } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvoiceCustomization } from '@/types/customization';
 
 interface HeaderTabProps {
@@ -26,7 +26,7 @@ export function HeaderTab({ customization, type, onUpdate }: HeaderTabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Header Settings</CardTitle>
-                    <CardDescription>Customize the invoice header and title</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <FloatingLabelInput
@@ -104,7 +104,7 @@ export function HeaderTab({ customization, type, onUpdate }: HeaderTabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Company Details</CardTitle>
-                    <CardDescription>Choose what company information to display</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {Object.entries({

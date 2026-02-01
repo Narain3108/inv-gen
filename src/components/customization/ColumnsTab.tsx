@@ -8,7 +8,7 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GripVertical } from 'lucide-react';
 import { InvoiceCustomization } from '@/types/customization';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -31,9 +31,7 @@ export function ColumnsTab({
             <Card>
                 <CardHeader>
                     <CardTitle>Table Columns</CardTitle>
-                    <CardDescription>
-                        Enable/disable columns and drag to reorder
-                    </CardDescription>
+
                 </CardHeader>
                 <CardContent>
                     <DragDropContext onDragEnd={onColumnReorder}>

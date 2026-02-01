@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { analyticsApi, EmployeeMetrics } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -109,16 +109,13 @@ export function EmployeePerformanceWidget({ companyId, userId }: EmployeePerform
     ];
 
     return (
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-950 dark:to-emerald-900 border-green-200 dark:border-green-800">
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-950 dark:to-emerald-900">
             <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
                     My Performance
                 </CardTitle>
-                <CardDescription className="text-xs flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {user?.name || user?.username || 'Employee'}
-                </CardDescription>
+
             </CardHeader>
             <CardContent className="p-4 pt-2 space-y-3">
                 {/* Stats Row */}

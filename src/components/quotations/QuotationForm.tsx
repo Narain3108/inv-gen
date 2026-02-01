@@ -131,7 +131,7 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <FloatingLabelInput id="quotationNumber" label="Quotation Number" {...register('quotationNumber')} error={errors.quotationNumber?.message} />
-                                    <p className="text-xs text-muted-foreground mt-1">Auto-filled</p>
+
                                 </div>
                                 <SearchableClientDropdown clients={clients} selectedClientId={watch('clientId') || ''} onClientSelect={(id) => setValue('clientId', id)} onClientAdded={(c) => { setValue('clientId', c.id); clearErrors('clientId'); onClientAdded?.(c); }} label="Client" required error={errors.clientId?.message} companyId={companyId} placeholder="Select client..." />
                             </div>
@@ -139,7 +139,7 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                                 <FloatingLabelInput id="date" type="date" label="Date *" {...register('date')} error={errors.date?.message} />
                                 <div>
                                     <FloatingLabelInput id="validUntil" type="date" label="Valid Until *" {...register('validUntil')} />
-                                    <p className="text-xs text-muted-foreground mt-1">Default: 30 days</p>
+
                                 </div>
                             </div>
                             {selectedClient && <ShippingAddressSection client={selectedClient} mode={shippingAddressMode} onModeChange={setShippingAddressMode} selectedAddressIndex={selectedAddressIndex} onSelectedAddressChange={setSelectedAddressIndex} newAddress={newShippingAddress} onNewAddressChange={setNewShippingAddress} />}
@@ -176,7 +176,55 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                 <TabsContent value="summary" className="mt-4 space-y-4">
                     <Card><CardHeader><CardTitle className="text-lg">Review</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            {selectedClient && <div className="p-4 bg-muted/30 rounded-lg"><h4 className="font-semibold">Client</h4><p className="text-sm">{selectedClient.clientName}</p><p className="text-sm text-muted-foreground">{selectedClient.address.city}, {selectedClient.address.state}</p></div>}
+                            {/* Header Overview */}
+                            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                                <div>
+                                    <span className="text-muted-foreground block text-xs">Quotation #</span>
+                                    <span className="font-semibold">{watch('quotationNumber')}</span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground block text-xs">Valid Until</span>
+                                    <span className="font-semibold">{watch('validUntil')}</span>
+                                </div>
+                            </div>
+
+                            {selectedClient && (
+                                <div className="p-4 bg-muted/30 rounded-lg border border-border/50 mb-4">
+                                    <h4 className="font-semibold mb-2 text-sm flex items-center gap-2"><FileText className="h-3 w-3" /> Client Details</h4>
+                                    <p className="text-sm font-medium">{selectedClient.clientName}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{selectedClient.address.city}, {selectedClient.address.state}</p>
+                                </div>
+                            )}
+
+                            {/* Items Summary Table */}
+                            {watchItems && watchItems.length > 0 && (
+                                <div className="rounded-md border text-xs mb-4">
+                                    <div className="grid grid-cols-12 bg-muted/50 p-2 font-medium border-b">
+                                        <div className="col-span-1">#</div>
+                                        <div className="col-span-5">Product/Service</div>
+                                        <div className="col-span-2 text-right">Qty</div>
+                                        <div className="col-span-2 text-right">Price</div>
+                                        <div className="col-span-2 text-right">Total</div>
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto">
+                                        {watchItems.map((item, idx) => {
+                                            const p = localProducts.find(pr => pr.id === item.productId);
+                                            if (!p) return null;
+                                            const total = (item.quantity * item.unitPrice) * (1 - (item.discount || 0) / 100);
+                                            return (
+                                                <div key={idx} className="grid grid-cols-12 p-2 border-b last:border-0 items-center hover:bg-muted/20">
+                                                    <div className="col-span-1 text-muted-foreground">{idx + 1}</div>
+                                                    <div className="col-span-5 truncate font-medium">{p.productName}</div>
+                                                    <div className="col-span-2 text-right">{item.quantity} {item.unit}</div>
+                                                    <div className="col-span-2 text-right">{formatCurrency(item.unitPrice)}</div>
+                                                    <div className="col-span-2 text-right font-semibold">{formatCurrency(total)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {totals ? <TotalsSummary taxableAmount={totals.taxableAmount} cgst={totals.cgst} sgst={totals.sgst} igst={totals.igst} totalAmount={totals.totalAmount} taxBreakdown={totals.taxBreakdown} isInterState={companyState !== selectedClient?.address?.state} /> : <p className="text-center py-8 text-muted-foreground">No items</p>}
                         </CardContent>
                     </Card>

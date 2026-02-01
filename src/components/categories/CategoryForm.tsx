@@ -97,7 +97,7 @@ function ProductsTab({
   const { fields, append, remove } = fieldArray;
 
   const handleAddProduct = () => {
-    append({ name: '', hsn: '', itemCode: '' });
+    append({ name: '', hsn: '' });
   };
 
   return (
@@ -138,14 +138,7 @@ function ProductsTab({
                   />
                 </div>
 
-                {/* Item Code */}
-                <div className="col-span-3">
-                  <FloatingLabelInput
-                    id={`products.${index}.itemCode`}
-                    label="Item Code"
-                    {...register(`products.${index}.itemCode` as const)}
-                  />
-                </div>
+
 
                 {/* Remove Button */}
                 <div className="col-span-1 flex items-end">

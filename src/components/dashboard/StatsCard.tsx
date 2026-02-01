@@ -31,8 +31,6 @@ export function StatsCard({
 }: StatsCardProps) {
   return (
     <Card className={cn(
-      'border-2 border-primary/10 dark:border-primary/20',
-      'hover:border-primary/30 dark:hover:border-primary/40',
       'hover-lift transition-all duration-300',
       'hover:shadow-lg dark:hover:shadow-primary/20',
       className

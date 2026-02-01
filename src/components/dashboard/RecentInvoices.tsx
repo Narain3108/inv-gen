@@ -26,7 +26,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
 
   if (invoices.length === 0) {
     return (
-      <Card className="border-2 border-primary/10 dark:border-primary/20">
+      <Card>
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
         </CardHeader>
@@ -43,7 +43,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
   }
 
   return (
-    <Card className="border-2 border-primary/10 dark:border-primary/20 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardHeader className="p-4 sm:p-6">
         <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
       </CardHeader>
@@ -52,7 +52,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
           {invoices.slice(0, 5).map((invoice) => (
             <div
               key={invoice.id}
-              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 border-primary/10 dark:border-primary/20 hover:border-primary/30 dark:hover:border-primary/40 bg-gradient-to-r from-muted/30 to-transparent dark:from-muted/20 hover:from-muted/50 dark:hover:from-muted/30 cursor-pointer transition-all duration-300 group hover-lift"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border bg-gradient-to-r from-muted/30 to-transparent dark:from-muted/20 hover:from-muted/50 dark:hover:from-muted/30 cursor-pointer transition-all duration-300 group hover-lift"
               onClick={() => onViewInvoice?.(invoice)}
             >
               <div className="space-y-1 flex-1 min-w-0">
@@ -70,7 +70,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
                 <div className="font-bold text-sm sm:text-base text-foreground tabular-nums">
                   {formatCurrency(invoice.totalAmount)}
                 </div>
-                <Badge 
+                <Badge
                   variant={invoice.paymentStatus === 'paid' ? 'default' : invoice.paymentStatus === 'partially_paid' ? 'secondary' : 'outline'}
                   className="text-xs"
                 >

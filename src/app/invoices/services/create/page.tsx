@@ -1,45 +1,39 @@
 'use client';
 
 /**
- * Create Service Page - Admin Form
+ * Create Service Page - Standardized
  * Form for creating a new service call
- * Follows SOLID, KISS, DRY principles
  */
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { servicesApi, clientsApi } from '@/lib/api';
 import { usersApi } from '@/lib/api/users.api';
 import { queryKeys } from '@/lib/query';
-import { ServiceFormData, ServiceType, Client, User, Address } from '@/types';
+import { serviceFormSchema, ServiceFormValues } from '@/lib/validations';
+import { Client, User, ServiceType } from '@/types';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FloatingLabelInput } from '@/components/ui/floating-label-input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { DashboardLayout } from '@/components/layout';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { SearchableClientDropdown } from '@/components/shared/SearchableClientDropdown';
+import { INDIAN_STATES } from '@/lib/constants';
 
 // ==================== Service Type Options ====================
-
 const serviceTypeOptions: { value: ServiceType; label: string }[] = [
     { value: 'warranty', label: 'Warranty' },
     { value: 'per_call', label: 'Per Call' },
@@ -47,54 +41,46 @@ const serviceTypeOptions: { value: ServiceType; label: string }[] = [
     { value: 'new_installation', label: 'New Installation' },
 ];
 
-// ==================== Main Content Component ====================
-
 function CreateServiceContent() {
     const router = useRouter();
     const { selectedCompany } = useCompany();
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
-    // Data state
     const [clients, setClients] = useState<Client[]>([]);
     const [employees, setEmployees] = useState<User[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
     const [generatedNumber, setGeneratedNumber] = useState('');
+    const [activeTab, setActiveTab] = useState('details');
 
-    // Form state
-    const [form, setForm] = useState<Partial<ServiceFormData>>({
-        clientId: '',
-        callDate: new Date(),
-        serviceType: 'per_call',
-        problemDescription: '',
-        initialSolution: '',
-        useClientAddress: true,
-        serviceAddress: { street: '', city: '', state: '', pincode: '' },
-        assignedToIds: [],
-        assignedDate: new Date(),
-        assignedTime: '10:00',
+    const form = useForm<ServiceFormValues>({
+        resolver: zodResolver(serviceFormSchema) as any,
+        defaultValues: {
+            callDate: new Date().toISOString().split('T')[0],
+            serviceType: 'per_call',
+            problemDescription: '',
+            useClientAddress: true,
+            assignedDate: new Date().toISOString().split('T')[0],
+            assignedTime: '10:00',
+            assignedToIds: [],
+        }
     });
 
-    // Selected employee IDs
-    const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+    const { register, handleSubmit, setValue, watch, control, trigger, formState: { errors, isSubmitting } } = form;
+
+    const watchUseClientAddress = watch('useClientAddress');
+    const watchAssignedToIds = watch('assignedToIds') || [];
 
     // Load initial data
     useEffect(() => {
         const loadData = async () => {
             if (!selectedCompany?.id) return;
-
-            setLoading(true);
             try {
-                // Load clients and employees in parallel
                 const [clientsData, usersData, numberData] = await Promise.all([
                     clientsApi.getAll({ company_id: selectedCompany.id }),
                     usersApi.getAll(),
                     servicesApi.generateNumber(selectedCompany.id),
                 ]);
-
                 setClients(clientsData);
-                // Filter only employees with access to this company
                 const companyEmployees = usersData.filter(
                     (u: User) => u.role === 'employee' &&
                         (u.allowedCompanyIds?.includes(selectedCompany.id) || u.allowedCompanyIds?.length === 0)
@@ -103,347 +89,273 @@ function CreateServiceContent() {
                 setGeneratedNumber(numberData.service_number);
             } catch (error) {
                 console.error('Error loading data:', error);
-                toast.error('Failed to load form data');
-            } finally {
-                setLoading(false);
+                toast.error('Failed to load initial data');
             }
         };
-
         loadData();
     }, [selectedCompany?.id]);
 
-    // RBAC: Redirect employees
-    useEffect(() => {
-        if (user?.role === 'employee') {
-            router.push('/invoices/my-tasks');
-        }
-    }, [user, router]);
+    // Handle employee toggle
+    const toggleEmployee = (employeeId: string) => {
+        const currentIds = watchAssignedToIds;
+        const newIds = currentIds.includes(employeeId)
+            ? currentIds.filter(id => id !== employeeId)
+            : [...currentIds, employeeId];
+        setValue('assignedToIds', newIds, { shouldValidate: true });
+    };
 
-    // Handle form submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!selectedCompany?.id || !form.clientId) {
-            toast.error('Please fill in all required fields');
-            return;
-        }
-
-        if (selectedEmployees.length === 0) {
-            toast.error('Please assign at least one employee');
-            return;
-        }
-
-        setSubmitting(true);
+    const onSubmit = async (data: ServiceFormValues) => {
+        if (!selectedCompany?.id) return;
         try {
             await servicesApi.create({
                 companyId: selectedCompany.id,
-                clientId: form.clientId,
-                callDate: form.callDate!,
-                serviceType: form.serviceType as ServiceType,
-                problemDescription: form.problemDescription || '',
-                initialSolution: form.initialSolution,
-                useClientAddress: form.useClientAddress ?? true,
-                serviceAddress: form.useClientAddress ? undefined : form.serviceAddress as Address,
-                assignedToIds: selectedEmployees,
-                assignedDate: form.assignedDate!,
-                assignedTime: form.assignedTime || '10:00',
+                clientId: data.clientId,
+                callDate: new Date(data.callDate),
+                serviceType: data.serviceType as ServiceType,
+                problemDescription: data.problemDescription,
+                initialSolution: data.initialSolution || undefined,
+                useClientAddress: data.useClientAddress,
+                serviceAddress: data.useClientAddress ? undefined : data.serviceAddress as any,
+                assignedToIds: data.assignedToIds,
+                assignedDate: new Date(data.assignedDate),
+                assignedTime: data.assignedTime,
             });
 
-            toast.success('Service created successfully!');
-
-            // Invalidate the services cache so the list updates immediately
+            toast.success('Service created successfully');
             queryClient.invalidateQueries({ queryKey: queryKeys.services.byCompany(selectedCompany.id) });
-            // Also invalidate myTasks since the new service might be assigned to employees
-            queryClient.invalidateQueries({ queryKey: ['services', 'my-tasks', selectedCompany.id] });
-
             router.push('/invoices/services');
         } catch (error) {
-            console.error('Error creating service:', error);
+            console.error('Failed to create service', error);
             toast.error('Failed to create service');
-        } finally {
-            setSubmitting(false);
         }
     };
 
-    // Toggle employee selection
-    const toggleEmployee = (employeeId: string) => {
-        setSelectedEmployees((prev) =>
-            prev.includes(employeeId)
-                ? prev.filter((id) => id !== employeeId)
-                : [...prev, employeeId]
-        );
+    const tabsOrder = ['details', 'address', 'assignment'];
+    const goToNext = async (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        let fieldsToValidate: any[] = [];
+        if (activeTab === 'details') fieldsToValidate = ['clientId', 'serviceType', 'callDate', 'problemDescription'];
+        if (activeTab === 'address' && !watchUseClientAddress) fieldsToValidate = ['serviceAddress'];
+
+        if (await trigger(fieldsToValidate)) {
+            const idx = tabsOrder.indexOf(activeTab);
+            if (idx < tabsOrder.length - 1) setActiveTab(tabsOrder[idx + 1]);
+        }
     };
 
-    // No company selected state
-    if (!selectedCompany) {
-        return (
-            <div className="space-y-6 p-6">
-                <div className="rounded-lg border border-dashed p-12 text-center">
-                    <p className="text-muted-foreground">Please select a company first</p>
-                </div>
-            </div>
-        );
-    }
+    const goBack = (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        const idx = tabsOrder.indexOf(activeTab);
+        if (idx > 0) setActiveTab(tabsOrder[idx - 1]);
+    };
 
-    if (loading) {
-        return (
-            <div className="flex h-screen items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
+    if (!selectedCompany) return <div className="p-8 text-center">Please select a company</div>;
 
     return (
         <div className="space-y-6 p-6">
-            {/* Header */}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => router.back()}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold">Create Service</h1>
-                    <p className="text-sm text-muted-foreground">Service Number: {generatedNumber}</p>
+                    <p className="text-sm text-muted-foreground">Service #{generatedNumber}</p>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Call Details */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Call Details</CardTitle>
-                        <CardDescription>Information about the service call</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="flex-1">
-                                <Label htmlFor="client">Client *</Label>
-                                <Select
-                                    value={form.clientId}
-                                    onValueChange={(value) => setForm({ ...form, clientId: value })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a client" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {clients.map((client) => (
-                                            <SelectItem key={client.id} value={client.id}>
-                                                {client.clientName}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="details">Details</TabsTrigger>
+                        <TabsTrigger value="address">Address</TabsTrigger>
+                        <TabsTrigger value="assignment">Assignment</TabsTrigger>
+                    </TabsList>
 
-                            <div className="w-full md:w-[220px]">
-                                <Label htmlFor="serviceType">Service Type *</Label>
-                                <Select
-                                    value={form.serviceType}
-                                    onValueChange={(value) => setForm({ ...form, serviceType: value as ServiceType })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {serviceTypeOptions.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="w-full md:w-[200px]">
-                                <Label htmlFor="callDate">Call Date *</Label>
-                                <Input
-                                    type="date"
-                                    value={form.callDate ? new Date(form.callDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => setForm({ ...form, callDate: new Date(e.target.value) })}
+                    <TabsContent value="details" className="mt-4 space-y-4">
+                        <Card>
+                            <CardHeader><CardTitle>Service Details</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <SearchableClientDropdown
+                                        clients={clients}
+                                        selectedClientId={watch('clientId') || ''}
+                                        onClientSelect={(id) => setValue('clientId', id, { shouldValidate: true })}
+                                        label="Client *"
+                                        error={errors.clientId?.message}
+                                        companyId={selectedCompany.id}
+                                    />
+                                    <FloatingLabelSelect
+                                        id="serviceType"
+                                        label="Service Type *"
+                                        value={watch('serviceType')}
+                                        onValueChange={(val) => setValue('serviceType', val as any)}
+                                        error={errors.serviceType?.message}
+                                    >
+                                        <SelectContent>
+                                            {serviceTypeOptions.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </FloatingLabelSelect>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FloatingLabelInput
+                                        id="callDate"
+                                        type="date"
+                                        label="Call Date *"
+                                        {...register('callDate')}
+                                        error={errors.callDate?.message}
+                                    />
+                                </div>
+                                <FloatingLabelTextarea
+                                    id="problemDescription"
+                                    label="Problem Description *"
+                                    {...register('problemDescription')}
+                                    error={errors.problemDescription?.message}
+                                    rows={3}
                                 />
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label htmlFor="problemDescription">Problem Description * (max 50 words)</Label>
-                            <Textarea
-                                id="problemDescription"
-                                placeholder="Describe the issue reported by the client..."
-                                value={form.problemDescription}
-                                onChange={(e) => setForm({ ...form, problemDescription: e.target.value })}
-                                maxLength={500}
-                            />
-                        </div>
-
-                        <div>
-                            <Label htmlFor="initialSolution">Initial Solution (Optional)</Label>
-                            <Textarea
-                                id="initialSolution"
-                                placeholder="Any known solution or troubleshooting steps..."
-                                value={form.initialSolution}
-                                onChange={(e) => setForm({ ...form, initialSolution: e.target.value })}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Service Address */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Service Address</CardTitle>
-                        <CardDescription>Location where service will be performed</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id="useClientAddress"
-                                checked={form.useClientAddress ?? true}
-                                onChange={(e) => setForm({ ...form, useClientAddress: e.target.checked })}
-                                className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <Label htmlFor="useClientAddress">Use client&apos;s address</Label>
-                        </div>
-
-                        {!form.useClientAddress && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <Label>Street Address</Label>
-                                    <Input
-                                        placeholder="Street address"
-                                        value={form.serviceAddress?.street || ''}
-                                        onChange={(e) => setForm({
-                                            ...form,
-                                            serviceAddress: { ...form.serviceAddress, street: e.target.value } as Address
-                                        })}
-                                    />
-                                </div>
-                                <div>
-                                    <Label>City</Label>
-                                    <Input
-                                        placeholder="City"
-                                        value={form.serviceAddress?.city || ''}
-                                        onChange={(e) => setForm({
-                                            ...form,
-                                            serviceAddress: { ...form.serviceAddress, city: e.target.value } as Address
-                                        })}
-                                    />
-                                </div>
-                                <div>
-                                    <Label>State</Label>
-                                    <Input
-                                        placeholder="State"
-                                        value={form.serviceAddress?.state || ''}
-                                        onChange={(e) => setForm({
-                                            ...form,
-                                            serviceAddress: { ...form.serviceAddress, state: e.target.value } as Address
-                                        })}
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Pincode</Label>
-                                    <Input
-                                        placeholder="Pincode"
-                                        value={form.serviceAddress?.pincode || ''}
-                                        onChange={(e) => setForm({
-                                            ...form,
-                                            serviceAddress: { ...form.serviceAddress, pincode: e.target.value } as Address
-                                        })}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Assignment */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Assignment</CardTitle>
-                        <CardDescription>Assign employees to this service</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <Label>Assigned Date *</Label>
-                                <Input
-                                    type="date"
-                                    value={form.assignedDate ? new Date(form.assignedDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => setForm({ ...form, assignedDate: new Date(e.target.value) })}
+                                <FloatingLabelTextarea
+                                    id="initialSolution"
+                                    label="Initial Solution (Optional)"
+                                    {...register('initialSolution')}
+                                    rows={2}
                                 />
-                            </div>
-                            <div>
-                                <Label>Assigned Time *</Label>
-                                <Input
-                                    type="time"
-                                    value={form.assignedTime}
-                                    onChange={(e) => setForm({ ...form, assignedTime: e.target.value })}
-                                />
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                        <div>
-                            <Label>Select Employees *</Label>
-                            <p className="text-sm text-muted-foreground mb-2">
-                                Choose one or more employees to assign this service
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                {employees.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground col-span-full">
-                                        No employees available. Please add employees first.
-                                    </p>
-                                ) : (
-                                    employees.map((emp) => (
-                                        <div
-                                            key={emp.id}
-                                            className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${selectedEmployees.includes(emp.id)
-                                                ? 'bg-primary/10 border-primary'
-                                                : 'hover:bg-muted'
-                                                }`}
-                                            onClick={() => toggleEmployee(emp.id)}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedEmployees.includes(emp.id)}
-                                                onChange={() => toggleEmployee(emp.id)}
-                                                className="h-4 w-4 rounded border-gray-300"
+                    <TabsContent value="address" className="mt-4 space-y-4">
+                        <Card>
+                            <CardHeader><CardTitle>Service Location</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center space-x-2 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        id="useClientAddress"
+                                        checked={watchUseClientAddress}
+                                        onChange={(e) => setValue('useClientAddress', e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                                    />
+                                    <Label htmlFor="useClientAddress">Use data from Client Profile</Label>
+                                </div>
+
+                                {!watchUseClientAddress && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                        <FloatingLabelTextarea
+                                            id="serviceAddress.street"
+                                            label="Street Address *"
+                                            {...register('serviceAddress.street')}
+                                            rows={2}
+                                            error={errors.serviceAddress?.street?.message}
+                                        />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FloatingLabelInput
+                                                id="serviceAddress.city"
+                                                label="City *"
+                                                {...register('serviceAddress.city')}
+                                                error={errors.serviceAddress?.city?.message}
                                             />
-                                            <div>
-                                                <p className="font-medium text-sm">{emp.name}</p>
-                                                <p className="text-xs text-muted-foreground">{emp.email}</p>
-                                            </div>
+                                            <FloatingLabelSelect
+                                                id="serviceAddress.state"
+                                                label="State *"
+                                                value={watch('serviceAddress.state') || ''}
+                                                onValueChange={(val) => setValue('serviceAddress.state', val)}
+                                                error={errors.serviceAddress?.state?.message}
+                                            >
+                                                <SelectContent>
+                                                    {INDIAN_STATES.map(st => (
+                                                        <SelectItem key={st.code} value={st.value}>{st.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </FloatingLabelSelect>
                                         </div>
-                                    ))
+                                        <FloatingLabelInput
+                                            id="serviceAddress.pincode"
+                                            label="Pincode *"
+                                            {...register('serviceAddress.pincode')}
+                                            maxLength={6}
+                                            error={errors.serviceAddress?.pincode?.message}
+                                        />
+                                    </div>
                                 )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                {/* Submit Button */}
-                <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline" onClick={() => router.back()}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={submitting}>
-                        {submitting ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Creating...
-                            </>
-                        ) : (
-                            <>
-                                <Save className="mr-2 h-4 w-4" />
-                                Create Service
-                            </>
+                    <TabsContent value="assignment" className="mt-4 space-y-4">
+                        <Card>
+                            <CardHeader><CardTitle>Assignment</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FloatingLabelInput
+                                        id="assignedDate"
+                                        type="date"
+                                        label="Assigned Date *"
+                                        {...register('assignedDate')}
+                                        error={errors.assignedDate?.message}
+                                    />
+                                    <FloatingLabelInput
+                                        id="assignedTime"
+                                        type="time"
+                                        label="Assigned Time *"
+                                        {...register('assignedTime')}
+                                        error={errors.assignedTime?.message}
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label className="mb-2 block">Assign Employees *</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {employees.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">No employees available</p>
+                                        ) : (
+                                            employees.map((emp) => (
+                                                <div
+                                                    key={emp.id}
+                                                    className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${watchAssignedToIds.includes(emp.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
+                                                        }`}
+                                                    onClick={() => toggleEmployee(emp.id)}
+                                                >
+                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${watchAssignedToIds.includes(emp.id) ? 'bg-primary border-primary' : 'border-gray-400'
+                                                        }`}>
+                                                        {watchAssignedToIds.includes(emp.id) && <span className="text-white text-xs">✓</span>}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-sm">{emp.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{emp.email}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    {errors.assignedToIds && <p className="text-destructive text-xs mt-1">{errors.assignedToIds.message}</p>}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+
+                <div className="flex justify-between pt-4 border-t">
+                    <div>
+                        {activeTab !== 'details' && (
+                            <Button type="button" variant="outline" onClick={goBack}>Back</Button>
                         )}
-                    </Button>
+                    </div>
+                    <div className="flex gap-4">
+                        <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+                        {activeTab !== 'assignment' ? (
+                            <Button type="button" onClick={goToNext} className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary">Next</Button>
+                        ) : (
+                            <Button type="submit" disabled={isSubmitting} className="bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30">
+                                {isSubmitting ? 'Creating...' : 'Create Service'}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </form>
         </div>
     );
 }
-
-// ==================== Export with DashboardLayout ====================
 
 export default function CreateServicePage() {
     return (

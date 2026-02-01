@@ -104,8 +104,8 @@ export function FormItemRow({
             <div className="space-y-3">
                 <SearchableProductDropdown
                     products={products}
-                    selectedProductName={product?.productName || ''}
-                    onProductSelect={(productName, selectedProduct) => {
+                    selectedProductId={product?.id}
+                    onProductSelect={(productId, selectedProduct) => {
                         if (selectedProduct) {
                             onProductSelect(index, selectedProduct.id);
                         }

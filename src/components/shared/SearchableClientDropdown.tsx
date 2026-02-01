@@ -1,18 +1,12 @@
-/**
- * Searchable Client Dropdown Component
- * A reusable dropdown with search functionality and "Add Client" option
- */
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, Check, ChevronDown } from 'lucide-react';
+import { Plus, Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatClientDropdownLabel } from '@/utils/formatters';
 import { ClientForm } from '@/components/clients/ClientForm';
@@ -42,7 +36,7 @@ export function SearchableClientDropdown({
   selectedClientId,
   onClientSelect,
   onClientAdded,
-  placeholder = "Search or select client...",
+  placeholder = " ", // Default to empty space for floating label triggers
   label = "Client",
   required = false,
   error,
@@ -139,7 +133,7 @@ export function SearchableClientDropdown({
         },
         companyId,
         billingAddress: data.address,
-        shippingAddress: data.address, // Default shipping to billing
+        shippingAddress: data.address,
         bankDetails: data.bankDetails &&
           data.bankDetails.bankName &&
           data.bankDetails.accountNumber &&
@@ -155,7 +149,6 @@ export function SearchableClientDropdown({
       });
 
       toast.success('Client added successfully');
-      // Refresh the global clients list
       await refreshClients();
       onClientAdded?.(newClient);
       onClientSelect(newClient.id);
@@ -171,27 +164,25 @@ export function SearchableClientDropdown({
     ? formatClientDropdownLabel(selectedClient, { maxLength: 40 })
     : '';
 
-  return (
-    <div className={cn("space-y-2", className)} ref={dropdownRef}>
-      {label && (
-        <Label htmlFor="client-search">
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-      )}
+  const isFloating = isOpen || searchTerm || displayValue;
 
+  return (
+    <div className={cn("relative", className)} ref={dropdownRef}>
       <div className="relative">
         <div
           className={cn(
-            "flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background cursor-pointer",
-            "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-            error && "border-red-500"
+            "group relative flex w-full rounded-md border-2 border-foreground/40 bg-transparent text-xs ring-offset-background cursor-pointer transition-colors duration-200",
+            "focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
+            error && "border-destructive focus-within:border-destructive focus-within:ring-destructive/20",
+            // Padding strategy to match FloatingLabelInput (pt-3 pb-1.5 px-2.5)
+            "pt-3 pb-1.5 px-2.5"
           )}
           onClick={() => {
             setIsOpen(!isOpen);
             inputRef.current?.focus();
           }}
         >
-          <Input
+          <input
             ref={inputRef}
             id="client-search"
             value={isOpen ? searchTerm : displayValue}
@@ -203,23 +194,38 @@ export function SearchableClientDropdown({
               if (v && v.trim() !== '') setIsOpen(true);
             }}
             onFocus={() => {
-              // Do not auto-open on focus to avoid dropdown opening when form mounts
+              // don't auto open
             }}
-            placeholder={placeholder}
-            className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+            placeholder=" "
+            className="peer block w-full appearance-none bg-transparent p-0 text-xs focus:outline-none focus:ring-0 placeholder-transparent"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck="false"
           />
+
           <ChevronDown className={cn(
-            "h-4 w-4 opacity-50 transition-transform",
+            "h-4 w-4 opacity-50 transition-transform absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none",
             isOpen && "rotate-180"
           )} />
+
+          <label
+            className={cn(
+              "absolute left-2.5 top-1/2 -translate-y-1/2 origin-[0] select-none bg-transparent px-0.5 text-xs text-muted-foreground pointer-events-none transition-all duration-200 ease-out",
+              // Float when open, has search term, or has value (displayValue)
+              (isOpen || searchTerm || displayValue) && "top-0 -translate-y-1/2 scale-[0.85] px-1 text-primary bg-background",
+              // Also trigger on peer-focus via CSS if needed
+              "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:scale-[0.85] peer-focus:px-1 peer-focus:text-primary peer-focus:bg-background",
+              "peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:-translate-y-1/2 peer-[:not(:placeholder-shown)]:scale-[0.85] peer-[:not(:placeholder-shown)]:px-1 peer-[:not(:placeholder-shown)]:bg-background",
+              error && "text-destructive peer-focus:text-destructive"
+            )}
+          >
+            {label} {required && <span>*</span>}
+          </label>
         </div>
 
         {isOpen && (
-          <Card className="absolute z-50 w-full mt-1 max-h-60 overflow-auto">
+          <Card className="absolute z-50 w-full mt-1 max-h-60 overflow-auto shadow-lg">
             <CardContent className="p-0">
               {filteredClients.length > 0 ? (
                 <div className="py-1">
@@ -256,7 +262,8 @@ export function SearchableClientDropdown({
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setIsAddClientOpen(true);
                     setIsOpen(false);
                   }}
@@ -272,7 +279,7 @@ export function SearchableClientDropdown({
       </div>
 
       {error && (
-        <p className="text-sm text-red-500">{error}</p>
+        <p className="text-sm text-destructive mt-1">{error}</p>
       )}
 
       {/* Add Client Dialog */}
@@ -282,7 +289,6 @@ export function SearchableClientDropdown({
             <DialogTitle>Add New Client</DialogTitle>
             <DialogDescription>
               Create a new client to add to your database.
-              {searchTerm.trim() && ` The client name will be pre-filled with "${searchTerm.trim()}".`}
             </DialogDescription>
           </DialogHeader>
           <ClientForm

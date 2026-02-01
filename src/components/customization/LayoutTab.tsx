@@ -11,7 +11,7 @@ import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SelectContent, SelectItem } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { InvoiceCustomization } from '@/types/customization';
 
 interface LayoutTabProps {
@@ -25,7 +25,7 @@ export function LayoutTab({ customization, onUpdate }: LayoutTabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Page Layout</CardTitle>
-                    <CardDescription>Configure page size and margins</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

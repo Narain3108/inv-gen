@@ -20,7 +20,7 @@ import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
 import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
 import { Label } from '@/components/ui/label';
 import { SelectContent, SelectItem } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Search, RefreshCw, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { GST_RATES, PRODUCT_UNITS } from '@/lib/constants';
@@ -57,12 +57,11 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
 
   const hsn = watch('hsn');
   const productType = watch('type');
-  const itemCode = watch('itemCode');
   const productName = watch('productName');
+
   const currentGstRate = watch('gstRate');
 
-  // Generate 5-digit item code
-  const generateItemCode = () => Math.floor(10000 + Math.random() * 90000).toString();
+
 
   // Auto-fill from HSN match
   const autoFillFromCategory = async () => {
@@ -71,9 +70,7 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
       if (hsnMatch) {
         setValue('productName', hsnMatch.product.name);
         setValue('gstRate', hsnMatch.category.defaultGstRate);
-        if (hsnMatch.product.itemCode) {
-          setValue('itemCode', hsnMatch.product.itemCode);
-        }
+
         setAutoFilledFrom(hsnMatch.category.categoryName);
         toast.success(`Auto-filled from category: ${hsnMatch.category.categoryName}`, { duration: 3000 });
       }
@@ -95,10 +92,6 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
       if (categoryMatch) {
         setValue('productName', categoryMatch.product.name);
         setValue('gstRate', categoryMatch.category.defaultGstRate);
-        if (categoryMatch.product.itemCode) {
-          setValue('itemCode', categoryMatch.product.itemCode);
-        }
-        setAutoFilledFrom(categoryMatch.category.categoryName);
         toast.success(`Auto-filled from category: ${categoryMatch.category.categoryName}`);
         setIsFetchingHSN(false);
         return;
@@ -165,33 +158,16 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
           </FloatingLabelSelect>
 
           {/* Serial Number Toggle */}
-          <div className="space-y-2">
-            <Label>Requires Serial Number? *</Label>
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="yes"
-                  checked={watch('hasSerialNumber') === true}
-                  onChange={() => setValue('hasSerialNumber', true)}
-                  className="w-4 h-4 text-primary focus:ring-primary focus:ring-2"
-                />
-                <span className="text-sm font-medium">Yes</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="no"
-                  checked={watch('hasSerialNumber') === false}
-                  onChange={() => setValue('hasSerialNumber', false)}
-                  className="w-4 h-4 text-primary focus:ring-primary focus:ring-2"
-                />
-                <span className="text-sm font-medium">No</span>
-              </label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Enable this if each unit has a unique serial number
-            </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="hasSerialNumber"
+              {...register('hasSerialNumber')}
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+            />
+            <Label htmlFor="hasSerialNumber" className="font-normal cursor-pointer">
+              Has Serial Number
+            </Label>
           </div>
 
           {/* HSN/SAC Code */}
@@ -204,9 +180,7 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
                 maxLength={8}
                 error={errors.hsn?.message}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                {productType === 'product' ? 'HSN code (4, 6, or 8 digits)' : 'SAC code (6 digits)'}
-              </p>
+
             </div>
             <Button
               type="button"
@@ -227,32 +201,7 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
             error={errors.productName?.message}
           />
 
-          {/* Item Code */}
-          <div className="flex gap-2 items-start">
-            <div className="flex-1">
-              <FloatingLabelInput
-                id="itemCode"
-                label="Item Code (Optional)"
-                {...register('itemCode')}
-                maxLength={5}
-                value={itemCode || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('itemCode', e.target.value || '')}
-                error={errors.itemCode?.message}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Optional 5-digit code. Click refresh to auto-generate.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setValue('itemCode', generateItemCode())}
-              title="Generate random 5-digit code"
-              className="mt-1"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
+
 
           {/* Description */}
           <FloatingLabelTextarea
@@ -301,7 +250,7 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
                 defaultValue={product?.stock ?? ''}
                 error={errors.stock?.message}
               />
-              <p className="text-xs text-muted-foreground mt-1">Current available stock</p>
+
             </div>
           )}
         </CardContent>
@@ -318,7 +267,7 @@ function TaxInfoTab({ form }: { form: UseFormReturn<ProductFormData> }) {
     <Card>
       <CardHeader>
         <CardTitle>Tax Information</CardTitle>
-        <CardDescription>GST and tax details</CardDescription>
+
       </CardHeader>
       <CardContent className="space-y-4">
         {/* GST Rate */}
@@ -348,9 +297,7 @@ function TaxInfoTab({ form }: { form: UseFormReturn<ProductFormData> }) {
             {...register('cessRate', { valueAsNumber: true })}
             error={errors.cessRate?.message}
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Additional cess percentage, if applicable
-          </p>
+
         </div>
       </CardContent>
     </Card>
@@ -373,7 +320,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
     defaultValues: product ? {
       productName: product.productName,
       description: product.description,
-      itemCode: product.itemCode,
+
       hsn: product.hsn,
       type: product.type,
       unit: product.unit,
@@ -427,7 +374,7 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
       const productData = {
         productName: data.productName,
         description: data.description || null,
-        itemCode: data.itemCode || null,
+
         hsn: data.hsn || null,
         unit: data.unit,
         price: data.price,

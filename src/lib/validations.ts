@@ -286,6 +286,21 @@ export const quotationFormSchema = z.object({
   })).min(1, 'At least one item is required'),
 });
 
+// ==================== Service Schema ====================
+
+export const serviceFormSchema = z.object({
+  clientId: z.string().min(1, 'Client is required'),
+  callDate: z.string().min(1, 'Call date is required'),
+  serviceType: z.enum(['warranty', 'per_call', 'amc', 'new_installation']),
+  problemDescription: z.string().min(1, 'Problem description is required').max(500, 'Description too long'),
+  initialSolution: z.string().optional().or(z.literal('')).nullish(),
+  useClientAddress: z.boolean().default(true),
+  serviceAddress: addressSchema.optional().or(z.literal(null)),
+  assignedDate: z.string().min(1, 'Assigned date is required'),
+  assignedTime: z.string().min(1, 'Assigned time is required'),
+  assignedToIds: z.array(z.string()).min(1, 'Assign at least one employee'),
+});
+
 // ==================== Login Schema ====================
 
 export const loginSchema = z.object({
@@ -312,5 +327,6 @@ export type ProductFormValues = z.infer<typeof productFormSchema>;
 export type ClientFormValues = z.infer<typeof clientFormSchema>;
 export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 export type QuotationFormValues = z.infer<typeof quotationFormSchema>;
+export type ServiceFormValues = z.infer<typeof serviceFormSchema>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;

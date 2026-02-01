@@ -26,7 +26,7 @@ import SerialManager from '@/components/shared/SerialManager';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { TotalsSummary } from '@/components/forms/shared';
 
-const purchaseItemSchema = z.object({ productId: z.string().optional(), productName: z.string().optional(), description: z.string().min(1), hsn: z.string().min(1), quantity: z.coerce.number().int().min(1), unit: z.string().min(1), unitPrice: z.coerce.number().min(0), discount: z.coerce.number().min(0).default(0), gstRate: z.coerce.number().min(0), cessRate: z.coerce.number().min(0).optional(), itemCode: z.string().optional() });
+const purchaseItemSchema = z.object({ productId: z.string().optional(), productName: z.string().optional(), description: z.string().min(1), hsn: z.string().min(1), quantity: z.coerce.number().int().min(1), unit: z.string().min(1), unitPrice: z.coerce.number().min(0), discount: z.coerce.number().min(0).default(0), gstRate: z.coerce.number().min(0), cessRate: z.coerce.number().min(0).optional() });
 const purchaseFormSchema = z.object({ invoiceNumber: z.string().min(1), referenceNumber: z.string().optional(), poNumber: z.string().optional(), poDate: z.string().optional(), ewayNumber: z.string().optional(), date: z.string().min(1), clientId: z.string().min(1), items: z.array(purchaseItemSchema).min(1), attachmentUrl: z.string().nullish() });
 type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
 type TabKey = 'header' | 'items' | 'summary';
@@ -46,7 +46,7 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
 
     const { register, handleSubmit, setValue, watch, control, clearErrors, trigger, formState: { errors } } = useForm<PurchaseFormData>({
         resolver: zodResolver(purchaseFormSchema) as unknown as Resolver<PurchaseFormData>,
-        defaultValues: purchase ? { invoiceNumber: purchase.invoiceNumber, referenceNumber: purchase.referenceNumber || '', poNumber: purchase.poNumber || '', poDate: purchase.poDate ? (typeof purchase.poDate === 'string' ? purchase.poDate.split('T')[0] : '') : '', ewayNumber: purchase.ewayNumber || '', clientId: purchase.clientId, date: purchase.date ? (typeof purchase.date === 'string' ? purchase.date.split('T')[0] : '') : new Date().toISOString().split('T')[0], items: purchase.items.map(i => ({ productId: i.productId || '', productName: i.productName || '', description: i.description || '', hsn: i.hsn || '', quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice, discount: i.discount || 0, gstRate: i.gstRate, cessRate: i.cessRate || 0, itemCode: i.itemCode || '' })), attachmentUrl: purchase.attachmentUrl } : { date: new Date().toISOString().split('T')[0], items: [{ productId: '', quantity: '', unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 }] } as any,
+        defaultValues: purchase ? { invoiceNumber: purchase.invoiceNumber, referenceNumber: purchase.referenceNumber || '', poNumber: purchase.poNumber || '', poDate: purchase.poDate ? (typeof purchase.poDate === 'string' ? purchase.poDate.split('T')[0] : '') : '', ewayNumber: purchase.ewayNumber || '', clientId: purchase.clientId, date: purchase.date ? (typeof purchase.date === 'string' ? purchase.date.split('T')[0] : '') : new Date().toISOString().split('T')[0], items: purchase.items.map(i => ({ productId: i.productId || '', productName: i.productName || '', description: i.description || '', hsn: i.hsn || '', quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice, discount: i.discount || 0, gstRate: i.gstRate, cessRate: i.cessRate || 0 })), attachmentUrl: purchase.attachmentUrl } : { date: new Date().toISOString().split('T')[0], items: [{ productId: '', quantity: '', unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 }] } as any,
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: 'items' });
@@ -64,7 +64,7 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
 
     const handleProductSelect = async (index: number, productId: string) => {
         const p = localProducts.find(pr => pr.id === productId);
-        if (p) { setValue(`items.${index}.productId`, productId); setValue(`items.${index}.productName`, p.productName); setValue(`items.${index}.description`, p.description || p.productName); setValue(`items.${index}.hsn`, p.hsn); setValue(`items.${index}.unit`, p.unit); setValue(`items.${index}.unitPrice`, p.price); setValue(`items.${index}.gstRate`, p.gstRate); setValue(`items.${index}.cessRate`, p.cessRate || 0); setValue(`items.${index}.itemCode`, p.itemCode || ''); }
+        if (p) { setValue(`items.${index}.productId`, productId); setValue(`items.${index}.productName`, p.productName); setValue(`items.${index}.description`, p.description || p.productName); setValue(`items.${index}.hsn`, p.hsn); setValue(`items.${index}.unit`, p.unit); setValue(`items.${index}.unitPrice`, p.price); setValue(`items.${index}.gstRate`, p.gstRate); setValue(`items.${index}.cessRate`, p.cessRate || 0); }
     };
 
     const handleQuantityChange = (index: number, quantity: number) => {
@@ -86,7 +86,7 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
             const base = qty * price, discAmt = (base * disc) / 100, taxable = base - discAmt;
             let c = 0, s = 0, i = 0; if (isInter) i = (taxable * gst) / 100; else { c = s = (taxable * gst / 2) / 100; }
             taxableAmt += taxable; cgst += c; sgst += s; igst += i;
-            const pi: any = { product_id: p.id, product_name: p.productName, description: item.description, hsn: item.hsn, quantity: qty, unit: item.unit, unit_price: price, discount: disc, gst_rate: gst, cess_rate: item.cessRate || 0, taxable_amount: taxable, cgst: c, sgst: s, igst: i, line_total: taxable + c + s + i, item_code: item.itemCode };
+            const pi: any = { product_id: p.id, product_name: p.productName, description: item.description, hsn: item.hsn, quantity: qty, unit: item.unit, unit_price: price, discount: disc, gst_rate: gst, cess_rate: item.cessRate || 0, taxable_amount: taxable, cgst: c, sgst: s, igst: i, line_total: taxable + c + s + i };
             if (p.hasSerialNumber) { const key = fields[idx]?.id; if (key && serialNumbers[key]) pi.serial_numbers = serialNumbers[key]; }
             return pi;
         }).filter(Boolean) as PurchaseItem[];
@@ -238,11 +238,11 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
                 <TabsContent value="items" className="mt-4 space-y-4">
                     <Card><CardHeader><CardTitle className="text-lg">Purchase Items</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="hidden lg:block"><table className="w-full"><thead className="border-b"><tr className="text-sm text-muted-foreground"><th className="p-2 text-left w-64">Product</th><th className="p-2 w-24">Code</th><th className="p-2 w-16">Qty</th><th className="p-2 w-24">Unit</th><th className="p-2 w-28 text-right">Price</th><th className="p-2 w-16">Disc%</th><th className="p-2 w-28 text-right">Amount</th><th className="p-2 w-10"></th></tr></thead>
+                            <div className="hidden lg:block"><table className="w-full"><thead className="border-b"><tr className="text-sm text-muted-foreground"><th className="p-2 text-left w-64">Product</th><th className="p-2 w-16">Qty</th><th className="p-2 w-24">Unit</th><th className="p-2 w-28 text-right">Price</th><th className="p-2 w-16">Disc%</th><th className="p-2 w-28 text-right">Amount</th><th className="p-2 w-10"></th></tr></thead>
                                 <tbody>{fields.map((f, i) => {
                                     const it = watchItems?.[i], p = it?.productId ? localProducts.find(pr => pr.id === it.productId) : null, amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
                                     return (<tr key={f.id} className="border-b align-top"><td className="p-2"><Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select>{p?.hasSerialNumber && <div className="mt-2"><Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(i)}>Serials</Button><span className="text-xs ml-2">{(serialNumbers[f.id] || []).length} sel</span></div>}</td>
-                                        <td className="p-2 text-center text-xs text-muted-foreground">{p?.itemCode || '—'}</td>
+
                                         <td className="p-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => { const v = e.target.value === '' ? '' : parseInt(e.target.value); field.onChange(v); if (v && !isNaN(v as number)) handleQuantityChange(i, v as number); }} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
                                         <td className="p-2"><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center text-sm" />} /></td>
                                         <td className="p-2"><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-right" />} /></td>
@@ -266,7 +266,62 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
                 <TabsContent value="summary" className="mt-4 space-y-4">
                     <Card><CardHeader><CardTitle className="text-lg">Review</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            {selectedClient && <div className="p-4 bg-muted/30 rounded-lg"><h4 className="font-semibold">Vendor</h4><p className="text-sm">{selectedClient.clientName}</p><p className="text-sm text-muted-foreground">{selectedClient.address.city}, {selectedClient.address.state}</p></div>}
+                            {/* Header Overview */}
+                            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                                <div>
+                                    <span className="text-muted-foreground block text-xs">Bill #</span>
+                                    <span className="font-semibold">{watch('invoiceNumber')}</span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground block text-xs">Date</span>
+                                    <span className="font-semibold">{watch('date')}</span>
+                                </div>
+                            </div>
+
+                            {selectedClient && (
+                                <div className="p-4 bg-muted/30 rounded-lg border border-border/50 mb-4">
+                                    <h4 className="font-semibold mb-2 text-sm flex items-center gap-2"><FileText className="h-3 w-3" /> Vendor Details</h4>
+                                    <p className="text-sm font-medium">{selectedClient.clientName}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{selectedClient.address.city}, {selectedClient.address.state}</p>
+                                </div>
+                            )}
+
+                            {/* Items Summary Table */}
+                            {watchItems && watchItems.length > 0 && (
+                                <div className="rounded-md border text-xs mb-4">
+                                    <div className="grid grid-cols-12 bg-muted/50 p-2 font-medium border-b">
+                                        <div className="col-span-1">#</div>
+                                        <div className="col-span-5">Product</div>
+                                        <div className="col-span-2 text-right">Qty</div>
+                                        <div className="col-span-2 text-right">Price</div>
+                                        <div className="col-span-2 text-right">Total</div>
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto">
+                                        {watchItems.map((item, idx) => {
+                                            const p = localProducts.find(pr => pr.id === item.productId);
+                                            if (!p) return null;
+                                            const disc = item.discount || 0;
+                                            // For purchase, discount usually reduces base
+                                            const base = (item.quantity * item.unitPrice);
+                                            const total = base - (base * disc / 100);
+
+                                            return (
+                                                <div key={idx} className="grid grid-cols-12 p-2 border-b last:border-0 items-center hover:bg-muted/20">
+                                                    <div className="col-span-1 text-muted-foreground">{idx + 1}</div>
+                                                    <div className="col-span-5 truncate font-medium">
+                                                        {p.productName}
+                                                        {p.hasSerialNumber && <span className="ml-1 text-[10px] text-primary bg-primary/10 px-1 rounded">SN</span>}
+                                                    </div>
+                                                    <div className="col-span-2 text-right">{item.quantity} {item.unit}</div>
+                                                    <div className="col-span-2 text-right">{formatCurrency(item.unitPrice)}</div>
+                                                    <div className="col-span-2 text-right font-semibold">{formatCurrency(total)}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {totals ? <TotalsSummary taxableAmount={totals.taxableAmount} cgst={totals.cgst} sgst={totals.sgst} igst={totals.igst} totalAmount={totals.totalAmount} taxBreakdown={totals.taxBreakdown} isInterState={companyState !== selectedClient?.address?.state} /> : <p className="text-center py-8 text-muted-foreground">No items</p>}
                         </CardContent>
                     </Card>
