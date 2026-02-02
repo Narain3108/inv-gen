@@ -304,7 +304,7 @@ export default function CompanySettingsPage() {
               <DialogDescription>
                 {editingCompany
                   ? 'Update your company information below.'
-                  : 'Add a new company to your account.'}
+                  : ''}
               </DialogDescription>
             </DialogHeader>
             <CompanyForm

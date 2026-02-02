@@ -266,7 +266,7 @@ function SettingsTab(props: SettingsTabProps) {
     <div className="space-y-6">
       <NumberingConfig
         title="Invoice Numbering"
-        description="Configure how invoice numbers are generated automatically"
+        description=""
         prefix={props.invoicePrefix}
         suffix={props.invoiceSuffix}
         order={props.invoiceOrder}
@@ -278,7 +278,7 @@ function SettingsTab(props: SettingsTabProps) {
 
       <NumberingConfig
         title="Quotation Numbering"
-        description="Configure how quotation numbers are generated automatically"
+        description=""
         prefix={props.quotationPrefix}
         suffix={props.quotationSuffix}
         order={props.quotationOrder}
@@ -290,7 +290,7 @@ function SettingsTab(props: SettingsTabProps) {
 
       <NumberingConfig
         title="Service Numbering"
-        description="Configure how service numbers are generated automatically"
+        description=""
         prefix={props.servicePrefix}
         suffix={props.serviceSuffix}
         order={props.serviceOrder}
@@ -607,8 +607,58 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
     },
   ], [form, company, isFetchingGSTIN, logoUrl, signatureUrl, invoicePrefix, invoiceSuffix, invoiceOrder, quotationPrefix, quotationSuffix, quotationOrder, servicePrefix, serviceSuffix, serviceOrder]);
 
+  // Form validation error handler
+  const onFormError = (errors: any) => {
+    console.log('Form validation errors:', errors);
+
+    // Collect all error messages
+    const errorMessages: string[] = [];
+
+    // Helper to extract messages recursively
+    const extractErrors = (obj: any, prefix = '') => {
+      Object.keys(obj).forEach(key => {
+        const error = obj[key];
+        // If it has a message property, it's an error object
+        if (error?.message) {
+          // Format field name for better readability
+          // e.g., 'address.street' -> 'Address Street'
+          const fieldName = (prefix + key)
+            .replace(/([A-Z])/g, ' $1') // Space before caps
+            .replace(/\./g, ' > ')      // Replace dots with arrows
+            .replace(/^\w/, c => c.toUpperCase()); // Capitalize first letter
+
+          errorMessages.push(`${fieldName}: ${error.message}`);
+        } else if (typeof error === 'object' && error !== null) {
+          // Recurse for nested objects (like address, bankDetails)
+          extractErrors(error, `${prefix}${key}.`);
+        }
+      });
+    };
+
+    extractErrors(errors);
+
+    if (errorMessages.length > 0) {
+      // Show summary toast
+      toast.error('', {
+        description: (
+          <div className="flex flex-col gap-1 mt-2 max-h-[300px] overflow-y-auto">
+            <p className="font-medium mb-1">Please fix the following:</p>
+            <ul className="list-disc pl-4 space-y-1 text-xs">
+              {errorMessages.map((msg, idx) => (
+                <li key={idx}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+        duration: 5000,
+      });
+    } else {
+      toast.error('Please fix the errors in the form before submitting.');
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)}>
+    <form onSubmit={handleSubmit(handleFormSubmit, onFormError)}>
       <TabFormLayout
         tabs={tabs}
         activeTab={activeTab}

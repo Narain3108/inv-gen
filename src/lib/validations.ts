@@ -61,17 +61,17 @@ export type SignupValues = z.infer<typeof signupSchema>;
 // ==================== Address Schema ====================
 
 export const addressSchema = z.object({
-  street: z.string().min(3, 'Street address is required').max(200),
-  city: z.string().min(2, 'City is required').max(100),
+  street: z.string().min(3, 'Street address must be at least 3 characters').max(200, 'Street address is too long'),
+  city: z.string().min(2, 'City name is required').max(100, 'City name is too long'),
   state: z.string().min(2, 'State is required'),
-  pincode: z.string().regex(VALIDATION_PATTERNS.pincode, 'Invalid pincode'),
+  pincode: z.string().regex(VALIDATION_PATTERNS.pincode, 'Pincode must be exactly 6 digits'),
   country: z.string().optional().default('India'),
 });
 
 // ==================== Contact Schema ====================
 
 export const contactSchema = z.object({
-  phone: z.string().regex(VALIDATION_PATTERNS.phone, 'Invalid phone number'),
+  phone: z.string().regex(VALIDATION_PATTERNS.phone, 'Phone number must be exactly 10 digits'),
   email: z.string().email('Invalid email address'),
   website: z.string().url().optional().or(z.literal('')).nullish(),
 });
@@ -80,8 +80,8 @@ export const contactSchema = z.object({
 
 export const bankDetailsSchema = z.object({
   bankName: z.string().min(2, 'Bank name is required').optional().or(z.literal('')).nullish(),
-  accountNumber: z.string().min(9, 'Invalid account number').max(18).optional().or(z.literal('')).nullish(),
-  ifscCode: z.string().regex(VALIDATION_PATTERNS.ifsc, 'Invalid IFSC code').optional().or(z.literal('')).nullish(),
+  accountNumber: z.string().min(9, 'Account number must be 9-18 digits').max(18, 'Account number must be 9-18 digits').optional().or(z.literal('')).nullish(),
+  ifscCode: z.string().regex(VALIDATION_PATTERNS.ifsc, 'Invalid IFSC code (e.g., SBIN0001234)').optional().or(z.literal('')).nullish(),
   accountHolderName: z.string().min(2, 'Account holder name is required').optional().or(z.literal('')).nullish(),
   branch: z.string().optional().or(z.literal('')).nullish(),
   upiId: z.string().regex(VALIDATION_PATTERNS.upi, 'Invalid UPI ID').optional().or(z.literal('')).nullish(),
@@ -90,7 +90,7 @@ export const bankDetailsSchema = z.object({
 // ==================== Company Schema ====================
 
 export const companyFormSchema = z.object({
-  name: z.string().min(2, 'Company name is required').max(200),
+  name: z.string().min(2, 'Company legal name is required (min 2 chars)').max(200, 'Company name is too long'),
   // Preprocess GSTIN: trim and uppercase but do NOT enforce format validation here
   gstin: z.preprocess((val) => typeof val === 'string' ? val.trim().toUpperCase() : val,
     z.string().optional().or(z.literal('')).nullish()
