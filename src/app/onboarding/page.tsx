@@ -13,7 +13,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { setSelectedCompany } = useCompany();
-  const { refreshCompanies } = useAppData();
+  const { addCompany } = useAppData();
 
   const handleCreateCompany = async (data: any) => {
     try {
@@ -21,11 +21,11 @@ export default function OnboardingPage() {
       const newCompany = await companiesApi.create(data);
 
       // Update global state
-      await refreshCompanies();
+      addCompany(newCompany);
       setSelectedCompany(newCompany);
 
       toast.success('Company profile set up successfully!');
-      
+
       if (user?.role === 'super_admin') {
         router.push('/invoices/dashboard');
       } else {
@@ -39,7 +39,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="space-y-6">
-       <CompanyForm onSubmit={handleCreateCompany} />
+      <CompanyForm onSubmit={handleCreateCompany} />
     </div>
   );
 }

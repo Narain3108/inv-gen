@@ -11,7 +11,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useForm, UseFormReturn } from 'react-hook-form';
+import { useForm, UseFormReturn, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { companyFormSchema } from '@/lib/validations';
 import { Company } from '@/types';
@@ -75,22 +75,7 @@ function BasicInfoTab({ form, company }: TabContentProps & {
                 error={errors.gstin?.message}
               />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={arguments[0].onFetchGSTIN}
-              disabled={arguments[0].isFetchingGSTIN}
-              className="mt-1"
-            >
-              {arguments[0].isFetchingGSTIN ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Fetching...
-                </>
-              ) : (
-                'Auto-fill'
-              )}
-            </Button>
+
           </div>
 
           {/* Company Name */}
@@ -101,24 +86,7 @@ function BasicInfoTab({ form, company }: TabContentProps & {
             error={errors.name?.message}
           />
 
-          {/* PAN */}
-          <FloatingLabelInput
-            id="pan"
-            label="PAN"
-            {...register('pan')}
-            maxLength={10}
-            className="uppercase"
-            error={errors.pan?.message}
-          />
 
-          {/* Website */}
-          <FloatingLabelInput
-            id="website"
-            label="Website"
-            {...register('website')}
-            type="url"
-            error={errors.website?.message}
-          />
         </CardContent>
       </Card>
 
@@ -143,21 +111,29 @@ function BasicInfoTab({ form, company }: TabContentProps & {
               error={errors.address?.city?.message}
             />
 
-            <FloatingLabelSelect
-              id="address.state"
-              label="State *"
-              value={watch('address.state') || ''}
-              onValueChange={(value: string) => setValue('address.state', value)}
-              error={errors.address?.state?.message}
-            >
-              <SelectContent>
-                {INDIAN_STATES.map((state) => (
-                  <SelectItem key={state.code} value={state.name}>
-                    {state.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </FloatingLabelSelect>
+            <Controller
+              control={form.control}
+              name="address.state"
+              render={({ field }) => (
+                <FloatingLabelSelect
+                  id="address.state"
+                  label="State *"
+                  value={field.value || ''}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                  }}
+                  error={errors.address?.state?.message}
+                >
+                  <SelectContent>
+                    {INDIAN_STATES.map((state) => (
+                      <SelectItem key={state.code} value={state.name}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </FloatingLabelSelect>
+              )}
+            />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -453,7 +429,7 @@ export function CompanyForm({ company, onSubmit, onCancel }: CompanyFormProps) {
       termsAndConditions: company.termsAndConditions || '',
       additionalNotes: company.additionalNotes || '',
     } : {
-      address: { country: 'India' },
+      address: { country: 'India', street: '', city: '', state: '', pincode: '' },
       termsAndConditions: '',
       additionalNotes: '',
     } as any,

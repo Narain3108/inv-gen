@@ -36,6 +36,7 @@ interface AppDataContextType {
   refreshCompanies: () => Promise<void>;
   refreshClients: () => Promise<void>;
   refreshProducts: () => Promise<void>;
+  addCompany: (company: Company) => void;
   deleteClient: (id: string) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
 }
@@ -253,6 +254,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     await loadProducts();
   }, [loadProducts]);
 
+  const addCompany = useCallback((company: Company) => {
+    setCompanies(prev => [...prev, company]);
+    // Also set as selected company if it's the first one or explicit choice needed
+    if (!selectedCompany) {
+      setSelectedCompany(company);
+    }
+  }, [selectedCompany, setSelectedCompany]);
+
   const deleteClient = useCallback(async (id: string) => {
     const previousClients = [...clients];
     setClients(prev => prev.filter(c => c.id !== id));
@@ -300,6 +309,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     refreshCompanies,
     refreshClients,
     refreshProducts,
+    addCompany,
     deleteClient,
     deleteProduct,
   };

@@ -554,12 +554,48 @@ export interface ServiceAttendData {
   isSolved: boolean;
   clientSignatureUrl?: string;
   proofDocumentUrl?: string;
-  // Inline invoice creation
-  createInvoice?: boolean;
-  invoiceItems?: InlineInvoiceItem[];
+  // Parts used directly by Admin
+  usedParts?: UsedPart[];
+  // Parts requested by Employee (requires approval)
+  sparePartRequests?: SparePartRequest[];
 }
 
-// For inline invoice creation during service attendance
+// Used Part (Admin direct consumption)
+export interface UsedPart {
+  productId: string;
+  productName: string;
+  hsn?: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  gstRate?: number;
+  serialNumbers?: string[];
+}
+
+// Spare Part Request (Employee requests, Admin approves)
+export type SparePartRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface SparePartRequest {
+  id?: string;
+  productId: string;
+  productName: string;
+  hsn?: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  gstRate?: number;
+  status: SparePartRequestStatus;
+  requestedBy?: string;
+  requestedByName?: string;
+  requestedAt?: string | Date;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string | Date;
+  serialNumbers?: string[];
+  rejectionReason?: string;
+}
+
+// For inline invoice creation during service attendance (Legacy)
 export interface InlineInvoiceItem {
   productId: string;
   productName?: string;
@@ -571,3 +607,4 @@ export interface InlineInvoiceItem {
   discount?: number;
   gstRate?: number;
 }
+

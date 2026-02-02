@@ -41,6 +41,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { TableSkeleton } from '@/components/shared/Skeletons';
+import { ServiceAttendDialog } from '@/components/services';
+import { Wrench } from 'lucide-react';
 
 // ==================== Helper Functions ====================
 
@@ -87,6 +89,7 @@ function ServicesContent() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [attendOpen, setAttendOpen] = useState(false);
 
     // React Query - replaces manual useState/useEffect fetching
     const { data: services = [], isLoading: loading, error } = useServicesQuery(
@@ -110,10 +113,15 @@ function ServicesContent() {
         return matchesSearch;
     });
 
-    // View service details
     const handleViewDetails = (service: Service) => {
         setSelectedService(service);
         setDetailsOpen(true);
+    };
+
+    // Open attend dialog
+    const handleAttend = (service: Service) => {
+        setSelectedService(service);
+        setAttendOpen(true);
     };
 
     // No company selected state
@@ -227,23 +235,49 @@ function ServicesContent() {
                                 {service.problemDescription || 'No description'}
                             </p>
 
-                            {/* Action Button - Touch Friendly */}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full h-10"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewDetails(service);
-                                }}
-                            >
-                                <Info className="h-4 w-4 mr-2" />
-                                View Details
-                            </Button>
+                            {/* Action Buttons - Touch Friendly */}
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 h-10"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewDetails(service);
+                                    }}
+                                >
+                                    <Info className="h-4 w-4 mr-2" />
+                                    Details
+                                </Button>
+                                {service.status !== 'closed' && (
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="flex-1 h-10"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleAttend(service);
+                                        }}
+                                    >
+                                        <Wrench className="h-4 w-4 mr-2" />
+                                        Attend
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* Service Attend Dialog */}
+            <ServiceAttendDialog
+                open={attendOpen}
+                onOpenChange={setAttendOpen}
+                service={selectedService}
+                onSuccess={() => {
+                    // Refetch is handled by React Query invalidation
+                }}
+            />
 
             {/* Service Details Dialog - Mobile Optimized */}
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

@@ -422,7 +422,10 @@ export function ProductForm({ product, companyId, onSubmit, onCancel }: ProductF
   ], [form, product, companyId, autoFilledFrom]);
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)}>
+    <form onSubmit={(e) => {
+      e.stopPropagation();
+      handleSubmit(handleFormSubmit)(e);
+    }}>
       <TabFormLayout
         tabs={tabs}
         activeTab={activeTab}

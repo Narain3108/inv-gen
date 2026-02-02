@@ -26,7 +26,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
 
   if (invoices.length === 0) {
     return (
-      <Card>
+      <Card className="border-2 border-black dark:border-white">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
         </CardHeader>
@@ -43,7 +43,7 @@ export function RecentInvoices({ invoices, clients, onViewInvoice }: RecentInvoi
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border-2 border-black dark:border-white">
       <CardHeader className="p-4 sm:p-6">
         <CardTitle className="text-base sm:text-lg">Recent Invoices</CardTitle>
       </CardHeader>

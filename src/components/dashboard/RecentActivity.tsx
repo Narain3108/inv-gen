@@ -21,26 +21,26 @@ export function RecentActivity({ invoices, quotations, clients }: RecentActivity
     // Helper function to safely convert any date format to Date
     const toDate = (timestamp: any): Date => {
       if (!timestamp) return new Date();
-      
+
       // Handle Date instance
       if (timestamp instanceof Date) return timestamp;
-      
+
       // Handle ISO string
       if (typeof timestamp === 'string') {
         const date = new Date(timestamp);
         return isNaN(date.getTime()) ? new Date() : date;
       }
-      
+
       // Handle Firestore Timestamp object with _seconds
       if (typeof timestamp === 'object' && timestamp._seconds) {
         return new Date(timestamp._seconds * 1000);
       }
-      
+
       // Handle Firestore Timestamp with toDate method
       if (timestamp.toDate && typeof timestamp.toDate === 'function') {
         return timestamp.toDate();
       }
-      
+
       // Fallback: try to parse as date
       const date = new Date(timestamp);
       return isNaN(date.getTime()) ? new Date() : date;
@@ -99,7 +99,7 @@ export function RecentActivity({ invoices, quotations, clients }: RecentActivity
   };
 
   return (
-    <Card>
+    <Card className="border-2 border-black dark:border-white">
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
       </CardHeader>

@@ -4,3 +4,5 @@
  */
 
 export { InlineInvoiceItems } from './InlineInvoiceItems';
+export { ServiceAttendDialog } from './ServiceAttendDialog';
+

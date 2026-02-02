@@ -35,7 +35,7 @@ import { productsApi } from '@/lib/api/products.api';
 import { invoicesApi } from '@/lib/api/invoices.api';
 import SerialManager from '@/components/shared/SerialManager';
 import { OutOfStockDialog } from '@/components/shared/OutOfStockDialog';
-import { TotalsSummary, ShippingAddressSection, ShippingAddressMode } from '@/components/forms/shared';
+import { TotalsSummary, ShippingAddressSection, ShippingAddressMode, FormItemRow } from '@/components/forms/shared';
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 type TabKey = 'header' | 'items' | 'summary';
@@ -628,244 +628,35 @@ export function InvoiceForm({
                             <CardTitle className="text-lg">Invoice Items</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {/* Desktop Table */}
-                            <div className="hidden lg:block overflow-x-auto">
-                                <table className="w-full table-fixed">
-                                    <thead className="border-b">
-                                        <tr className="text-sm text-muted-foreground">
-                                            <th className="p-2 text-left w-64">Product/Service</th>
-
-                                            <th className="p-2 text-center w-16">Qty</th>
-                                            <th className="p-2 text-center w-24">Unit</th>
-                                            <th className="p-2 text-right w-28">Price</th>
-                                            <th className="p-2 text-center w-16">Disc %</th>
-                                            <th className="p-2 text-right w-28">Amount</th>
-                                            <th className="p-2 w-10"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {fields.map((field, index) => {
-                                            const item = watchItems?.[index];
-                                            const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
-                                            const quantity = Number(item?.quantity) || 0;
-                                            const unitPrice = Number(item?.unitPrice) || 0;
-                                            const discount = Number(item?.discount) || 0;
-                                            const amount = quantity * unitPrice * (1 - discount / 100);
-                                            const isOutOfStock = product?.type === 'product' && typeof product.stock === 'number' && product.stock === 0;
-
-                                            return (
-                                                <React.Fragment key={field.id}>
-                                                    <tr className="border-b align-top">
-                                                        <td className="p-2">
-                                                            <Select
-                                                                value={item?.productId || ''}
-                                                                onValueChange={(value) => { handleProductSelect(index, value); setActiveRowIndex(index); }}
-                                                            >
-                                                                <SelectTrigger className="w-full truncate">
-                                                                    <SelectValue placeholder="Select product" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {localProducts.map((p) => {
-                                                                        const oos = p.type === 'product' && typeof p.stock === 'number' && p.stock === 0;
-                                                                        return (
-                                                                            <SelectItem key={p.id} value={p.id} disabled={oos}>
-                                                                                {p.productName} ({p.hsn}){oos ? ' - Out of Stock' : ''}
-                                                                            </SelectItem>
-                                                                        );
-                                                                    })}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            {product?.hasSerialNumber === true && (
-                                                                <div className="mt-2">
-                                                                    <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                                                                        Manage Serials
-                                                                    </Button>
-                                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                                        {(serialNumbers[field.id] || []).filter(Boolean).length} selected
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </td>
-
-                                                        <td className="p-2">
-                                                            <Controller
-                                                                control={control}
-                                                                name={`items.${index}.quantity` as const}
-                                                                render={({ field: f }) => (
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="1"
-                                                                        min="1"
-                                                                        {...f}
-                                                                        value={f.value ?? ''}
-                                                                        onChange={(e) => {
-                                                                            const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                                                                            f.onChange(val);
-                                                                            if (val && !isNaN(val as number) && (val as number) > 0) {
-                                                                                handleQuantityChange(index, val as number);
-                                                                            }
-                                                                        }}
-                                                                        className="text-center w-full"
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <Controller
-                                                                control={control}
-                                                                name={`items.${index}.unit` as const}
-                                                                render={({ field: f }) => <Input {...f} className="text-center w-full text-sm" placeholder="Unit" />}
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <Controller
-                                                                control={control}
-                                                                name={`items.${index}.unitPrice` as const}
-                                                                render={({ field: f }) => (
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
-                                                                        {...f}
-                                                                        value={f.value ?? ''}
-                                                                        onChange={(e) => f.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                                                        className="text-right w-full"
-                                                                        placeholder="0.00"
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <Controller
-                                                                control={control}
-                                                                name={`items.${index}.discount` as const}
-                                                                render={({ field: f }) => (
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
-                                                                        max="100"
-                                                                        {...f}
-                                                                        value={f.value ?? ''}
-                                                                        onChange={(e) => f.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                                                        className="text-center w-full"
-                                                                    />
-                                                                )}
-                                                            />
-                                                        </td>
-                                                        <td className="p-2 text-right font-medium">{formatCurrency(amount)}</td>
-                                                        <td className="p-2">
-                                                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Mobile Cards */}
-                            <div className="space-y-4 lg:hidden">
-                                {fields.map((field, index) => {
-                                    const item = watchItems?.[index];
-                                    const product = item?.productId ? localProducts.find(p => p.id === item.productId) : null;
-                                    const quantity = Number(item?.quantity) || 0;
-                                    const unitPrice = Number(item?.unitPrice) || 0;
-                                    const discount = Number(item?.discount) || 0;
-                                    const amount = quantity * unitPrice * (1 - discount / 100);
-
-                                    return (
-                                        <Card key={field.id} className="relative">
-                                            <CardContent className="pt-6 space-y-4">
-                                                <div className="absolute top-2 right-2">
-                                                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                                    </Button>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    <Label>Product/Service</Label>
-                                                    <Select value={item?.productId || ''} onValueChange={(value) => { handleProductSelect(index, value); setActiveRowIndex(index); }}>
-                                                        <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                                                        <SelectContent>
-                                                            {localProducts.map((p) => {
-                                                                const oos = p.type === 'product' && typeof p.stock === 'number' && p.stock === 0;
-                                                                return (
-                                                                    <SelectItem key={p.id} value={p.id} disabled={oos}>
-                                                                        {p.productName}{oos ? ' - Out of Stock' : ''}
-                                                                    </SelectItem>
-                                                                );
-                                                            })}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {product?.hasSerialNumber === true && (
-                                                        <div className="mt-2">
-                                                            <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(index)}>
-                                                                Manage Serials
-                                                            </Button>
-                                                            <div className="text-xs text-muted-foreground mt-1">
-                                                                {(serialNumbers[field.id] || []).filter(Boolean).length} selected
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="grid grid-cols-3 gap-3">
-                                                    <div className="space-y-2">
-                                                        <Label>Qty</Label>
-                                                        <Controller
-                                                            control={control}
-                                                            name={`items.${index}.quantity` as const}
-                                                            render={({ field: f }) => (
-                                                                <Input type="number" {...f} value={f.value ?? ''} onChange={(e) => {
-                                                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                                                                    f.onChange(val);
-                                                                    if (val && !isNaN(val as number) && (val as number) > 0) { handleQuantityChange(index, val as number); }
-                                                                }} className="text-center" />
-                                                            )}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Unit</Label>
-                                                        <Controller control={control} name={`items.${index}.unit` as const} render={({ field: f }) => <Input {...f} className="text-center" />} />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Price</Label>
-                                                        <Controller
-                                                            control={control}
-                                                            name={`items.${index}.unitPrice` as const}
-                                                            render={({ field: f }) => (
-                                                                <Input type="number" {...f} value={f.value ?? ''} onChange={(e) => f.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} className="text-right" />
-                                                            )}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="space-y-2">
-                                                        <Label>Discount %</Label>
-                                                        <Controller
-                                                            control={control}
-                                                            name={`items.${index}.discount` as const}
-                                                            render={({ field: f }) => (
-                                                                <Input type="number" {...f} value={f.value ?? ''} onChange={(e) => f.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))} className="text-center" />
-                                                            )}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Amount</Label>
-                                                        <div className="h-10 flex items-center justify-center border rounded-md bg-primary/5 px-3">
-                                                            <span className="font-bold text-primary">{formatCurrency(amount)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
+                            {/* Use FormItemRow for consistent searchable dropdowns with Add New */}
+                            <div className="space-y-4">
+                                {fields.map((field, index) => (
+                                    <FormItemRow
+                                        key={field.id}
+                                        index={index}
+                                        fieldId={field.id}
+                                        control={control}
+                                        products={localProducts}
+                                        companyId={companyId}
+                                        watchItem={watchItems?.[index] || {}}
+                                        onProductSelect={(idx, productId) => {
+                                            handleProductSelect(idx, productId);
+                                            setActiveRowIndex(idx);
+                                        }}
+                                        onQuantityChange={handleQuantityChange}
+                                        onRemove={remove}
+                                        onOpenSerialManager={setSerialModalIndex}
+                                        onProductAdded={(product) => {
+                                            setLocalProducts(prev => [...prev, product]);
+                                            handleProductSelect(index, product.id);
+                                        }}
+                                        serialNumbers={serialNumbers[field.id] || []}
+                                        serialNumberError={serialNumberErrors[field.id]}
+                                        canRemove={fields.length > 1}
+                                        error={errors.items?.[index]}
+                                        showSerialButton={true}
+                                    />
+                                ))}
                             </div>
 
                             <Button type="button" variant="outline" onClick={() => { append({ productId: '' } as any); setActiveRowIndex(fields.length); }} className="w-full">

@@ -1,59 +1,34 @@
 /**
  * useCompanies Hook
  * Manages global companies list - synced from React Query cache
- * This is a wrapper for backward compatibility.
+ * Updated: Mutations now update React Query cache directly for consistency.
  */
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { create } from 'zustand';
 import { Company } from '@/types';
-import { useCompaniesQuery, useUpdateCompanyMutation } from '@/hooks/queries';
+import { useCompaniesQuery } from '@/hooks/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query';
 
 interface CompaniesStore {
   companies: Company[];
   loading: boolean;
-  // Note: These are kept for compatibility but now work with React Query
   setCompanies: (companies: Company[]) => void;
   setLoading: (loading: boolean) => void;
-  addCompany: (company: Company) => void;
-  updateCompany: (id: string, company: Partial<Company>) => void;
-  removeCompany: (id: string) => void;
 }
 
 /**
  * Zustand store for global companies state.
- * This is synced automatically by useCompaniesSync() below.
+ * Synced automatically by useCompaniesSync() below.
  */
 export const useCompaniesStore = create<CompaniesStore>((set) => ({
   companies: [],
   loading: false,
-
   setCompanies: (companies: Company[]) => set({ companies }),
   setLoading: (loading: boolean) => set({ loading }),
-
-  addCompany: (company: Company) => {
-    set((state) => ({
-      companies: [...state.companies, company],
-    }));
-  },
-
-  updateCompany: (id: string, updates: Partial<Company>) => {
-    set((state) => ({
-      companies: state.companies.map((c) =>
-        c.id === id ? { ...c, ...updates } : c
-      ),
-    }));
-  },
-
-  removeCompany: (id: string) => {
-    set((state) => ({
-      companies: state.companies.filter((c) => c.id !== id),
-    }));
-  },
 }));
 
 /**
@@ -63,6 +38,7 @@ export const useCompaniesStore = create<CompaniesStore>((set) => ({
 export function useCompaniesSync() {
   const { data: companies, isLoading, refetch } = useCompaniesQuery();
   const store = useCompaniesStore();
+  const queryClient = useQueryClient();
 
   // Sync React Query data to Zustand store
   useEffect(() => {
@@ -74,33 +50,73 @@ export function useCompaniesSync() {
     }
   }, [companies, isLoading, store]);
 
+  // Add company - updates both RQ cache and Zustand store
+  const addCompany = useCallback((company: Company) => {
+    // Update React Query cache first
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? [...old, company] : [company];
+    });
+    // Zustand will auto-sync via the useEffect above
+  }, [queryClient]);
+
+  // Update company - updates both RQ cache and Zustand store
+  const updateCompany = useCallback((id: string, updates: Partial<Company>) => {
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? old.map((c) => (c.id === id ? { ...c, ...updates } : c)) : [];
+    });
+  }, [queryClient]);
+
+  // Remove company - updates both RQ cache and Zustand store
+  const removeCompany = useCallback((id: string) => {
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? old.filter((c) => c.id !== id) : [];
+    });
+  }, [queryClient]);
+
   return {
     companies: companies || [],
     loading: isLoading,
-    loadCompanies: refetch, // Now uses React Query refetch
-    addCompany: store.addCompany,
-    updateCompany: store.updateCompany,
-    removeCompany: store.removeCompany,
+    loadCompanies: refetch,
+    addCompany,
+    updateCompany,
+    removeCompany,
   };
 }
 
 /**
  * Legacy hook for backward compatibility.
- * Prefer using useCompaniesQuery() directly for new code.
+ * Uses the newer mutation logic via useCompaniesSync.
  */
 export function useCompanies() {
   const store = useCompaniesStore();
   const queryClient = useQueryClient();
 
+  const addCompany = useCallback((company: Company) => {
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? [...old, company] : [company];
+    });
+  }, [queryClient]);
+
+  const updateCompany = useCallback((id: string, updates: Partial<Company>) => {
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? old.map((c) => (c.id === id ? { ...c, ...updates } : c)) : [];
+    });
+  }, [queryClient]);
+
+  const removeCompany = useCallback((id: string) => {
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => {
+      return old ? old.filter((c) => c.id !== id) : [];
+    });
+  }, [queryClient]);
+
   return {
     companies: store.companies,
     loading: store.loading,
     loadCompanies: async () => {
-      // Trigger React Query refetch instead of direct API call
       await queryClient.invalidateQueries({ queryKey: queryKeys.companies.all });
     },
-    addCompany: store.addCompany,
-    updateCompany: store.updateCompany,
-    removeCompany: store.removeCompany,
+    addCompany,
+    updateCompany,
+    removeCompany,
   };
-};
+}

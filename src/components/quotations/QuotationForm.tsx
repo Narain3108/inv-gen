@@ -23,7 +23,7 @@ import { calculateTaxBreakdown } from '@/lib/utils/tax-calculator';
 import { generateQuotationNumber } from '@/lib/utils/numbering-utils';
 import { z } from 'zod';
 import { clientsApi } from '@/lib/api/clients.api';
-import { TotalsSummary, ShippingAddressSection, ShippingAddressMode } from '@/components/forms/shared';
+import { TotalsSummary, ShippingAddressSection, ShippingAddressMode, FormItemRow } from '@/components/forms/shared';
 
 type QuotationFormData = z.infer<typeof quotationFormSchema>;
 type TabKey = 'header' | 'items' | 'summary';
@@ -78,6 +78,10 @@ export function QuotationForm({ quotation, companyId, company, products, clients
     const handleProductSelect = (index: number, productId: string) => {
         const p = localProducts.find(pr => pr.id === productId);
         if (p) { setValue(`items.${index}.productId`, productId); setValue(`items.${index}.unitPrice`, p.price); setValue(`items.${index}.unit`, p.unit); }
+    };
+
+    const handleQuantityChange = (index: number, quantity: number) => {
+        setValue(`items.${index}.quantity`, quantity);
     };
 
     const calculateTotals = () => {
@@ -150,24 +154,30 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                 <TabsContent value="items" className="mt-4 space-y-4">
                     <Card><CardHeader><CardTitle className="text-lg">Line Items</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="hidden lg:block"><table className="w-full"><thead className="border-b"><tr className="text-sm text-muted-foreground"><th className="p-2 text-left w-64">Product</th><th className="p-2 w-16">Qty</th><th className="p-2 w-24">Unit</th><th className="p-2 w-28 text-right">Price</th><th className="p-2 w-16">Disc%</th><th className="p-2 w-28 text-right">Amount</th><th className="p-2 w-10"></th></tr></thead>
-                                <tbody>{fields.map((f, i) => {
-                                    const it = watchItems?.[i], p = it?.productId ? localProducts.find(pr => pr.id === it.productId) : null, amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
-                                    return (<tr key={f.id} className="border-b"><td className="p-2"><Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center text-sm" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-right" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.discount`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
-                                        <td className="p-2 text-right font-medium">{formatCurrency(amt)}</td>
-                                        <td className="p-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></td></tr>);
-                                })}</tbody></table></div>
-                            <div className="lg:hidden space-y-4">{fields.map((f, i) => {
-                                const it = watchItems?.[i], amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
-                                return (<Card key={f.id} className="relative"><CardContent className="pt-6 space-y-3"><div className="absolute top-2 right-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
-                                    <Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Product" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select>
-                                    <div className="grid grid-cols-3 gap-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseInt(e.target.value))} placeholder="Qty" className="text-center" />} /><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} placeholder="Unit" className="text-center" />} /><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} placeholder="Price" className="text-right" />} /></div>
-                                    <div className="text-right font-bold">{formatCurrency(amt)}</div></CardContent></Card>);
-                            })}</div>
+                            {/* Use FormItemRow for consistent searchable dropdowns with Add New */}
+                            <div className="space-y-4">
+                                {fields.map((f, i) => (
+                                    <FormItemRow
+                                        key={f.id}
+                                        index={i}
+                                        fieldId={f.id}
+                                        control={control}
+                                        products={localProducts}
+                                        companyId={companyId}
+                                        watchItem={watchItems?.[i] || {}}
+                                        onProductSelect={handleProductSelect}
+                                        onQuantityChange={handleQuantityChange}
+                                        onRemove={remove}
+                                        onProductAdded={(product) => {
+                                            setLocalProducts(prev => [...prev, product]);
+                                            handleProductSelect(i, product.id);
+                                        }}
+                                        canRemove={fields.length > 1}
+                                        error={errors.items?.[i]}
+                                        showSerialButton={false}
+                                    />
+                                ))}
+                            </div>
                             <Button type="button" variant="outline" onClick={() => append({ productId: '' } as any)} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
                         </CardContent>
                     </Card>

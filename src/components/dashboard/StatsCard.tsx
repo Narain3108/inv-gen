@@ -33,16 +33,17 @@ export function StatsCard({
     <Card className={cn(
       'hover-lift transition-all duration-300',
       'hover:shadow-lg dark:hover:shadow-primary/20',
+      'border-2 border-black dark:border-white',
       className
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
-        <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">{title}</CardTitle>
-        <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20 shrink-0">
-          <Icon className={cn('h-3 w-3 sm:h-4 sm:w-4', iconColor)} />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3">
+        <CardTitle className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold truncate pr-2">{title}</CardTitle>
+        <div className="p-1.5 rounded-md bg-muted/50 dark:bg-muted/20 shrink-0">
+          <Icon className={cn('h-3 w-3', iconColor)} />
         </div>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-0 space-y-1">
-        <div className="text-xl sm:text-2xl font-bold truncate">{value}</div>
+      <CardContent className="p-3 pt-0 space-y-1">
+        <div className="text-lg sm:text-lg md:text-xl font-bold truncate">{value}</div>
         {change !== undefined && (
           <div className="flex items-center gap-1.5">
             {trend === 'up' ? (
@@ -51,7 +52,7 @@ export function StatsCard({
               <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 dark:text-red-400" />
             ) : null}
             <span className={cn(
-              'text-xs sm:text-sm font-medium',
+              'text-[10px] font-medium',
               trend === 'up' ? 'text-green-500 dark:text-green-400' : trend === 'down' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'
             )}>
               {change > 0 ? '+' : ''}{change.toFixed(1)}%
@@ -59,7 +60,7 @@ export function StatsCard({
           </div>
         )}
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
         )}
       </CardContent>
     </Card>

@@ -24,7 +24,7 @@ import { SearchableClientDropdown } from '@/components/shared';
 import { productsApi } from '@/lib/api/products.api';
 import SerialManager from '@/components/shared/SerialManager';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
-import { TotalsSummary } from '@/components/forms/shared';
+import { TotalsSummary, FormItemRow } from '@/components/forms/shared';
 
 const purchaseItemSchema = z.object({ productId: z.string().optional(), productName: z.string().optional(), description: z.string().min(1), hsn: z.string().min(1), quantity: z.coerce.number().int().min(1), unit: z.string().min(1), unitPrice: z.coerce.number().min(0), discount: z.coerce.number().min(0).default(0), gstRate: z.coerce.number().min(0), cessRate: z.coerce.number().min(0).optional() });
 const purchaseFormSchema = z.object({ invoiceNumber: z.string().min(1), referenceNumber: z.string().optional(), poNumber: z.string().optional(), poDate: z.string().optional(), ewayNumber: z.string().optional(), date: z.string().min(1), clientId: z.string().min(1), items: z.array(purchaseItemSchema).min(1), attachmentUrl: z.string().nullish() });
@@ -238,26 +238,32 @@ export function PurchaseForm({ purchase, companyId, company, products, clients, 
                 <TabsContent value="items" className="mt-4 space-y-4">
                     <Card><CardHeader><CardTitle className="text-lg">Purchase Items</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="hidden lg:block"><table className="w-full"><thead className="border-b"><tr className="text-sm text-muted-foreground"><th className="p-2 text-left w-64">Product</th><th className="p-2 w-16">Qty</th><th className="p-2 w-24">Unit</th><th className="p-2 w-28 text-right">Price</th><th className="p-2 w-16">Disc%</th><th className="p-2 w-28 text-right">Amount</th><th className="p-2 w-10"></th></tr></thead>
-                                <tbody>{fields.map((f, i) => {
-                                    const it = watchItems?.[i], p = it?.productId ? localProducts.find(pr => pr.id === it.productId) : null, amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
-                                    return (<tr key={f.id} className="border-b align-top"><td className="p-2"><Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select>{p?.hasSerialNumber && <div className="mt-2"><Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(i)}>Serials</Button><span className="text-xs ml-2">{(serialNumbers[f.id] || []).length} sel</span></div>}</td>
-
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => { const v = e.target.value === '' ? '' : parseInt(e.target.value); field.onChange(v); if (v && !isNaN(v as number)) handleQuantityChange(i, v as number); }} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center text-sm" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-right" />} /></td>
-                                        <td className="p-2"><Controller control={control} name={`items.${i}.discount`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} onBlur={field.onBlur} name={field.name} ref={field.ref} className="text-center" />} /></td>
-                                        <td className="p-2 text-right font-medium">{formatCurrency(amt)}</td>
-                                        <td className="p-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></td></tr>);
-                                })}</tbody></table></div>
-                            <div className="lg:hidden space-y-4">{fields.map((f, i) => {
-                                const it = watchItems?.[i], p = it?.productId ? localProducts.find(pr => pr.id === it.productId) : null, amt = (Number(it?.quantity) || 0) * (Number(it?.unitPrice) || 0) * (1 - (Number(it?.discount) || 0) / 100);
-                                return (<Card key={f.id} className="relative"><CardContent className="pt-6 space-y-3"><div className="absolute top-2 right-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>
-                                    <Select value={it?.productId || ''} onValueChange={(v) => handleProductSelect(i, v)}><SelectTrigger><SelectValue placeholder="Product" /></SelectTrigger><SelectContent>{localProducts.map(pr => <SelectItem key={pr.id} value={pr.id}>{pr.productName}</SelectItem>)}</SelectContent></Select>
-                                    {p?.hasSerialNumber && <Button type="button" variant="outline" size="sm" onClick={() => setSerialModalIndex(i)}>Serials ({(serialNumbers[f.id] || []).length})</Button>}
-                                    <div className="grid grid-cols-3 gap-2"><Controller control={control} name={`items.${i}.quantity`} render={({ field }) => <Input type="number" value={field.value ?? ''} placeholder="Qty" className="text-center" onChange={e => { const v = parseInt(e.target.value); field.onChange(isNaN(v) ? '' : v); if (!isNaN(v)) handleQuantityChange(i, v); }} />} /><Controller control={control} name={`items.${i}.unit`} render={({ field }) => <Input value={field.value ?? ''} onChange={field.onChange} placeholder="Unit" className="text-center" />} /><Controller control={control} name={`items.${i}.unitPrice`} render={({ field }) => <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))} placeholder="Price" className="text-right" />} /></div>
-                                    <div className="text-right font-bold">{formatCurrency(amt)}</div></CardContent></Card>);
-                            })}</div>
+                            {/* Mobile & Desktop: Use FormItemRow for consistent searchable dropdowns */}
+                            <div className="space-y-4">
+                                {fields.map((f, i) => (
+                                    <FormItemRow
+                                        key={f.id}
+                                        index={i}
+                                        fieldId={f.id}
+                                        control={control}
+                                        products={localProducts}
+                                        companyId={companyId}
+                                        watchItem={watchItems?.[i] || {}}
+                                        onProductSelect={handleProductSelect}
+                                        onQuantityChange={handleQuantityChange}
+                                        onRemove={remove}
+                                        onOpenSerialManager={setSerialModalIndex}
+                                        onProductAdded={(product) => {
+                                            setLocalProducts(prev => [...prev, product]);
+                                            handleProductSelect(i, product.id);
+                                        }}
+                                        serialNumbers={serialNumbers[f.id] || []}
+                                        canRemove={fields.length > 1}
+                                        error={errors.items?.[i]}
+                                        showSerialButton={true}
+                                    />
+                                ))}
+                            </div>
                             <Button type="button" variant="outline" onClick={() => append({ productId: '', quantity: '', unit: 'Nos', unitPrice: 0, discount: 0, gstRate: 18 } as any)} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Item</Button>
                         </CardContent>
                     </Card>

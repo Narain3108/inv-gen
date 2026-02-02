@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  Users,
+  Package,
 } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useAppData } from '@/contexts/AppDataContext';
@@ -150,15 +152,15 @@ function DashboardContent() {
         refreshing={refreshing}
       />
 
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Key Metrics Cards - All 6 in One Row */}
+      <div className="flex flex-nowrap overflow-x-auto pb-2 -mx-4 px-4 lg:grid lg:grid-cols-6 lg:overflow-visible lg:pb-0 lg:mx-0 lg:px-0 gap-2">
         <StatsCard
           title="Total Revenue"
           value={formatCurrency(stats.totalRevenue)}
           change={stats.revenueGrowth}
           icon={DollarSign}
           trend={stats.revenueGrowth >= 0 ? 'up' : 'down'}
-          className="col-span-2 lg:col-span-1"
+          className="min-w-[140px] lg:min-w-0"
         />
         <StatsCard
           title="Total Invoices"
@@ -166,19 +168,35 @@ function DashboardContent() {
           change={stats.invoicesGrowth}
           icon={FileText}
           trend={stats.invoicesGrowth >= 0 ? 'up' : 'down'}
-          className="col-span-2 lg:col-span-1"
+          className="min-w-[140px] lg:min-w-0"
         />
         <StatsCard
           title="Amount Pending"
           value={formatCurrency(stats.pendingAmount)}
           icon={Clock}
           iconColor="text-orange-500 dark:text-orange-400"
+          className="min-w-[140px] lg:min-w-0"
         />
         <StatsCard
           title="Amount Received"
           value={formatCurrency(stats.paidAmount)}
           icon={CheckCircle2}
           iconColor="text-green-500 dark:text-green-400"
+          className="min-w-[140px] lg:min-w-0"
+        />
+        <StatsCard
+          title="Total Clients"
+          value={stats.totalClients.toString()}
+          icon={Users}
+          iconColor="text-blue-500 dark:text-blue-400"
+          className="min-w-[140px] lg:min-w-0"
+        />
+        <StatsCard
+          title="Products"
+          value={stats.totalProducts.toString()}
+          icon={Package}
+          iconColor="text-purple-500 dark:text-purple-400"
+          className="min-w-[140px] lg:min-w-0"
         />
       </div>
 
@@ -193,7 +211,7 @@ function DashboardContent() {
 
       {/* Charts and Tables */}
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4 overflow-hidden">
+        <Card className="lg:col-span-4 overflow-hidden border-2 border-black dark:border-white">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base sm:text-lg">Payment Status</CardTitle>
 
@@ -202,7 +220,7 @@ function DashboardContent() {
             <PaymentStatusChart invoices={getFilteredData(invoices)} />
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3 overflow-hidden">
+        <Card className="lg:col-span-3 overflow-hidden border-2 border-black dark:border-white">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base sm:text-lg">Top Clients</CardTitle>
 
@@ -215,7 +233,7 @@ function DashboardContent() {
 
       {/* Revenue and GST Analysis */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+        <Card className="col-span-4 border-2 border-black dark:border-white">
           <CardHeader>
             <CardTitle>Revenue Trend</CardTitle>
 
@@ -224,7 +242,7 @@ function DashboardContent() {
             <RevenueChart invoices={invoices} />
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+        <Card className="col-span-3 border-2 border-black dark:border-white">
           <CardHeader>
             <CardTitle>GST Collection</CardTitle>
 
@@ -237,7 +255,7 @@ function DashboardContent() {
 
       {/* Quotation Metrics */}
       {quotations.length > 0 && (
-        <Card>
+        <Card className="border-2 border-black dark:border-white">
           <CardHeader>
             <CardTitle>Quotation Performance</CardTitle>
 
