@@ -90,4 +90,21 @@ export const servicesApi = {
             {}
         );
     },
+
+    /**
+     * Approve or reject a spare part request (Admin only)
+     * @param serviceId - Service ID
+     * @param requestId - Spare part request ID
+     * @param data - Approval data including serialNumbers and action (approve/reject)
+     */
+    approveSpareRequest: async (
+        serviceId: string,
+        requestId: string,
+        data: { action: 'approve' | 'reject'; serialNumbers?: string[]; rejectionReason?: string }
+    ): Promise<Service> => {
+        return apiClient.patch<Service>(
+            `${SERVICES_ENDPOINT}/${serviceId}/approve_request/${requestId}`,
+            data
+        );
+    },
 };

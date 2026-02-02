@@ -52,10 +52,10 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
       (async () => {
         try {
           setLoading(true);
-          // Fetch serials with status from backend endpoint
-          const data = await productsApi.getSerials(productId, 'unused');
+          // Fetch all serials (status undefined = all)
+          const data = await productsApi.getSerials(productId);
           const serialsData = data.serials || {};
-          
+
           // Convert object to array with status metadata
           const serialsList: SerialWithStatus[] = Object.entries(serialsData).map(([serial, metadata]: [string, any]) => ({
             serial,
@@ -63,7 +63,7 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
             invoiceId: metadata.invoiceId,
             purchaseId: metadata.purchaseId,
           }));
-          
+
           setAvailable(serialsList);
         } catch (err) {
           console.error('Failed to fetch product serials', err);
@@ -79,6 +79,7 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
   }, [open, fetchFromDb, productId]);
 
   const useAvailable = (serialObj: SerialWithStatus) => {
+    if (serialObj.status === 'used') return;
     if (selected.includes(serialObj.serial)) return;
     setSelected(prev => [...prev, serialObj.serial]);
     setAvailable(prev => prev.filter(x => x.serial !== serialObj.serial));
@@ -129,22 +130,30 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
         <div className="space-y-3 max-h-[56vh] overflow-y-auto">
           {fetchFromDb && (
             <div>
-              <Label className="text-sm font-medium">Available (Unused)</Label>
+              <Label className="text-sm font-medium">Available & Used</Label>
               {loading ? (
                 <p className="text-xs text-muted-foreground">Loading…</p>
               ) : available.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No available serials</p>
+                <p className="text-xs text-muted-foreground">No serials found</p>
               ) : (
                 <div className="space-y-1 mt-2">
                   {available.map(serialObj => (
-                    <div key={serialObj.serial} className="flex items-center justify-between gap-3">
+                    <div key={serialObj.serial} className={`flex items-center justify-between gap-3 ${serialObj.status === 'used' ? 'opacity-60' : ''}`}>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm truncate">{serialObj.serial}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {serialObj.status === 'unused' ? '✓ Available' : 'Used'}
+                        <Badge variant={serialObj.status === 'unused' ? 'secondary' : 'outline'} className="text-xs">
+                          {serialObj.status === 'unused' ? 'Available' : 'Used'}
                         </Badge>
                       </div>
-                      <Button size="sm" type="button" variant="ghost" onClick={() => useAvailable(serialObj)}>Use</Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        disabled={serialObj.status === 'used'}
+                        onClick={() => useAvailable(serialObj)}
+                      >
+                        Use
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -155,11 +164,11 @@ export default function SerialManager({ open, onClose, productId, initialSelecte
           <div>
             <Label className="text-sm font-medium">Add Manual Serial</Label>
             <div className="flex gap-2 mt-2">
-              <Input 
-                value={input} 
-                onChange={(e) => setInput(e.target.value)} 
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addManual()}
-                placeholder="Enter serial" 
+                placeholder="Enter serial"
               />
               <Button type="button" onClick={addManual}>Add</Button>
             </div>

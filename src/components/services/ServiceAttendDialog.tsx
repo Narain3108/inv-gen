@@ -15,12 +15,12 @@ import { CheckCircle2, XCircle, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProductsQuery, useAttendServiceMutation } from '@/hooks/queries';
 import { useCompany } from '@/hooks/useCompany';
-import { Service, ServiceAttendData, UsedPart, SparePartRequest, Product } from '@/types';
+import { Service, ServiceAttendData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
 import {
     Dialog,
     DialogContent,
@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { SearchableProductDropdown } from '@/components/shared/SearchableProductDropdown';
+import SerialManager from '@/components/shared/SerialManager';
 
 // ==================== Types ====================
 
@@ -77,7 +78,11 @@ export function ServiceAttendDialog({
     // Parts state
     const [parts, setParts] = useState<PartItem[]>([]);
     const [selectedProductId, setSelectedProductId] = useState('');
-    const [quantity, setQuantity] = useState(1);
+    const [quantity, setQuantity] = useState<number | ''>('');
+
+    // Serial Manager Modal state
+    const [serialModalOpen, setSerialModalOpen] = useState(false);
+    const [serialModalPartIndex, setSerialModalPartIndex] = useState<number | null>(null);
 
     // Products for dropdown
     const { data: products = [] } = useProductsQuery(selectedCompany?.id);
@@ -92,7 +97,7 @@ export function ServiceAttendDialog({
             setCreateInvoiceAfterSolved(false);
             setParts([]);
             setSelectedProductId('');
-            setQuantity(1);
+            setQuantity('');
         }
     }, [open]);
 
@@ -103,7 +108,9 @@ export function ServiceAttendDialog({
             toast.error('Please select a product');
             return;
         }
-        if (quantity < 1) {
+
+        const qtyNum = Number(quantity);
+        if (!quantity || qtyNum < 1) {
             toast.error('Quantity must be at least 1');
             return;
         }
@@ -112,7 +119,7 @@ export function ServiceAttendDialog({
             productId: product.id,
             productName: product.productName,
             hsn: product.hsn,
-            quantity,
+            quantity: qtyNum,
             unitPrice: product.price,
             unit: product.unit,
             gstRate: product.gstRate,
@@ -120,7 +127,7 @@ export function ServiceAttendDialog({
         }]);
 
         setSelectedProductId('');
-        setQuantity(1);
+        setQuantity('');
     };
 
     // Remove part from list
@@ -128,14 +135,24 @@ export function ServiceAttendDialog({
         setParts(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Update serial numbers for a part
-    const handleSerialChange = (index: number, value: string) => {
-        setParts(prev => prev.map((p, i) => {
-            if (i === index) {
-                return { ...p, serialNumbers: value.split(',').map(s => s.trim()).filter(Boolean) };
-            }
-            return p;
-        }));
+    // Update serial numbers for a part (from SerialManager)
+    const handleSaveSerials = async (serials: string[]) => {
+        if (serialModalPartIndex !== null) {
+            setParts(prev => prev.map((p, i) => {
+                if (i === serialModalPartIndex) {
+                    return { ...p, serialNumbers: serials };
+                }
+                return p;
+            }));
+        }
+        setSerialModalOpen(false);
+        setSerialModalPartIndex(null);
+    };
+
+    // Open serial manager for a part
+    const openSerialManager = (index: number) => {
+        setSerialModalPartIndex(index);
+        setSerialModalOpen(true);
     };
 
     // Submit form
@@ -208,176 +225,200 @@ export function ServiceAttendDialog({
     const submitting = attendMutation.isPending;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Attend Service - {service?.serviceNumber}</DialogTitle>
-                    <DialogDescription>
-                        Record your observation and solution
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Attend Service - {service?.serviceNumber}</DialogTitle>
+                        <DialogDescription>
+                            Record your observation and solution
+                        </DialogDescription>
+                    </DialogHeader>
 
-                <div className="space-y-4">
-                    {/* Observation */}
-                    <div>
-                        <Label htmlFor="observation">Observation</Label>
-                        <Textarea
+                    <div className="space-y-5 py-2">
+                        {/* Observation - Floating Label Textarea */}
+                        <FloatingLabelTextarea
                             id="observation"
-                            placeholder="What did you observe on site?"
+                            label="Observation"
                             value={observation}
                             onChange={(e) => setObservation(e.target.value)}
+                            rows={3}
                         />
-                    </div>
 
-                    {/* Action Taken */}
-                    <div>
-                        <Label htmlFor="actionTaken">Action Taken / Solution</Label>
-                        <Textarea
+                        {/* Action Taken - Floating Label Textarea */}
+                        <FloatingLabelTextarea
                             id="actionTaken"
-                            placeholder="What action did you take to resolve the issue?"
+                            label="Action Taken / Solution"
                             value={actionTaken}
                             onChange={(e) => setActionTaken(e.target.value)}
+                            rows={3}
                         />
-                    </div>
 
-                    {/* Parts Section */}
-                    <div className="border-t pt-4">
-                        <Label className="font-semibold">
-                            {isAdmin ? 'Parts Used' : 'Request Spare Parts'}
-                        </Label>
-                        <p className="text-xs text-muted-foreground mb-2">
-                            {isAdmin
-                                ? 'Add parts you consumed (with serial numbers if applicable)'
-                                : 'Request parts from Admin for this service'
-                            }
-                        </p>
+                        {/* Parts Section */}
+                        <div className="border-t pt-4">
+                            <Label className="font-semibold text-base">
+                                {isAdmin ? 'Parts Used' : 'Request Spare Parts'}
+                            </Label>
+                            <p className="text-xs text-muted-foreground mb-4">
+                                {isAdmin
+                                    ? 'Add parts you consumed (with serial numbers if applicable)'
+                                    : 'Request parts from Admin for this service'
+                                }
+                            </p>
 
-                        {/* Add Part Row */}
-                        <div className="flex gap-2 mb-2">
-                            <div className="flex-1">
+                            {/* Add Part - Stacked layout for clarity */}
+                            <div className="space-y-3 mb-4">
                                 <SearchableProductDropdown
                                     products={products}
                                     selectedProductId={selectedProductId}
                                     onProductSelect={(id) => setSelectedProductId(id)}
-                                    placeholder="Select product"
+                                    placeholder="Search and select product..."
                                 />
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="quantity" className="text-sm whitespace-nowrap">Quantity:</Label>
+                                        <Input
+                                            id="quantity"
+                                            type="number"
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(e.target.value === '' ? '' : parseInt(e.target.value))}
+                                            className="w-20"
+                                        />
+                                    </div>
+                                    <Button type="button" onClick={handleAddPart} size="sm">
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Add Part
+                                    </Button>
+                                </div>
                             </div>
-                            <Input
-                                type="number"
-                                min={1}
-                                value={quantity}
-                                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                                className="w-20"
-                                placeholder="Qty"
-                            />
-                            <Button type="button" size="sm" onClick={handleAddPart}>
-                                <Plus className="h-4 w-4" />
-                            </Button>
+
+                            {/* Parts List */}
+                            {parts.length > 0 && (
+                                <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
+                                    {parts.map((part, idx) => {
+                                        const product = products.find(p => p.id === part.productId);
+                                        const hasSerial = product?.hasSerialNumber === true;
+                                        return (
+                                            <div key={idx} className="flex items-center gap-2 bg-background p-3 rounded border">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-sm truncate">{part.productName}</p>
+                                                    <p className="text-xs text-muted-foreground">Qty: {part.quantity}</p>
+                                                </div>
+                                                {isAdmin && hasSerial && (
+                                                    <Button
+                                                        type="button"
+                                                        variant={part.serialNumbers.length < part.quantity ? 'outline' : 'secondary'}
+                                                        size="sm"
+                                                        className={`text-xs ${part.serialNumbers.length < part.quantity ? 'border-amber-400 text-amber-600' : 'text-green-600'}`}
+                                                        onClick={() => openSerialManager(idx)}
+                                                    >
+                                                        {part.serialNumbers.length}/{part.quantity} Serials
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRemovePart(idx)}
+                                                    className="shrink-0 h-8 w-8 text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
-                        {/* Parts List */}
-                        {parts.length > 0 && (
-                            <div className="space-y-2 bg-muted/50 p-2 rounded">
-                                {parts.map((part, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 bg-background p-2 rounded text-sm">
-                                        <div className="flex-1">
-                                            <span className="font-medium">{part.productName}</span>
-                                            <span className="text-muted-foreground ml-2">x{part.quantity}</span>
-                                        </div>
-                                        {isAdmin && (
-                                            <Input
-                                                type="text"
-                                                placeholder="Serial #s (comma sep)"
-                                                value={part.serialNumbers.join(', ')}
-                                                onChange={(e) => handleSerialChange(idx, e.target.value)}
-                                                className="w-40 text-xs"
-                                            />
-                                        )}
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleRemovePart(idx)}
-                                        >
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </div>
-                                ))}
+                        {/* Status Selection */}
+                        <div className="border-t pt-4">
+                            <Label className="font-semibold text-base mb-3 block">Was the issue resolved?</Label>
+                            <div className="flex gap-3">
+                                <Button
+                                    type="button"
+                                    variant={isSolved ? "default" : "outline"}
+                                    className={`flex-1 ${isSolved ? "bg-green-600 hover:bg-green-700" : ""}`}
+                                    onClick={() => setIsSolved(true)}
+                                >
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Solved
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={!isSolved ? "default" : "outline"}
+                                    className={`flex-1 ${!isSolved ? "bg-yellow-600 hover:bg-yellow-700" : ""}`}
+                                    onClick={() => setIsSolved(false)}
+                                >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Not Solved
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Proof Document Upload - Required for Solved */}
+                        {isSolved && (
+                            <div className="border-t pt-4 space-y-4">
+                                <DocumentUpload
+                                    label="Proof Document (Required)"
+                                    currentDocumentUrl={proofDocumentUrl}
+                                    onDocumentUploaded={(url) => setProofDocumentUrl(url)}
+                                    onDocumentRemoved={() => setProofDocumentUrl('')}
+                                    folder="service-proofs"
+                                    accept="image/png,image/jpeg,image/jpg,application/pdf"
+                                    maxSize={5}
+                                />
+                                {!proofDocumentUrl && (
+                                    <p className="text-xs text-red-500">
+                                        Proof document is mandatory to mark as solved
+                                    </p>
+                                )}
+
+                                {/* Create Invoice Switch */}
+                                <div className="flex items-center space-x-3 bg-muted/30 p-3 rounded-lg border border-dashed border-primary/30">
+                                    <Switch
+                                        id="createInvoice"
+                                        checked={createInvoiceAfterSolved}
+                                        onCheckedChange={setCreateInvoiceAfterSolved}
+                                    />
+                                    <Label htmlFor="createInvoice" className="cursor-pointer font-medium text-sm">
+                                        Create Invoice now related to this service
+                                    </Label>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Status Selection */}
-                    <div>
-                        <Label>Was the issue resolved?</Label>
-                        <div className="flex gap-4 mt-2">
-                            <Button
-                                type="button"
-                                variant={isSolved ? "default" : "outline"}
-                                className={isSolved ? "bg-green-600 hover:bg-green-700" : ""}
-                                onClick={() => setIsSolved(true)}
-                            >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                Solved
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={!isSolved ? "default" : "outline"}
-                                className={!isSolved ? "bg-yellow-600 hover:bg-yellow-700" : ""}
-                                onClick={() => setIsSolved(false)}
-                            >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Not Solved
-                            </Button>
-                        </div>
-                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={submitting || (isSolved && !proofDocumentUrl)}
+                        >
+                            {submitting ? 'Submitting...' : 'Submit'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
-                    {/* Proof Document Upload - Required for Solved */}
-                    {isSolved && (
-                        <div className="border-t pt-4 space-y-4">
-                            <DocumentUpload
-                                label="Proof Document (Required)"
-                                currentDocumentUrl={proofDocumentUrl}
-                                onDocumentUploaded={(url) => setProofDocumentUrl(url)}
-                                onDocumentRemoved={() => setProofDocumentUrl('')}
-                                folder="service-proofs"
-                                accept="image/png,image/jpeg,image/jpg,application/pdf"
-                                maxSize={5}
-                            />
-                            {!proofDocumentUrl && (
-                                <p className="text-xs text-red-500 mt-1">
-                                    Proof document is mandatory to mark as solved
-                                </p>
-                            )}
-
-                            {/* Create Invoice Switch */}
-                            <div className="flex items-center space-x-2 bg-muted/30 p-3 rounded-md border border-dashed border-primary/20">
-                                <Switch
-                                    id="createInvoice"
-                                    checked={createInvoiceAfterSolved}
-                                    onCheckedChange={setCreateInvoiceAfterSolved}
-                                />
-                                <Label htmlFor="createInvoice" className="cursor-pointer font-medium">
-                                    Create Invoice now related to this service
-                                </Label>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={submitting || (isSolved && !proofDocumentUrl)}
-                    >
-                        {submitting ? 'Submitting...' : 'Submit'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            {/* Serial Manager Modal */}
+            {serialModalPartIndex !== null && (
+                <SerialManager
+                    open={serialModalOpen}
+                    onClose={() => {
+                        setSerialModalOpen(false);
+                        setSerialModalPartIndex(null);
+                    }}
+                    productId={parts[serialModalPartIndex]?.productId}
+                    initialSelected={parts[serialModalPartIndex]?.serialNumbers || []}
+                    quantity={parts[serialModalPartIndex]?.quantity || 0}
+                    fetchFromDb={true}
+                    onSave={handleSaveSerials}
+                />
+            )}
+        </>
     );
 }
 

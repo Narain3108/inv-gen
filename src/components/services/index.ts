@@ -5,4 +5,5 @@
 
 export { InlineInvoiceItems } from './InlineInvoiceItems';
 export { ServiceAttendDialog } from './ServiceAttendDialog';
-
+export { SparePartApprovalDialog } from './SparePartApprovalDialog';
+export { ServiceList } from './ServiceList';

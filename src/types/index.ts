@@ -527,6 +527,11 @@ export interface Service {
   // Invoice Integration
   invoiceId?: string;
 
+  // Spare Parts Workflow
+  sparePartRequests?: SparePartRequest[];  // Pending/approved/rejected requests
+  usedParts?: UsedPart[];  // Parts consumed directly (Admin)
+  approvedParts?: UsedPart[];  // Parts approved after request
+
   // Audit
   createdBy?: string;
   createdByName?: string;
