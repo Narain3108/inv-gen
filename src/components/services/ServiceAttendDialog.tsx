@@ -15,7 +15,8 @@ import { CheckCircle2, XCircle, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProductsQuery, useAttendServiceMutation } from '@/hooks/queries';
 import { useCompany } from '@/hooks/useCompany';
-import { Service, ServiceAttendData } from '@/types';
+import { Service, ServiceAttendData, SparePartRequest } from '@/types';
+import { SparePartRequestHistory } from './SparePartRequestHistory';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -159,6 +160,14 @@ export function ServiceAttendDialog({
     const handleSubmit = async () => {
         if (!service) return;
 
+        // check if user has selected a product but not added it
+        if (selectedProductId && quantity) {
+            toast.warning('You have a part selected but not added to the list. Please click "Add Part" to include it or clear the selection.', {
+                duration: 5000,
+            });
+            return;
+        }
+
         // Validate proof document for solved status
         if (isSolved && !proofDocumentUrl) {
             toast.error('Please upload proof document before marking as solved');
@@ -253,6 +262,11 @@ export function ServiceAttendDialog({
                             onChange={(e) => setActionTaken(e.target.value)}
                             rows={3}
                         />
+
+                        {/* Existing Requests History (Employee Only) */}
+                        {!isAdmin && service?.sparePartRequests && service.sparePartRequests.length > 0 && (
+                            <SparePartRequestHistory requests={service.sparePartRequests} />
+                        )}
 
                         {/* Parts Section */}
                         <div className="border-t pt-4">
