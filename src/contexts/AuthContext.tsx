@@ -10,6 +10,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
 import { ROLES } from '@/lib/constants';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +20,7 @@ interface AuthContextType {
   // User Actions
   signupUser: (data: any) => Promise<void>;
   loginUser: (email: string, password: string) => Promise<void>;
+  googleLoginUser: (token: string, username?: string, name?: string) => Promise<void>;
   logoutUser: (shouldRedirect?: boolean) => void;
   logout: () => void;
 }
@@ -167,6 +169,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const googleLoginUser = async (token: string, username?: string, name?: string) => {
+    try {
+      const loginResponse = await authApi.googleLogin(token, username, name);
+
+      if (loginResponse.token) {
+        localStorage.setItem('userToken', loginResponse.token);
+        if (loginResponse.localId) {
+          localStorage.setItem('userId', loginResponse.localId);
+        }
+      }
+
+      const freshUser = await usersApi.getMe();
+      setUser(freshUser);
+      localStorage.setItem('userData', JSON.stringify(freshUser));
+
+      try {
+        await apiClient.initCsrf();
+      } catch (e) {
+        console.error('Failed to initialize CSRF token:', e);
+      }
+
+      toast.success(`Welcome back, ${freshUser.name}`);
+
+      if (freshUser.role === ROLES.SUPER_ADMIN) {
+        try {
+          const companies = await (await import('@/lib/api/companies.api')).companiesApi.getAll();
+          if (companies.length === 0) {
+            router.push('/onboarding');
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking companies:', error);
+        }
+      }
+      router.push('/invoices/dashboard');
+    } catch (error: any) {
+      console.error('Google Login Error:', error);
+      throw error;
+    }
+  };
+
   const logoutUser = (shouldRedirect: boolean = true) => {
     (async () => {
       try {
@@ -192,16 +235,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // No organization logout - single user session handled via logoutUser
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      signupUser,
-      loginUser,
-      logoutUser,
-      logout: logoutUser,
-    }}>
-      {children}
-    </AuthContext.Provider>
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
+      <AuthContext.Provider value={{
+        user,
+        loading,
+        signupUser,
+        loginUser,
+        googleLoginUser,
+        logoutUser,
+        logout: logoutUser,
+      }}>
+        {children}
+      </AuthContext.Provider>
+    </GoogleOAuthProvider>
   );
 }
 

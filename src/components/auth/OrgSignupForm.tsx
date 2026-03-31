@@ -10,16 +10,19 @@ import { Button } from '@/components/ui/button';
 import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function SignupForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { signupUser } = useAuth();
+  const { signupUser, googleLoginUser } = useAuth();
 
   const {
     register,
     handleSubmit,
+    getValues,
+    trigger,
     formState: { errors },
   } = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
@@ -37,10 +40,33 @@ export default function SignupForm() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    // Validate username and name before proceeding
+    const isValid = await trigger(["username", "name"]);
+    if (!isValid) {
+      toast.error("Please provide your Username and Name above first.");
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      const { username, name } = getValues();
+      await googleLoginUser(credentialResponse.credential, username, name);
+    } catch (error: any) {
+      console.error('Google signup error:', error);
+      toast.error(error.message || 'Failed to create account with Google.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-5">
         <h3 className="font-semibold text-lg">Create Account</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          For Google Sign up, just fill Username and Your Name and click the Google button below.
+        </p>
 
         <FloatingLabelInput
           id="username"
@@ -106,8 +132,25 @@ export default function SignupForm() {
 
       <Button type="submit" className="w-full bg-gradient-to-r from-primary to-accent text-white shadow-lg" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Create Account
+        Create Account with Password
       </Button>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-muted-foreground/20" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or</span>
+        </div>
+      </div>
+      
+      <div className="flex justify-center w-full pb-4">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => toast.error('Google Signup Failed')}
+          useOneTap
+        />
+      </div>
     </form>
   );
 }

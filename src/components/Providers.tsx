@@ -7,6 +7,7 @@ import { AppDataProvider } from '@/contexts/AppDataContext';
 import { QueryProvider } from '@/lib/query';
 import { Toaster } from 'sonner';
 import { useCompaniesSync } from '@/hooks/useCompanies';
+import { PWAInstallPrompt } from './shared/PWAInstallPrompt';
 
 function StateSync() {
   useCompaniesSync();
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AuthProvider>
           <AppDataProvider>
             {children}
+            <PWAInstallPrompt />
             <Toaster
               position="top-right"
               richColors

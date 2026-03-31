@@ -17,6 +17,7 @@ export const metadata: Metadata = {
     shortcut: "/loo.jpg",
     apple: "/loo.jpg",
   },
+  manifest: "/manifest.json",
 };
 
 export const viewport = {
