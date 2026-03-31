@@ -7,6 +7,7 @@
  */
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Info, Users, Clock, CheckCircle2, XCircle, PlayCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,6 +68,7 @@ const getServiceTypeBadge = (type: ServiceType) => {
 function MyTasksContent() {
     const { selectedCompany } = useCompany();
     const { user } = useAuth();
+    const router = useRouter();
 
     // State  
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -90,8 +92,8 @@ function MyTasksContent() {
         setAttendOpen(true);
     };
 
-    // Create invoice from resolved service
-    const handleCreateInvoice = async (service: Service) => {
+    // Navigate to invoice form pre-filled from this service
+    const handleCreateInvoice = (service: Service) => {
         if (!service.resolution?.isSolved) {
             toast.error('Can only create invoice for solved services');
             return;
@@ -104,15 +106,7 @@ function MyTasksContent() {
             toast.error('Proof document is required before creating invoice');
             return;
         }
-
-        try {
-            const result = await servicesApi.createInvoice(service.id);
-            toast.success(`Invoice ${result.invoiceNumber} created successfully!`);
-            refetch();
-        } catch (error: any) {
-            console.error('Error creating invoice:', error);
-            toast.error(error.message || 'Failed to create invoice');
-        }
+        router.push(`/invoices/invoices?serviceId=${service.id}`);
     };
 
     // No company selected state

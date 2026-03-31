@@ -7,6 +7,29 @@
 import { apiClient } from './client';
 import { Service, ServiceFormData, ServiceAttendData } from '@/types';
 
+/** Shape returned by GET /services/:id/invoice_prefill */
+export interface ServiceInvoicePrefillItem {
+    productId: string | null;
+    productName: string;
+    hsn: string;
+    quantity: number;
+    unitPrice: number;
+    unit: string;
+    gstRate: number;
+    serialNumbers: string[];
+}
+
+export interface ServiceInvoicePrefill {
+    serviceId: string;
+    clientId: string;
+    clientName: string;
+    referenceNumber: string;
+    serviceType: string;
+    problemDescription: string;
+    resolution: { actionTaken: string | null; observation: string | null };
+    items: ServiceInvoicePrefillItem[];
+}
+
 const SERVICES_ENDPOINT = '/services';
 
 export const servicesApi = {
@@ -81,12 +104,26 @@ export const servicesApi = {
     },
 
     /**
-     * Create an invoice from a resolved service
+     * Get invoice prefill data from a resolved service
      * @param id - Service ID
      */
-    createInvoice: async (id: string): Promise<{ message: string; invoiceId: string; invoiceNumber: string }> => {
-        return apiClient.post<{ message: string; invoiceId: string; invoiceNumber: string }>(
-            `${SERVICES_ENDPOINT}/${id}/create_invoice`,
+    getInvoicePrefill: async (id: string): Promise<ServiceInvoicePrefill> => {
+        return apiClient.get<ServiceInvoicePrefill>(
+            `${SERVICES_ENDPOINT}/${id}/invoice_prefill`
+        );
+    },
+
+    /**
+     * Link a newly created invoice back to a service
+     * @param serviceId - Service ID
+     * @param invoiceId - Invoice ID to link
+     */
+    linkInvoice: async (
+        serviceId: string,
+        invoiceId: string
+    ): Promise<{ message: string; invoiceId: string }> => {
+        return apiClient.patch<{ message: string; invoiceId: string }>(
+            `${SERVICES_ENDPOINT}/${serviceId}/link_invoice?invoiceId=${encodeURIComponent(invoiceId)}`,
             {}
         );
     },

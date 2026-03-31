@@ -50,7 +50,7 @@ interface UseInvoiceActionsReturn extends DialogState {
     // Action handlers
     handleAddInvoice: () => Promise<void>;
     handleEditInvoice: (invoice: Invoice) => void;
-    handleSubmit: (data: any) => Promise<void>;
+    handleSubmit: (data: any) => Promise<Invoice | undefined>;
     handleDeleteInvoice: () => Promise<void>;
     handleViewInvoice: (invoice: Invoice) => Promise<void>;
     handleDownloadInvoice: (invoice: Invoice) => void;
@@ -125,8 +125,8 @@ export function useInvoiceActions({
      * Submit invoice form - creates or updates invoice
      * Now uses React Query mutations for automatic cache updates
      */
-    const handleSubmit = useCallback(async (data: any) => {
-        if (!selectedCompany || !company) return;
+    const handleSubmit = useCallback(async (data: any): Promise<Invoice | undefined> => {
+        if (!selectedCompany || !company) return undefined;
 
         try {
             // Auto-generate invoice number if not provided
@@ -153,9 +153,11 @@ export function useInvoiceActions({
                 totalAmountInWords: amountToWords(data.totalAmount),
             };
 
+            let result: Invoice | undefined;
+
             if (editingInvoice?.id) {
                 // Update existing invoice using mutation
-                await updateInvoiceMutation.mutateAsync({
+                result = await updateInvoiceMutation.mutateAsync({
                     id: editingInvoice.id,
                     data: {
                         ...invoiceData,
@@ -169,7 +171,7 @@ export function useInvoiceActions({
                 // Toast handled by mutation onSuccess
             } else {
                 // Create new invoice using mutation
-                await createInvoiceMutation.mutateAsync({
+                result = await createInvoiceMutation.mutateAsync({
                     ...invoiceData,
                     paymentStatus: 'pending',
                     amountPaid: 0,
@@ -191,10 +193,11 @@ export function useInvoiceActions({
             }
 
             setIsDialogOpen(false);
-            // Note: onRefreshInvoices is no longer needed as React Query handles cache invalidation
+            return result;
         } catch (error) {
             console.error('Error saving invoice:', error);
             // Error toast handled by mutation onError
+            return undefined;
         }
     }, [selectedCompany, company, invoices, editingInvoice, createInvoiceMutation, updateInvoiceMutation, updateCompanyMutation]);
 

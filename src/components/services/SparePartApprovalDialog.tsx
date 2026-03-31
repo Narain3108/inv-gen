@@ -8,11 +8,13 @@
 
 import React, { useState } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, X, Package } from 'lucide-react';
 
 import { servicesApi } from '@/lib/api';
 import { useCompany } from '@/hooks/useCompany';
 import { useProductsQuery } from '@/hooks/queries';
+import { queryKeys } from '@/lib/query';
 import { Service, SparePartRequest } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -51,6 +53,7 @@ export function SparePartApprovalDialog({
     const [rejectionReason, setRejectionReason] = useState('');
     const [rejectingId, setRejectingId] = useState<string | null>(null);
 
+    const queryClient = useQueryClient();
     const { selectedCompany } = useCompany();
     const { data: products = [] } = useProductsQuery(selectedCompany?.id);
 
@@ -76,9 +79,14 @@ export function SparePartApprovalDialog({
                 serialNumbers: serialNumbers.length > 0 ? serialNumbers : undefined
             });
             toast.success(`Approved request for ${request.productName}`);
+            // Invalidate services cache to reflect updated status immediately
+            if (service.companyId) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.services.byCompany(service.companyId) });
+                queryClient.invalidateQueries({ queryKey: ['services', 'my-tasks', service.companyId] });
+            }
             onSuccess?.();
             if (pendingRequests.length === 1) {
-                onOpenChange(false); // Close if last request
+                onOpenChange(false);
             }
         } catch (error: any) {
             console.error('Error approving request:', error);
@@ -106,6 +114,11 @@ export function SparePartApprovalDialog({
             toast.success('Request rejected');
             setRejectingId(null);
             setRejectionReason('');
+            // Invalidate services cache to reflect updated status immediately
+            if (service.companyId) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.services.byCompany(service.companyId) });
+                queryClient.invalidateQueries({ queryKey: ['services', 'my-tasks', service.companyId] });
+            }
             onSuccess?.();
             if (pendingRequests.length === 1) {
                 onOpenChange(false);

@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Service, ServiceStatusType, ServiceType } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ import {
     CheckCircle2,
     XCircle,
     FileText,
+    Receipt,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -98,6 +100,7 @@ export function ServiceList({
     showAttendActions = true,
     showRequestReview = true,
 }: ServiceListProps) {
+    const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -238,6 +241,17 @@ export function ServiceList({
                                                         <Package className="h-4 w-4" />
                                                     </Button>
                                                 )}
+                                                {service.status === 'closed' && !service.invoiceId && (
+                                                    <Button
+                                                        variant="default"
+                                                        size="sm"
+                                                        className="bg-emerald-600 hover:bg-emerald-700"
+                                                        onClick={() => router.push(`/invoices/invoices?serviceId=${service.id}`)}
+                                                    >
+                                                        <Receipt className="h-4 w-4 mr-1" />
+                                                        Bill
+                                                    </Button>
+                                                )}
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -345,6 +359,17 @@ export function ServiceList({
                                     <Button variant="destructive" size="sm" className="flex-1" onClick={() => onReviewRequests(service)}>
                                         <Package className="h-4 w-4 mr-1" />
                                         Review
+                                    </Button>
+                                )}
+                                {service.status === 'closed' && !service.invoiceId && (
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                                        onClick={() => router.push(`/invoices/invoices?serviceId=${service.id}`)}
+                                    >
+                                        <Receipt className="h-4 w-4 mr-1" />
+                                        Generate Bill
                                     </Button>
                                 )}
                             </div>

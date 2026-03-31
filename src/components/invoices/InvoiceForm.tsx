@@ -51,7 +51,10 @@ interface InvoiceFormProps {
     onSubmit: (data: InvoiceFormData) => Promise<void>;
     onCancel?: () => void;
     onClientAdded?: (client: Client) => void;
-    prefillData?: Partial<InvoiceFormData>;
+    prefillData?: Partial<InvoiceFormData> & {
+        _serialNumbers?: Record<string, string[]>;
+        _serviceId?: string;
+    };
 }
 
 export function InvoiceForm({
@@ -159,6 +162,26 @@ export function InvoiceForm({
         if (Object.keys(serialMap).length > 0) setSerialNumbers((prev) => ({ ...prev, ...serialMap }));
         setOriginalItems((prev) => ({ ...prev, ...origItems }));
     }, [invoice, localProducts, fields]);
+
+    // Hydrate serial numbers from service prefill data (Bill button flow)
+    useEffect(() => {
+        if (!prefillData?._serialNumbers || !fields || fields.length === 0) return;
+        const serialMap: Record<string, string[]> = {};
+        const prefillSerials = prefillData._serialNumbers as Record<string, string[]>;
+
+        fields.forEach((field, idx) => {
+            const indexSerials = prefillSerials[String(idx)];
+            if (indexSerials && indexSerials.length > 0) {
+                serialMap[field.id] = [...indexSerials];
+            }
+        });
+
+        if (Object.keys(serialMap).length > 0) {
+            setSerialNumbers((prev) => ({ ...prev, ...serialMap }));
+        }
+    // Run once when fields are first mounted with prefill data
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fields.length]);
 
     const watchItems = watch('items');
     const watchClientId = watch('clientId');

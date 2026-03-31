@@ -111,6 +111,7 @@ function InvoicesContent() {
   // Local state
   const [company, setCompany] = useState<Company | null>(null);
   const [prefillData, setPrefillData] = useState<any>(null);
+  const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
 
   // Filter hook
   const {
@@ -180,36 +181,105 @@ function InvoicesContent() {
     }
   }, [selectedCompany]);
 
-  // Handle createFor query param
+  // Handle serviceId query param — fetch prefill data (step 1)
   useEffect(() => {
-    const createForServiceId = searchParams?.get('createFor');
-    if (createForServiceId && selectedCompany && !loading && clients.length > 0) {
-      const initInvoiceFromService = async () => {
-        try {
-          // Clear query param to prevent loop/re-trigger
-          router.replace('/invoices/invoices');
+    const serviceId = searchParams?.get('serviceId');
+    if (!serviceId || !selectedCompany || loading || clients.length === 0) return;
 
-          const service = await servicesApi.getById(createForServiceId);
-          if (service && service.companyId === selectedCompany.id) {
-            setPrefillData({
-              clientId: service.clientId,
-              referenceNumber: service.serviceNumber,
-            });
-            await actions.handleAddInvoice();
-            toast.info(`Creating invoice for Service ${service.serviceNumber}`);
+    const fetchServicePrefill = async () => {
+      try {
+        // Clear query param to prevent re-trigger
+        router.replace('/invoices/invoices');
+
+        const prefill = await servicesApi.getInvoicePrefill(serviceId);
+
+        // Map prefill items to InvoiceForm item format
+        // Filter to only keep items with a matching product in the company's product list,
+        // because the form's zod schema requires productId to be non-empty.
+        const formItems = prefill.items
+          .map((item) => {
+            const matchedProduct = products.find(
+              (p) => p.id === item.productId || p.productName === item.productName
+            );
+            if (!matchedProduct) return null; // No matching product — skip
+            return {
+              productId: matchedProduct.id,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: 0,
+            };
+          })
+          .filter(Boolean) as { productId: string; quantity: number; unitPrice: number; discount: number }[];
+
+        // Build serial numbers map (index → serial array)
+        // Re-index after filtering to match the final items array
+        const serialsMap: Record<string, string[]> = {};
+        let finalIdx = 0;
+        prefill.items.forEach((item) => {
+          const matchedProduct = products.find(
+            (p) => p.id === item.productId || p.productName === item.productName
+          );
+          if (!matchedProduct) return; // Was filtered out
+          if (item.serialNumbers?.length) {
+            serialsMap[String(finalIdx)] = item.serialNumbers;
           }
-        } catch (error) {
-          console.error("Failed to load service for invoice creation", error);
-          toast.error("Failed to load service details");
-        }
-      };
+          finalIdx++;
+        });
 
-      initInvoiceFromService();
+        setPendingServiceId(serviceId);
+        setPrefillData({
+          clientId: prefill.clientId,
+          referenceNumber: prefill.referenceNumber,
+          items: formItems.length > 0 ? formItems : [{ productId: '' }],
+          _serialNumbers: serialsMap,
+          _serviceId: serviceId,
+        });
+
+        toast.info(`Creating invoice for Service ${prefill.referenceNumber}`);
+      } catch (error: any) {
+        console.error('Failed to load service prefill data', error);
+        toast.error(error?.message || 'Failed to load service details for billing');
+      }
+    };
+
+    fetchServicePrefill();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, selectedCompany, loading, clients, products, router]);
+
+  // Open the invoice dialog once prefillData is ready (step 2)
+  // This separate effect ensures React has committed the prefillData state
+  // before the InvoiceForm mounts and reads it as defaultValues.
+  useEffect(() => {
+    if (prefillData && pendingServiceId && !actions.isDialogOpen) {
+      actions.handleAddInvoice();
     }
-  }, [searchParams, selectedCompany, loading, clients, actions, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillData, pendingServiceId]);
+
 
   const handleInvoiceChange = async () => {
     await refreshData();
+  };
+
+  /**
+   * Wrapper around actions.handleSubmit that also links the invoice to the
+   * source service (if the form was opened via the "Bill" button).
+   */
+  const handleSubmitWithServiceLink = async (data: any) => {
+    const createdInvoice = await actions.handleSubmit(data);
+
+    if (createdInvoice?.id && pendingServiceId) {
+      try {
+        await servicesApi.linkInvoice(pendingServiceId, createdInvoice.id);
+        toast.success('Invoice linked to service');
+      } catch (err) {
+        console.error('Failed to link invoice to service:', err);
+        toast.error('Invoice created but failed to link to service');
+      } finally {
+        setPendingServiceId(null);
+        setPrefillData(null);
+      }
+    }
   };
 
   // Custom delete handler using React Query mutation for proper cache invalidation
@@ -320,7 +390,7 @@ function InvoicesContent() {
               clients={clients}
               companyState={company.state || company.address.state}
               invoiceCount={invoices.length}
-              onSubmit={actions.handleSubmit}
+              onSubmit={handleSubmitWithServiceLink}
               onCancel={() => actions.setIsDialogOpen(false)}
               prefillData={prefillData}
               onClientAdded={(newClient) => {
