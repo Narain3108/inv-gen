@@ -39,6 +39,8 @@ import {
     XCircle,
     FileText,
     Receipt,
+    Trash2,
+    Loader2,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -49,6 +51,8 @@ interface ServiceListProps {
     onView: (service: Service) => void;
     onAttend?: (service: Service) => void;
     onReviewRequests?: (service: Service) => void;
+    onDelete?: (serviceIds: string[]) => void;
+    isDeleting?: boolean;
     showAttendActions?: boolean;
     showRequestReview?: boolean;
 }
@@ -97,12 +101,15 @@ export function ServiceList({
     onView,
     onAttend,
     onReviewRequests,
+    onDelete,
+    isDeleting = false,
     showAttendActions = true,
     showRequestReview = true,
 }: ServiceListProps) {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // Filter services
     const filteredServices = services.filter((service) => {
@@ -113,6 +120,22 @@ export function ServiceList({
         const matchesStatus = statusFilter === 'all' || service.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedIds(filteredServices.map(s => s.id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const handleSelect = (id: string, checked: boolean) => {
+        if (checked) {
+            setSelectedIds(prev => [...prev, id]);
+        } else {
+            setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+        }
+    };
 
     // Empty state
     if (services.length === 0) {
@@ -150,6 +173,21 @@ export function ServiceList({
                         <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                 </Select>
+                {selectedIds.length > 0 && onDelete && (
+                    <Button 
+                        variant="destructive" 
+                        onClick={() => onDelete(selectedIds)}
+                        disabled={isDeleting}
+                        className="whitespace-nowrap"
+                    >
+                        {isDeleting ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="mr-2 h-4 w-4" />
+                        )}
+                        Delete ({selectedIds.length})
+                    </Button>
+                )}
             </div>
 
             {/* Desktop Table */}
@@ -158,6 +196,16 @@ export function ServiceList({
                     <table className="w-full">
                         <thead className="border-b bg-muted/50">
                             <tr>
+                                {onDelete && (
+                                    <th className="p-3 w-12 text-center text-left">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-background cursor-pointer"
+                                            checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                        />
+                                    </th>
+                                )}
                                 <th className="p-3 text-left text-sm font-medium">Service #</th>
                                 <th className="p-3 text-left text-sm font-medium">Client</th>
                                 <th className="p-3 text-left text-sm font-medium">Type</th>
@@ -174,9 +222,19 @@ export function ServiceList({
                                 return (
                                     <tr
                                         key={service.id}
-                                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                                        className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer ${selectedIds.includes(service.id) ? 'bg-muted/50' : ''}`}
                                         onClick={() => onView(service)}
                                     >
+                                        {onDelete && (
+                                            <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-background cursor-pointer"
+                                                    checked={selectedIds.includes(service.id)}
+                                                    onChange={(e) => handleSelect(service.id, e.target.checked)}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-3">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono font-medium">{service.serviceNumber}</span>
@@ -275,6 +333,15 @@ export function ServiceList({
                                                                 Review Requests ({pendingCount})
                                                             </DropdownMenuItem>
                                                         )}
+                                                        {onDelete && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => onDelete([service.id])}
+                                                                className="text-destructive focus:text-destructive"
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
@@ -297,12 +364,22 @@ export function ServiceList({
                             key={service.id}
                             className={`p-4 cursor-pointer hover:shadow-md transition-all border-l-4 ${service.status === 'open' ? 'border-l-blue-500' :
                                     service.status === 'pending' ? 'border-l-yellow-500' : 'border-l-green-500'
-                                }`}
+                                } ${selectedIds.includes(service.id) ? 'bg-muted/30' : ''}`}
                             onClick={() => onView(service)}
                         >
                             {/* Header */}
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-2">
+                                    {onDelete && (
+                                        <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-background cursor-pointer"
+                                                checked={selectedIds.includes(service.id)}
+                                                onChange={(e) => handleSelect(service.id, e.target.checked)}
+                                            />
+                                        </div>
+                                    )}
                                     <span className="font-mono font-medium">{service.serviceNumber}</span>
                                     {pendingCount > 0 && (
                                         <Badge variant="destructive" className="text-xs animate-pulse">
@@ -370,6 +447,11 @@ export function ServiceList({
                                     >
                                         <Receipt className="h-4 w-4 mr-1" />
                                         Generate Bill
+                                    </Button>
+                                )}
+                                {onDelete && (
+                                    <Button variant="outline" size="sm" className="flex-none text-destructive hover:text-destructive border-destructive hover:bg-destructive/10" onClick={() => onDelete([service.id])}>
+                                        <Trash2 className="h-4 w-4" />
                                     </Button>
                                 )}
                             </div>

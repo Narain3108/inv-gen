@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCcw, Search, ShieldCheck, Users as UsersIcon, UserPlus } from 'lucide-react';
+import { Plus, RefreshCcw, Search, ShieldCheck, Users as UsersIcon, UserPlus, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -55,6 +55,8 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'super_admin' | 'admin' | 'employee'>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmIds, setDeleteConfirmIds] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!authLoading && currentUser) {
@@ -88,6 +90,30 @@ export default function UsersPage() {
   const handleRefresh = () => {
     refetchUsers();
     toast.info('User list refreshed');
+  };
+
+  const handleDeleteUsers = (userIds: string[]) => {
+    setDeleteConfirmIds(userIds);
+  };
+
+  const confirmDeleteUsers = async () => {
+    if (!deleteConfirmIds) return;
+    
+    setIsDeleting(true);
+    try {
+      if (deleteConfirmIds.length === 1) {
+        await usersApi.delete(deleteConfirmIds[0]);
+      } else {
+        await usersApi.batchDelete(deleteConfirmIds);
+      }
+      toast.success(`Successfully deleted ${deleteConfirmIds.length} user(s)`);
+      setDeleteConfirmIds(null);
+      refetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete users');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleFormSubmit = async (data: any) => {
@@ -340,7 +366,28 @@ export default function UsersPage() {
           users={filteredUsers}
           onEdit={handleEditUser}
           onAnalysis={handleAnalysis}
+          onDelete={(currentUser?.role === 'admin' || currentUser?.role === 'super_admin') ? handleDeleteUsers : undefined}
+          isDeleting={isDeleting}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!deleteConfirmIds} onOpenChange={(open) => !open && setDeleteConfirmIds(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete {deleteConfirmIds?.length} user(s)? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setDeleteConfirmIds(null)} disabled={isDeleting}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteUsers} disabled={isDeleting}>
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

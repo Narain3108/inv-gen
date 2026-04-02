@@ -93,6 +93,17 @@ export const servicesApi = {
     },
 
     /**
+     * Batch delete services (Admin only)
+     * @param serviceIds - Array of Service IDs to delete
+     */
+    batchDelete: async (serviceIds: string[]): Promise<{ message: string; deletedCount: number; errors: string[] }> => {
+        return apiClient.post<{ message: string; deletedCount: number; errors: string[] }>(
+            `${SERVICES_ENDPOINT}/batch_delete`,
+            { serviceIds }
+        );
+    },
+
+    /**
      * Generate next service number for a company
      * @param companyId - Company ID
      */

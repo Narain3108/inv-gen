@@ -8,11 +8,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, Clock, CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { Plus, Users, Clock, CheckCircle2, XCircle, FileText, Loader2 } from 'lucide-react';
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { useServicesQuery } from '@/hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { servicesApi } from '@/lib/api/services.api';
 import { Service, ServiceStatusType, ServiceType, ServiceResolution } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -73,9 +76,15 @@ function ServicesContent() {
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [attendOpen, setAttendOpen] = useState(false);
     const [approvalOpen, setApprovalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteConfirmIds, setDeleteConfirmIds] = useState<string[] | null>(null);
 
     // React Query
+    const queryClient = useQueryClient();
     const { data: services = [], isLoading: loading } = useServicesQuery(selectedCompany?.id);
+
+    // RBAC
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
     // RBAC: Redirect employees
     useEffect(() => {
@@ -98,6 +107,26 @@ function ServicesContent() {
     const handleReviewRequests = (service: Service) => {
         setSelectedService(service);
         setApprovalOpen(true);
+    };
+
+    const handleDeleteServices = (serviceIds: string[]) => {
+        setDeleteConfirmIds(serviceIds);
+    };
+
+    const confirmDeleteServices = async () => {
+        if (!deleteConfirmIds) return;
+        
+        setIsDeleting(true);
+        try {
+            await servicesApi.batchDelete(deleteConfirmIds);
+            toast.success(`Successfully deleted ${deleteConfirmIds.length} service(s)`);
+            queryClient.invalidateQueries({ queryKey: ['services', selectedCompany?.id] });
+            setDeleteConfirmIds(null);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to delete services');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     // No company selected state
@@ -152,6 +181,8 @@ function ServicesContent() {
                 onView={handleViewDetails}
                 onAttend={handleAttend}
                 onReviewRequests={handleReviewRequests}
+                onDelete={isAdmin ? handleDeleteServices : undefined}
+                isDeleting={isDeleting}
                 showAttendActions={true}
                 showRequestReview={true}
             />
@@ -182,6 +213,25 @@ function ServicesContent() {
                 open={detailsOpen}
                 onClose={() => setDetailsOpen(false)}
             />
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!deleteConfirmIds} onOpenChange={(open) => !open && setDeleteConfirmIds(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete {deleteConfirmIds?.length} service(s)? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button variant="outline" onClick={() => setDeleteConfirmIds(null)} disabled={isDeleting}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDeleteServices} disabled={isDeleting}>
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Delete
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
