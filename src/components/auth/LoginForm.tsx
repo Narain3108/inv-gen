@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { FloatingLabelInput } from '@/components/ui/floating-label-input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { GoogleLogin } from '@react-oauth/google';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -23,7 +22,7 @@ interface LoginFormProps {
 export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { loginUser, googleLoginUser } = useAuth();
+  const { loginUser } = useAuth();
 
   const {
     register,
@@ -42,19 +41,6 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Failed to login. Please check your credentials.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse: any) => {
-    try {
-      setIsLoading(true);
-      await googleLoginUser(credentialResponse.credential);
-      onSuccess?.();
-    } catch (error: any) {
-      console.error('Google login error:', error);
-      toast.error(error.message || 'Failed to login with Google.');
     } finally {
       setIsLoading(false);
     }
@@ -96,24 +82,6 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign In
       </Button>
-
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-muted-foreground/20" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-        </div>
-      </div>
-      
-      <div className="flex justify-center w-full">
-        <GoogleLogin
-          onSuccess={handleGoogleSuccess}
-          onError={() => toast.error('Google Login Failed')}
-          useOneTap
-        />
-      </div>
     </form>
   );
 }
-

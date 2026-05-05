@@ -21,7 +21,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { FloatingLabelTextarea } from '@/components/ui/floating-label-textarea';
+import { FloatingLabelSelect } from '@/components/ui/floating-label-select';
+import { SelectContent, SelectItem } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -52,6 +55,7 @@ interface PartItem {
     unit?: string;
     gstRate?: number;
     serialNumbers: string[];
+    type: 'used' | 'request';
 }
 
 // ==================== Component ====================
@@ -80,6 +84,8 @@ export function ServiceAttendDialog({
     const [parts, setParts] = useState<PartItem[]>([]);
     const [selectedProductId, setSelectedProductId] = useState('');
     const [quantity, setQuantity] = useState<number | ''>('');
+    const [unitPrice, setUnitPrice] = useState<string>('');
+    const [partType, setPartType] = useState<'used' | 'request'>('used');
 
     // Serial Manager Modal state
     const [serialModalOpen, setSerialModalOpen] = useState(false);
@@ -116,19 +122,24 @@ export function ServiceAttendDialog({
             return;
         }
 
+        const customPrice = unitPrice !== '' ? Number(unitPrice) : product.price;
+
         setParts(prev => [...prev, {
             productId: product.id,
             productName: product.productName,
             hsn: product.hsn,
             quantity: qtyNum,
-            unitPrice: product.price,
+            unitPrice: customPrice,
             unit: product.unit,
             gstRate: product.gstRate,
-            serialNumbers: []
+            serialNumbers: [],
+            type: isAdmin ? partType : 'request'
         }]);
 
         setSelectedProductId('');
         setQuantity('');
+        setUnitPrice('');
+        setPartType('used');
     };
 
     // Remove part from list
@@ -182,11 +193,13 @@ export function ServiceAttendDialog({
             proofDocumentUrl: proofDocumentUrl || undefined,
         };
 
-        // Add parts based on role
+        // Add parts based on their type
         if (parts.length > 0) {
-            if (isAdmin) {
-                // Admin: Direct consumption with serial numbers
-                attendData.usedParts = parts.map(p => ({
+            const usedParts = parts.filter(p => p.type === 'used');
+            const requestedParts = parts.filter(p => p.type === 'request');
+
+            if (usedParts.length > 0) {
+                attendData.usedParts = usedParts.map(p => ({
                     productId: p.productId,
                     productName: p.productName,
                     hsn: p.hsn,
@@ -196,9 +209,10 @@ export function ServiceAttendDialog({
                     gstRate: p.gstRate,
                     serialNumbers: p.serialNumbers.length > 0 ? p.serialNumbers : undefined
                 }));
-            } else {
-                // Employee: Request parts (no serial numbers)
-                attendData.sparePartRequests = parts.map(p => ({
+            }
+
+            if (requestedParts.length > 0) {
+                attendData.sparePartRequests = requestedParts.map(p => ({
                     productId: p.productId,
                     productName: p.productName,
                     hsn: p.hsn,
@@ -220,7 +234,7 @@ export function ServiceAttendDialog({
 
                     // Redirect to invoice creation if selected
                     if (isSolved && createInvoiceAfterSolved) {
-                        router.push(`/invoices/invoices?createFor=${service.id}`);
+                        router.push(`/invoices/invoices?serviceId=${service.id}`);
                     }
                 },
                 onError: (error) => {
@@ -263,8 +277,8 @@ export function ServiceAttendDialog({
                             rows={3}
                         />
 
-                        {/* Existing Requests History (Employee Only) */}
-                        {!isAdmin && service?.sparePartRequests && service.sparePartRequests.length > 0 && (
+                        {/* Existing Requests History */}
+                        {service?.sparePartRequests && service.sparePartRequests.length > 0 && (
                             <SparePartRequestHistory requests={service.sparePartRequests} />
                         )}
 
@@ -285,20 +299,51 @@ export function ServiceAttendDialog({
                                 <SearchableProductDropdown
                                     products={products}
                                     selectedProductId={selectedProductId}
-                                    onProductSelect={(id) => setSelectedProductId(id)}
+                                    onProductSelect={(id) => {
+                                        setSelectedProductId(id);
+                                        const p = products.find(prod => prod.id === id);
+                                        if (p) setUnitPrice(p.price.toString());
+                                    }}
                                     placeholder="Search and select product..."
                                 />
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
-                                        <Label htmlFor="quantity" className="text-sm whitespace-nowrap">Quantity:</Label>
+                                        <Label htmlFor="quantity" className="text-sm whitespace-nowrap">Qty:</Label>
                                         <Input
                                             id="quantity"
                                             type="number"
                                             value={quantity}
                                             onChange={(e) => setQuantity(e.target.value === '' ? '' : parseInt(e.target.value))}
-                                            className="w-20"
+                                            className="w-16"
                                         />
                                     </div>
+                                    {isAdmin && (
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="price" className="text-sm whitespace-nowrap">Price:</Label>
+                                            <Input
+                                                id="price"
+                                                type="number"
+                                                value={unitPrice}
+                                                onChange={(e) => setUnitPrice(e.target.value)}
+                                                className="w-20"
+                                            />
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="flex-1">
+                                            <FloatingLabelSelect
+                                                id="partType"
+                                                label="Mode"
+                                                value={partType}
+                                                onValueChange={(val) => setPartType(val as any)}
+                                            >
+                                                <SelectContent>
+                                                    <SelectItem value="used">Used Now</SelectItem>
+                                                    <SelectItem value="request">Request</SelectItem>
+                                                </SelectContent>
+                                            </FloatingLabelSelect>
+                                        </div>
+                                    )}
                                     <Button type="button" onClick={handleAddPart} size="sm">
                                         <Plus className="h-4 w-4 mr-1" />
                                         Add Part
@@ -315,10 +360,17 @@ export function ServiceAttendDialog({
                                         return (
                                             <div key={idx} className="flex items-center gap-2 bg-background p-3 rounded border">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="font-medium text-sm truncate">{part.productName}</p>
-                                                    <p className="text-xs text-muted-foreground">Qty: {part.quantity}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-medium text-sm truncate">{part.productName}</p>
+                                                        {isAdmin && (
+                                                            <Badge variant="outline" className={part.type === 'used' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}>
+                                                                {part.type === 'used' ? 'Used' : 'Req'}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">Qty: {part.quantity} | Price: ₹{part.unitPrice}</p>
                                                 </div>
-                                                {isAdmin && hasSerial && (
+                                                {isAdmin && part.type === 'used' && hasSerial && (
                                                     <Button
                                                         type="button"
                                                         variant={part.serialNumbers.length < part.quantity ? 'outline' : 'secondary'}

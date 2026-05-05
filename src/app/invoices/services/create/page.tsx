@@ -81,10 +81,16 @@ function CreateServiceContent() {
                     servicesApi.generateNumber(selectedCompany.id),
                 ]);
                 setClients(clientsData);
-                const companyEmployees = usersData.filter(
-                    (u: User) => u.role === 'employee' &&
-                        (u.allowedCompanyIds?.includes(selectedCompany.id) || u.allowedCompanyIds?.length === 0)
-                );
+                const companyEmployees = usersData.filter((u: User) => {
+                    // Respect company access for all roles
+                    // If allowedCompanyIds is empty or undefined, it means the user has access to ALL companies (Super Admin / Admin pattern)
+                    const hasAccess = !u.allowedCompanyIds || u.allowedCompanyIds.length === 0 || u.allowedCompanyIds.includes(selectedCompany.id);
+                    
+                    if (!hasAccess) return false;
+
+                    // Include all admins and employees of this company
+                    return u.role === 'admin' || u.role === 'super_admin' || u.role === 'employee';
+                });
                 setEmployees(companyEmployees);
                 setGeneratedNumber(numberData.service_number);
             } catch (error) {

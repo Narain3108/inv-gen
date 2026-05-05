@@ -157,7 +157,14 @@ export function FormItemRow({
                                     step="0.01"
                                     className="h-8 text-sm"
                                     {...field}
-                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === '') {
+                                            field.onChange(0);
+                                        } else {
+                                            field.onChange(Number(val));
+                                        }
+                                    }}
                                 />
                             )}
                         />

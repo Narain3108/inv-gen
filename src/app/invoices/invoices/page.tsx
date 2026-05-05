@@ -181,10 +181,10 @@ function InvoicesContent() {
     }
   }, [selectedCompany]);
 
-  // Handle serviceId query param — fetch prefill data (step 1)
-  useEffect(() => {
-    const serviceId = searchParams?.get('serviceId');
-    if (!serviceId || !selectedCompany || loading || clients.length === 0) return;
+    // Handle serviceId query param — fetch prefill data (step 1)
+    useEffect(() => {
+        const serviceId = searchParams?.get('serviceId') || searchParams?.get('createFor');
+        if (!serviceId || !selectedCompany || loading || clients.length === 0) return;
 
     const fetchServicePrefill = async () => {
       try {
