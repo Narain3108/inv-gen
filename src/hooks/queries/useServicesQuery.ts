@@ -120,6 +120,77 @@ export function useCreateServiceMutation() {
 }
 
 /**
+ * Mutation for batch deleting services with optimistic updates
+ */
+export function useDeleteServicesMutation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ serviceIds, companyId }: { serviceIds: string[]; companyId: string }) => {
+            await servicesApi.batchDelete(serviceIds);
+            return { serviceIds, companyId };
+        },
+        onMutate: async ({ serviceIds, companyId }) => {
+            // Cancel outgoing queries to prevent overwriting optimistic update
+            await queryClient.cancelQueries({ queryKey: queryKeys.services.byCompany(companyId) });
+            await queryClient.cancelQueries({ queryKey: ['services', 'my-tasks', companyId] });
+
+            // Snapshot previous services for company
+            const previousServices = queryClient.getQueryData<Service[]>(
+                queryKeys.services.byCompany(companyId)
+            );
+
+            // Snapshot previous my-tasks
+            const queryCache = queryClient.getQueryCache();
+            const myTasksQueries = queryCache.findAll({ queryKey: ['services', 'my-tasks', companyId] });
+            const previousMyTasks = myTasksQueries.map(q => ({
+                queryKey: q.queryKey,
+                data: q.state.data as Service[] | undefined
+            }));
+
+            // Optimistically update the company's services cache
+            queryClient.setQueryData<Service[]>(
+                queryKeys.services.byCompany(companyId),
+                (old) => old?.filter((service) => !serviceIds.includes(service.id)) || []
+            );
+
+            // Optimistically update any my-tasks queries
+            previousMyTasks.forEach(({ queryKey }) => {
+                queryClient.setQueryData<Service[]>(
+                    queryKey,
+                    (old) => old?.filter((service) => !serviceIds.includes(service.id)) || []
+                );
+            });
+
+            return { previousServices, previousMyTasks, companyId };
+        },
+        onError: (err, { companyId }, context) => {
+            // Rollback company services
+            if (context?.previousServices) {
+                queryClient.setQueryData(
+                    queryKeys.services.byCompany(companyId),
+                    context.previousServices
+                );
+            }
+            // Rollback my tasks
+            if (context?.previousMyTasks) {
+                context.previousMyTasks.forEach(({ queryKey, data }) => {
+                    queryClient.setQueryData(queryKey, data);
+                });
+            }
+            toast.error('Failed to delete services');
+        },
+        onSuccess: (_data, { serviceIds, companyId }) => {
+            toast.success(`Successfully deleted ${serviceIds.length} service(s)`);
+            // Invalidate to fetch fresh data from backend
+            queryClient.invalidateQueries({ queryKey: queryKeys.services.byCompany(companyId) });
+            queryClient.invalidateQueries({ queryKey: ['services', 'my-tasks', companyId] });
+        },
+    });
+}
+
+
+/**
  * Prefetch services for a company (for link prefetching)
  */
 export function usePrefetchServices() {

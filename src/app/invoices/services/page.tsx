@@ -12,7 +12,7 @@ import { Plus, Users, Clock, CheckCircle2, XCircle, FileText, Loader2 } from 'lu
 
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
-import { useServicesQuery } from '@/hooks/queries';
+import { useServicesQuery, useDeleteServicesMutation } from '@/hooks/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { servicesApi } from '@/lib/api/services.api';
@@ -82,6 +82,7 @@ function ServicesContent() {
     // React Query
     const queryClient = useQueryClient();
     const { data: services = [], isLoading: loading } = useServicesQuery(selectedCompany?.id);
+    const deleteServicesMutation = useDeleteServicesMutation();
 
     // RBAC
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -114,16 +115,17 @@ function ServicesContent() {
     };
 
     const confirmDeleteServices = async () => {
-        if (!deleteConfirmIds) return;
+        if (!deleteConfirmIds || !selectedCompany) return;
         
         setIsDeleting(true);
         try {
-            await servicesApi.batchDelete(deleteConfirmIds);
-            toast.success(`Successfully deleted ${deleteConfirmIds.length} service(s)`);
-            queryClient.invalidateQueries({ queryKey: ['services', selectedCompany?.id] });
+            await deleteServicesMutation.mutateAsync({
+                serviceIds: deleteConfirmIds,
+                companyId: selectedCompany.id,
+            });
             setDeleteConfirmIds(null);
         } catch (error: any) {
-            toast.error(error.message || 'Failed to delete services');
+            // Error is already toasted by the mutation
         } finally {
             setIsDeleting(false);
         }

@@ -1,20 +1,24 @@
 /**
  * Global App Data Context
  * Centralized data management for companies, clients, and products
- * Prevents race conditions and ensures data is loaded once
+ * Powered by React Query under the hood to ensure instant reactive updates
+ * and solve split-brain state issues between React Query and Context.
  */
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { Company, Client, Product } from '@/types';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query';
+import { STALE_TIME } from '@/lib/query';
+import { useDeleteClientMutation, useDeleteProductMutation } from '@/hooks/queries';
 import { companiesApi } from '@/lib/api/companies.api';
 import { clientsApi } from '@/lib/api/clients.api';
 import { productsApi } from '@/lib/api/products.api';
-import { toast } from 'sonner';
 
 interface AppDataContextType {
   // Companies
@@ -47,6 +51,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   // Define public pages where we shouldn't fetch app data
   const isPublicPage = React.useMemo(() => {
@@ -54,161 +59,49 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return ['/', '/onboarding'].includes(path) || path.startsWith('/auth/');
   }, [pathname]);
 
-  // Companies state
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [companiesLoading, setCompaniesLoading] = useState(true);
-  const [companiesInitialized, setCompaniesInitialized] = useState(false);
+  // Companies Query
+  const { 
+    data: companies = [], 
+    isLoading: companiesLoading, 
+    isSuccess: companiesInitialized 
+  } = useQuery({
+    queryKey: queryKeys.companies.all,
+    queryFn: async () => {
+      return companiesApi.getAll();
+    },
+    enabled: !isPublicPage && !!user && !authLoading,
+    staleTime: STALE_TIME.LONG,
+  });
 
-  // Clients state (global)
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [clientsInitialized, setClientsInitialized] = useState(false);
+  // Clients Query (scoped by current selected company)
+  const { 
+    data: clients = [], 
+    isLoading: clientsLoading, 
+    isSuccess: clientsInitialized 
+  } = useQuery({
+    queryKey: queryKeys.clients.byCompany(selectedCompany?.id || ''),
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      return clientsApi.getAll({ company_id: selectedCompany.id });
+    },
+    enabled: !isPublicPage && !!user && !authLoading && !!selectedCompany?.id,
+    staleTime: STALE_TIME.MEDIUM,
+  });
 
-  // Products state (company-specific)
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsInitialized, setProductsInitialized] = useState(false);
-
-  // Track user ID to detect user switches
-  const [prevUserId, setPrevUserId] = useState<string | null>(null);
-
-  // Merged user change detection into the main data loading effect below
-
-
-  // Load companies once on mount
-  const loadCompanies = useCallback(async (force = false) => {
-    if (!force && companiesInitialized && !companiesLoading) return; // Already loaded
-
-    setCompaniesLoading(true);
-    try {
-      console.log('🏢 Loading companies...');
-      const data = await companiesApi.getAll();
-
-      setCompanies(data);
-      console.log('✅ Companies loaded:', data.length);
-
-      // DO NOT auto-select here - let Sidebar handle company selection
-      // This prevents overriding persisted company from Zustand localStorage
-
-    } catch (error) {
-      console.error('❌ Error loading companies:', error);
-      // Set empty array on error to allow UI to continue
-      setCompanies([]);
-      toast.error('Failed to load companies. Please try refreshing the page.');
-    } finally {
-      // CRITICAL: Always set initialized to true to prevent infinite loading
-      setCompaniesInitialized(true);
-      setCompaniesLoading(false);
-    }
-  }, [companiesInitialized, companiesLoading]);
-
-  // Load clients once on mount (global - not company-specific)
-  const loadClients = useCallback(async (force = false) => {
-    if (!force && clientsInitialized && !clientsLoading) return; // Already loaded
-
-    setClientsLoading(true);
-    try {
-      console.log('👥 Loading clients...');
-      const data = await clientsApi.getAll();
-
-      setClients(data);
-      console.log('✅ Clients loaded:', data.length);
-    } catch (error) {
-      console.error('❌ Error loading clients:', error);
-      // Set empty array on error to allow UI to continue
-      setClients([]);
-      toast.error('Failed to load clients. Some features may be limited.');
-    } finally {
-      // CRITICAL: Always set initialized to true to prevent infinite loading
-      setClientsInitialized(true);
-      setClientsLoading(false);
-    }
-  }, [clientsInitialized, clientsLoading]);
-
-  // Load products for selected company
-  const loadProducts = useCallback(async () => {
-    if (!selectedCompany) {
-      setProducts([]);
-      setProductsInitialized(false);
-      return;
-    }
-
-    // Safety check: Ensure selected company is actually in the loaded companies list
-    // This prevents 403 errors when switching users with persisted selectedCompany
-    if (companiesInitialized && companies.length > 0) {
-      const isValid = companies.find(c => c.id === selectedCompany.id);
-      if (!isValid) {
-        console.log('⚠️ Skipping product load for invalid company:', selectedCompany.name);
-        return;
-      }
-    }
-
-    setProductsLoading(true);
-    try {
-      console.log('📦 Loading products for company:', selectedCompany.name);
-      const data = await productsApi.getAll({ company_id: selectedCompany.id });
-
-      setProducts(data);
-      console.log('✅ Products loaded:', data.length);
-    } catch (error) {
-      console.error('❌ Error loading products:', error);
-      // Set empty array on error to allow UI to continue
-      setProducts([]);
-      toast.error('Failed to load products. Some features may be limited.');
-    } finally {
-      // CRITICAL: Always set initialized to true to prevent infinite loading
-      setProductsInitialized(true);
-      setProductsLoading(false);
-    }
-  }, [selectedCompany, companies, companiesInitialized]);
-
-  // Initial load on mount and user change handling
-  useEffect(() => {
-    if (authLoading) return;
-
-    // Skip data fetching on public pages to prevent unnecessary API calls
-    if (isPublicPage) return;
-
-    if (user) {
-      // CRITICAL: Check if user has a valid token before making API calls
-      const userToken = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
-      if (!userToken) {
-        console.warn('⚠️ User exists but no token found. Skipping data load.');
-        return;
-      }
-
-      const hasUserChanged = user.id !== prevUserId;
-
-      if (hasUserChanged) {
-        console.log('👤 User changed, forcing data reload');
-        setPrevUserId(user.id);
-        // Reset flags immediately to reflect loading state if needed
-        setCompaniesInitialized(false);
-        setClientsInitialized(false);
-        setProductsInitialized(false);
-      }
-
-      const initializeData = async () => {
-        // Load companies and clients in parallel
-        // Force reload if user changed
-        await Promise.all([
-          loadCompanies(hasUserChanged),
-          loadClients(hasUserChanged),
-        ]);
-      };
-
-      initializeData();
-    } else {
-      // Clear data on logout
-      if (prevUserId) setPrevUserId(null);
-      setCompanies([]);
-      setClients([]);
-      setProducts([]);
-      setCompaniesInitialized(false);
-      setClientsInitialized(false);
-      setProductsInitialized(false);
-    }
-  }, [user, authLoading, loadCompanies, loadClients, isPublicPage, prevUserId]);
+  // Products Query
+  const { 
+    data: products = [], 
+    isLoading: productsLoading, 
+    isSuccess: productsInitialized 
+  } = useQuery({
+    queryKey: queryKeys.products.byCompany(selectedCompany?.id || ''),
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      return productsApi.getAll({ company_id: selectedCompany.id });
+    },
+    enabled: !isPublicPage && !!user && !authLoading && !!selectedCompany?.id,
+    staleTime: STALE_TIME.MEDIUM,
+  });
 
   // Validate selected company against loaded companies
   useEffect(() => {
@@ -231,79 +124,54 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [companies, companiesInitialized, companiesLoading, selectedCompany, setSelectedCompany]);
 
-  // Reload products when company changes
-  useEffect(() => {
-    if (companiesInitialized) {
-      loadProducts();
-    }
-  }, [selectedCompany, companiesInitialized, loadProducts]);
-
   // Refresh methods
   const refreshCompanies = useCallback(async () => {
-    setCompaniesInitialized(false);
-    await loadCompanies(true);
-  }, [loadCompanies]);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.companies.all });
+  }, [queryClient]);
 
   const refreshClients = useCallback(async () => {
-    setClientsInitialized(false);
-    await loadClients(true);
-  }, [loadClients]);
+    if (selectedCompany?.id) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clients.byCompany(selectedCompany.id) });
+    }
+  }, [queryClient, selectedCompany]);
 
   const refreshProducts = useCallback(async () => {
-    setProductsInitialized(false);
-    await loadProducts();
-  }, [loadProducts]);
+    if (selectedCompany?.id) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.products.byCompany(selectedCompany.id) });
+    }
+  }, [queryClient, selectedCompany]);
 
   const addCompany = useCallback((company: Company) => {
-    setCompanies(prev => [...prev, company]);
-    // Also set as selected company if it's the first one or explicit choice needed
+    queryClient.setQueryData<Company[]>(queryKeys.companies.all, (old) => [...(old || []), company]);
     if (!selectedCompany) {
       setSelectedCompany(company);
     }
-  }, [selectedCompany, setSelectedCompany]);
+  }, [queryClient, selectedCompany, setSelectedCompany]);
 
+  // Mutations with optimistic updates
+  const deleteClientMutation = useDeleteClientMutation();
   const deleteClient = useCallback(async (id: string) => {
-    const previousClients = [...clients];
-    setClients(prev => prev.filter(c => c.id !== id));
+    if (!selectedCompany?.id) return;
+    await deleteClientMutation.mutateAsync({ id, companyId: selectedCompany.id });
+  }, [deleteClientMutation, selectedCompany]);
 
-    try {
-      await clientsApi.delete(id);
-      toast.success('Client deleted successfully');
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      toast.error('Failed to delete client');
-      setClients(previousClients);
-      throw error;
-    }
-  }, [clients]);
-
+  const deleteProductMutation = useDeleteProductMutation();
   const deleteProduct = useCallback(async (id: string) => {
-    const productToDelete = products.find(p => p.id === id);
-    const previousProducts = [...products];
-    setProducts(prev => prev.filter(p => p.id !== id));
-
-    try {
-      await productsApi.delete(id, productToDelete?.companyId);
-      toast.success('Product deleted successfully');
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
-      setProducts(previousProducts);
-      throw error;
-    }
-  }, [products]);
+    if (!selectedCompany?.id) return;
+    await deleteProductMutation.mutateAsync({ id, companyId: selectedCompany.id });
+  }, [deleteProductMutation, selectedCompany]);
 
   const value: AppDataContextType = {
     companies,
-    companiesLoading,
+    companiesLoading: companiesLoading && companies.length === 0, // only true if no data exists yet
     companiesInitialized,
 
     clients,
-    clientsLoading,
+    clientsLoading: clientsLoading && clients.length === 0,
     clientsInitialized,
 
     products,
-    productsLoading,
+    productsLoading: productsLoading && products.length === 0,
     productsInitialized,
 
     refreshCompanies,
