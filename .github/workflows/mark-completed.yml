@@ -12,6 +12,9 @@ jobs:
     # Only run if the PR was merged (not just closed without merging)
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
     
     steps:
       - name: Checkout Repository
