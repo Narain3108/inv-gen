@@ -1,0 +1,64 @@
+name: Mark Issue Completed in Sheets
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - dev
+
+jobs:
+  mark-completed:
+    # Only run if the PR was merged (not just closed without merging)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Parse Issue Number from Branch
+        id: parse
+        run: |
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          # Look for 'issue-' followed by numbers
+          if [[ $BRANCH_NAME =~ issue-([0-9]+) ]]; then
+            ISSUE_NUM="${BASH_REMATCH[1]}"
+            echo "issue_number=$ISSUE_NUM" >> $GITHUB_OUTPUT
+            echo "Found issue number: $ISSUE_NUM"
+          else
+            echo "Branch name ($BRANCH_NAME) does not contain an issue number. Skipping."
+            echo "issue_number=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Google Credentials File
+        if: steps.parse.outputs.issue_number != ''
+        run: |
+          # The secret GOOGLE_CREDENTIALS_JSON must contain the raw service account JSON
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials.json
+
+      - name: Close GitHub Issue
+        if: steps.parse.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue close ${{ steps.parse.outputs.issue_number }} -m "Closed via PR merge"
+
+      - name: Run Resolution Script
+        if: steps.parse.outputs.issue_number != ''
+        env:
+          # Configuration for the script
+          GOOGLE_CREDENTIALS_FILE: credentials.json
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          WORKSHEET_NAME: ${{ secrets.WORKSHEET_NAME || 'Sheet1' }}
+        run: |
+          python src/resolve.py ${{ steps.parse.outputs.issue_number }}
