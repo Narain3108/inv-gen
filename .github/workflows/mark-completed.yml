@@ -51,7 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue close ${{ steps.parse.outputs.issue_number }} -m "Closed via PR merge"
+          gh issue close ${{ steps.parse.outputs.issue_number }} -c "Closed via PR merge"
 
       - name: Run Resolution Script
         if: steps.parse.outputs.issue_number != ''
