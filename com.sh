@@ -14,7 +14,7 @@ foreach ($branch in $featureBranches) {
         # This removes 'feature/xyz' from GitHub
         Write-Host "🧹 Deleting remote branch from GitHub..." -ForegroundColor Gray
         git push origin --delete $branch
-        
+#jfk
         Write-Host "✨ Remote $branch is gone. Local copy preserved." -ForegroundColor Cyan
     } else {
         Write-Host "❌ Conflict in $branch. Aborting merge to protect dev." -ForegroundColor Red
