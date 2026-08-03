@@ -10,7 +10,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useForm, UseFormReturn } from 'react-hook-form';
+import { useForm, UseFormReturn, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { productFormSchema } from '@/lib/validations';
 import { Product } from '@/types';
@@ -144,18 +144,24 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Product Type */}
-          <FloatingLabelSelect
-            id="type"
-            label="Type *"
-            value={watch('type') || 'product'}
-            onValueChange={(value: string) => setValue('type', value as 'product' | 'service')}
-            error={errors.type?.message}
-          >
-            <SelectContent>
-              <SelectItem value="product">Product</SelectItem>
-              <SelectItem value="service">Service</SelectItem>
-            </SelectContent>
-          </FloatingLabelSelect>
+          <Controller
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FloatingLabelSelect
+                id="type"
+                label="Type *"
+                value={field.value || 'product'}
+                onValueChange={field.onChange}
+                error={errors.type?.message}
+              >
+                <SelectContent>
+                  <SelectItem value="product">Product</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                </SelectContent>
+              </FloatingLabelSelect>
+            )}
+          />
 
           {/* Serial Number Toggle */}
           <div className="flex items-center gap-3">
@@ -213,19 +219,25 @@ function BasicInfoTab({ form, product, companyId, autoFilledFrom, setAutoFilledF
           />
 
           {/* Unit */}
-          <FloatingLabelSelect
-            id="unit"
-            label="Unit *"
-            value={watch('unit') || 'Nos'}
-            onValueChange={(value: string) => setValue('unit', value)}
-            error={errors.unit?.message}
-          >
-            <SelectContent>
-              {PRODUCT_UNITS.map((unit: string) => (
-                <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-              ))}
-            </SelectContent>
-          </FloatingLabelSelect>
+          <Controller
+            control={form.control}
+            name="unit"
+            render={({ field }) => (
+              <FloatingLabelSelect
+                id="unit"
+                label="Unit *"
+                value={field.value || 'Nos'}
+                onValueChange={field.onChange}
+                error={errors.unit?.message}
+              >
+                <SelectContent>
+                  {PRODUCT_UNITS.map((unit: string) => (
+                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                  ))}
+                </SelectContent>
+              </FloatingLabelSelect>
+            )}
+          />
 
           {/* Price */}
           <FloatingLabelInput
@@ -271,21 +283,27 @@ function TaxInfoTab({ form }: { form: UseFormReturn<ProductFormData> }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* GST Rate */}
-        <FloatingLabelSelect
-          id="gstRate"
-          label="GST Rate (%) *"
-          value={watch('gstRate')?.toString() || '18'}
-          onValueChange={(value: string) => setValue('gstRate', parseFloat(value))}
-          error={errors.gstRate?.message}
-        >
-          <SelectContent>
-            {GST_RATES.map((rate) => (
-              <SelectItem key={rate.value} value={rate.value.toString()}>
-                {rate.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </FloatingLabelSelect>
+        <Controller
+          control={form.control}
+          name="gstRate"
+          render={({ field }) => (
+            <FloatingLabelSelect
+              id="gstRate"
+              label="GST Rate (%) *"
+              value={field.value?.toString() || '18'}
+              onValueChange={(value: string) => field.onChange(parseFloat(value))}
+              error={errors.gstRate?.message}
+            >
+              <SelectContent>
+                {GST_RATES.map((rate) => (
+                  <SelectItem key={rate.value} value={rate.value.toString()}>
+                    {rate.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </FloatingLabelSelect>
+          )}
+        />
 
         {/* Cess */}
         <div>

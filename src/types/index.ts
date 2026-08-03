@@ -219,6 +219,7 @@ export interface InvoiceItem {
   productId?: string;
   itemCode?: string; // Optional item code from product
   description: string;
+  productDescription?: string;
   hsn: string;
   quantity: number;
   unit: string;

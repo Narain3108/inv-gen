@@ -97,7 +97,7 @@ export function QuotationForm({ quotation, companyId, company, products, clients
             let c = 0, s = 0, i = 0;
             if (isInter) i = (taxable * p.gstRate) / 100; else { c = s = (taxable * p.gstRate / 2) / 100; }
             taxableAmt += taxable; cgst += c; sgst += s; igst += i;
-            return { productId: p.id, description: p.productName, hsn: p.hsn, quantity: qty, unit: item.unit || p.unit, unitPrice: price, discount: disc, gstRate: p.gstRate, taxableAmount: taxable, cgst: c, sgst: s, igst: i, lineTotal: taxable + c + s + i } as InvoiceItem;
+            return { productId: p.id, description: p.productName, productDescription: p.description || '', hsn: p.hsn, quantity: qty, unit: item.unit || p.unit, unitPrice: price, discount: disc, gstRate: p.gstRate, taxableAmount: taxable, cgst: c, sgst: s, igst: i, lineTotal: taxable + c + s + i } as InvoiceItem;
         }).filter(Boolean) as InvoiceItem[];
         return { items, taxableAmount: taxableAmt, cgst, sgst, igst, totalAmount: taxableAmt + cgst + sgst + igst, taxBreakdown: calculateTaxBreakdown(validItems.map((i: any) => ({ amount: Number(i.unitPrice), quantity: Number(i.quantity), gstRate: localProducts.find(p => p.id === i.productId)?.gstRate || 0, discount: Number(i.discount) || 0 })), companyState, selectedClient.address.state) };
     };
