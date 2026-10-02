@@ -7,6 +7,7 @@ export { RecentActivity } from './RecentActivity';
 export { PaymentStatusChart } from './PaymentStatusChart';
 export { RecentInvoices } from './RecentInvoices';
 export { TopClients } from './TopClients';
+export { GstrExportDialog } from './GstrExportDialog';
 export { RevenueChart } from './RevenueChart';
 export { GSTSummary } from './GSTSummary';
 export { QuotationMetrics } from './QuotationMetrics';

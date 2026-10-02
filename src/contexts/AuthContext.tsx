@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (loading) return;
 
     const isAuthPage = pathname?.startsWith('/auth');
-    const isPublicPage = pathname === '/';
+    const isPublicPage = pathname === '/' || pathname?.startsWith('/quick-invoice');
 
     if (!user && !isAuthPage && !isPublicPage) {
       router.push('/auth/login');

@@ -125,8 +125,10 @@ class ApiClient {
       if (response.status === 401 && typeof window !== 'undefined') {
         try {
           const currentPath = window.location.pathname;
-          // Only log and redirect if not already on an auth page
-          if (!currentPath.startsWith('/auth')) {
+          const isPublicPage = currentPath === '/' || currentPath.startsWith('/quick-invoice');
+          
+          // Only log and redirect if not already on an auth page or public page
+          if (!currentPath.startsWith('/auth') && !isPublicPage) {
             console.warn('[apiClient] 401 Unauthorized received. Clearing local session and redirecting to login.');
             localStorage.removeItem('userData');
             localStorage.removeItem('userToken');
@@ -136,7 +138,9 @@ class ApiClient {
             // Give caller a chance to handle before redirecting in SPA environments
             setTimeout(() => {
               try {
-                if (!window.location.pathname.startsWith('/auth')) {
+                const newPath = window.location.pathname;
+                const newIsPublic = newPath === '/' || newPath.startsWith('/quick-invoice');
+                if (!newPath.startsWith('/auth') && !newIsPublic) {
                   window.location.href = '/auth/login';
                 }
               } catch (e) {

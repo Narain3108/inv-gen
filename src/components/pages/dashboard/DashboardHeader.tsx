@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Download, BarChart3, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import { TimeFilter } from '@/hooks/useDashboardData';
+import { GstrExportDialog } from '@/components/dashboard/GstrExportDialog';
 
 interface DashboardHeaderProps {
+    companyId: string;
     companyName: string;
     timeFilter: TimeFilter;
     onTimeFilterChange: (filter: TimeFilter) => void;
@@ -23,6 +25,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({
+    companyId,
     companyName,
     timeFilter,
     onTimeFilterChange,
@@ -54,7 +57,8 @@ export function DashboardHeader({
                 </Select>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <GstrExportDialog companyId={companyId} />
                     <Button
                         variant="outline"
                         size="sm"

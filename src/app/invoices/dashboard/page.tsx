@@ -143,6 +143,7 @@ function DashboardContent() {
     <div className="space-y-6">
       {/* Header with Time Filter and Actions */}
       <DashboardHeader
+        companyId={selectedCompany.id}
         companyName={selectedCompany.name}
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}

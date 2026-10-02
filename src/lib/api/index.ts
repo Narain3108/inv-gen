@@ -42,6 +42,8 @@ export type { AuditFilters } from './audit.api';
 export { analyticsApi } from './analytics.api';
 export type { EmployeeMetrics, DashboardAnalytics } from './analytics.api';
 
+export { reportsApi } from './reports.api';
+
 // Import for centralized API object
 import { companiesApi } from './companies.api';
 import { clientsApi } from './clients.api';
@@ -54,6 +56,7 @@ import { uploadsApi } from './uploads.api';
 import { customizationsApi } from './customizations.api';
 import { auditApi } from './audit.api';
 import { analyticsApi } from './analytics.api';
+import { reportsApi } from './reports.api';
 
 /**
  * Centralized API object for convenience
@@ -70,4 +73,5 @@ export const api = {
   customizations: customizationsApi,
   audit: auditApi,
   analytics: analyticsApi,
+  reports: reportsApi,
 };
