@@ -65,6 +65,9 @@ export default function QuickInvoicePage() {
     companyName: 'SRIVARI PHOTOGRAPHY',
     tagline: 'Professional Photography & Videography Services',
     invoiceTitle: 'Invoice / Service Details',
+    invoiceDate: '02 Oct 2026',
+    invoiceNumber: 'INV-2026-001',
+    billedTo: '',
     meta: [
       { id: '1', label: 'Project', value: '#Love Promotion' },
       { id: '2', label: 'Service Provider', value: 'Srivari Photography' },
@@ -109,29 +112,40 @@ export default function QuickInvoicePage() {
       try {
         const element = invoiceRef.current as HTMLElement;
         if (!element) return;
-        const htmlToImage = await import('html-to-image');
         const { jsPDF } = await import('jspdf');
+        const htmlToImage = await import('html-to-image');
         
-        const imgData = await htmlToImage.toPng(element, {
-          pixelRatio: 2,
-        });
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = 210;
+        const pageHeight = 297;
+        const paddingMm = 15; // 15mm padding
+        const contentWidth = pdfWidth - (paddingMm * 2);
         
-        const img = new Image();
-        img.src = imgData;
-        await new Promise((resolve) => { img.onload = resolve; });
+        let currentY = paddingMm;
         
-        // Exact A4 width in mm
-        const pdfWidth = 210; 
-        const pdfHeight = (img.height * pdfWidth) / img.width;
+        // Find all blocks
+        const blocks = Array.from(invoiceRef.current!.querySelectorAll('[data-pdf-block="true"]')) as HTMLElement[];
         
-        // Create custom sized PDF perfectly fitting the content height without slicing!
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: [pdfWidth, pdfHeight]
-        });
+        for (let i = 0; i < blocks.length; i++) {
+          const block = blocks[i];
+          const imgData = await htmlToImage.toPng(block, { pixelRatio: 2 });
+          
+          const img = new Image();
+          img.src = imgData;
+          await new Promise((resolve) => { img.onload = resolve; });
+          
+          const imgHeightMm = (img.height * contentWidth) / img.width;
+          
+          // If block doesn't fit and it's not the first item on the page, create new page
+          if (currentY + imgHeightMm > (pageHeight - paddingMm) && currentY > paddingMm) {
+            pdf.addPage();
+            currentY = paddingMm;
+          }
+          
+          pdf.addImage(imgData, 'PNG', paddingMm, currentY, contentWidth, imgHeightMm);
+          currentY += imgHeightMm;
+        }
         
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`${fileName}.pdf`);
       } catch (err) {
         console.error("Error generating PDF", err);
@@ -167,30 +181,37 @@ export default function QuickInvoicePage() {
       {/* Invoice Document Wrapper */}
       <div 
         ref={invoiceRef}
-        className={`bg-white ${!isGeneratingPdf ? 'max-w-4xl mx-auto shadow-sm border rounded-xl p-10' : 'w-[794px] p-10 m-0'}`}
+        className={`bg-white ${!isGeneratingPdf ? 'max-w-4xl mx-auto shadow-sm border rounded-xl p-10' : 'w-[794px] m-0'}`}
       >
-        
+        <div data-pdf-block="true" className="bg-white">
         {/* Header section with Logo */}
-        <div className="relative text-center mb-10 flex flex-col items-center">
+        <div className="mb-10 flex justify-between items-start">
           
-          <div className="absolute top-0 left-0">
+          {/* Left: Logo */}
+          <div className="w-1/4 flex justify-start">
             <img src="/logo.png" alt="Studio Logo" className="w-24 h-24 object-contain rounded shadow-sm bg-white border border-gray-200" />
           </div>
 
-          <EditableInput
-            value={data.companyName}
-            onChange={(v: string) => setData({ ...data, companyName: v })}
-            readOnly={isGeneratingPdf}
-            className="text-3xl font-bold text-center uppercase tracking-wider mb-2 font-serif"
-            placeholder="COMPANY NAME"
-          />
-          <EditableInput
-            value={data.tagline}
-            onChange={(v: string) => setData({ ...data, tagline: v })}
-            readOnly={isGeneratingPdf}
-            className="text-gray-500 text-center"
-            placeholder="Company Tagline or Address"
-          />
+          {/* Center: Company Name & Tagline */}
+          <div className="w-1/2 flex flex-col items-center text-center">
+            <EditableInput
+              value={data.companyName}
+              onChange={(v: string) => setData({ ...data, companyName: v })}
+              readOnly={isGeneratingPdf}
+              className="text-3xl font-bold text-center uppercase tracking-wider mb-2 font-serif"
+              placeholder="COMPANY NAME"
+            />
+            <EditableInput
+              value={data.tagline}
+              onChange={(v: string) => setData({ ...data, tagline: v })}
+              readOnly={isGeneratingPdf}
+              className="text-gray-500 text-center"
+              placeholder="Company Tagline or Address"
+            />
+          </div>
+          
+          {/* Right: Empty for layout balance */}
+          <div className="w-1/4"></div>
         </div>
 
         {/* Title */}
@@ -202,6 +223,51 @@ export default function QuickInvoicePage() {
             className="text-xl font-bold border-b-2 border-gray-800 pb-2"
             placeholder="Invoice Title"
           />
+        </div>
+
+        {/* Billed To */}
+        <div className="mb-6">
+          <div className="font-bold text-gray-800 mb-1">Billing To:</div>
+          <AutoTextarea
+            value={data.billedTo}
+            onChange={(v: string) => setData({ ...data, billedTo: v })}
+            readOnly={isGeneratingPdf}
+            className="w-1/2 text-gray-900"
+            placeholder="Client Name&#10;Address Line 1&#10;Address Line 2&#10;Contact"
+            minRows={3}
+          />
+        </div>
+
+        {/* Invoice Primary Details */}
+        <div className="mb-6 space-y-1">
+          <div className="flex items-center">
+            <div className="w-1/3 flex items-center font-semibold text-gray-800">
+              Invoice No<span className="ml-auto mr-2">:</span>
+            </div>
+            <div className="w-2/3">
+              <EditableInput
+                value={data.invoiceNumber}
+                onChange={(v: string) => setData({ ...data, invoiceNumber: v })}
+                readOnly={isGeneratingPdf}
+                className="w-full text-gray-900"
+                placeholder="INV-001"
+              />
+            </div>
+          </div>
+          <div className="flex items-center">
+            <div className="w-1/3 flex items-center font-semibold text-gray-800">
+              Date<span className="ml-auto mr-2">:</span>
+            </div>
+            <div className="w-2/3">
+              <EditableInput
+                value={data.invoiceDate}
+                onChange={(v: string) => setData({ ...data, invoiceDate: v })}
+                readOnly={isGeneratingPdf}
+                className="w-full text-gray-900"
+                placeholder="DD/MM/YYYY"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Meta Info (Project, Provider, etc.) */}
@@ -255,11 +321,12 @@ export default function QuickInvoicePage() {
             </Button>
           )}
         </div>
+        </div>
 
         {/* Line Items */}
         <div className="mb-12">
           {data.items.map((item, index) => (
-            <div key={item.id} className="mb-8 group relative break-inside-avoid">
+            <div key={item.id} data-pdf-block="true" className="mb-8 group relative break-inside-avoid bg-white">
               <Separator className="mb-6 bg-gray-300" />
               
               {!isGeneratingPdf && (
@@ -351,6 +418,7 @@ export default function QuickInvoicePage() {
           )}
         </div>
 
+        <div data-pdf-block="true" className="bg-white pb-10">
         {/* Payment Summary */}
         <div className="mb-12">
           <h3 className="font-bold text-lg mb-4 tracking-wide text-gray-900">PAYMENT SUMMARY</h3>
@@ -456,7 +524,7 @@ export default function QuickInvoicePage() {
             minRows={2}
           />
         </div>
-        
+        </div>
       </div>
     </div>
   );
