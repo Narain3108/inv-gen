@@ -6,3 +6,4 @@ export { useServicesQuery, useMyTasksQuery, useServiceQuery, useAttendServiceMut
 export { useQuotationsQuery, useQuotationQuery, useCreateQuotationMutation, useUpdateQuotationMutation, useDeleteQuotationMutation, usePrefetchQuotations } from './useQuotationsQuery';
 export { useUsersQuery, useCreateUserMutation, useUpdateUserMutation, useDeleteUserMutation } from './useUsersQuery';
 export { usePurchasesQuery, useCreatePurchaseMutation, useUpdatePurchaseMutation, useDeletePurchaseMutation } from './usePurchasesQuery';
+export { useDiscountPoliciesQuery } from './useDiscountPoliciesQuery';

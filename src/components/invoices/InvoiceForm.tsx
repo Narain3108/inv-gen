@@ -317,7 +317,7 @@ export function InvoiceForm({
             const discount = Number(item.discount) || 0;
 
             const baseAmount = quantity * unitPrice;
-            const discountAmount = (baseAmount * discount) / 100;
+            const discountAmount = discount; // Directly use absolute amount
             const taxableAmount = baseAmount - discountAmount;
 
             let cgst = 0, sgst = 0, igst = 0, cess = 0;
@@ -734,7 +734,7 @@ export function InvoiceForm({
                                         {watchItems.map((item, idx) => {
                                             const p = localProducts.find(pr => pr.id === item.productId);
                                             if (!p) return null;
-                                            const total = (item.quantity * item.unitPrice) * (1 - (item.discount || 0) / 100);
+                                            const total = (item.quantity * item.unitPrice) - (item.discount || 0);
                                             return (
                                                 <div key={idx} className="grid grid-cols-12 p-2 border-b last:border-0 items-center hover:bg-muted/20">
                                                     <div className="col-span-1 text-muted-foreground">{idx + 1}</div>

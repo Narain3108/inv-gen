@@ -14,6 +14,7 @@ import { Trash2, Package, Hash } from 'lucide-react';
 import { Product } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { SearchableProductDropdown } from '@/components/shared/SearchableProductDropdown';
+import { DiscountPolicySelector } from './DiscountPolicySelector';
 
 interface FormItemRowProps {
     index: number;
@@ -67,11 +68,11 @@ export function FormItemRow({
     const product = products.find((p) => p.id === watchItem?.productId);
     const quantity = Number(watchItem?.quantity) || 0;
     const unitPrice = Number(watchItem?.unitPrice) || 0;
-    const discount = Number(watchItem?.discount) || 0;
+    const discount = Number(watchItem?.discount) || 0; // This is now an absolute amount
 
     // Calculate line total
     const baseAmount = quantity * unitPrice;
-    const discountAmount = (baseAmount * discount) / 100;
+    const discountAmount = discount; // Directly use absolute discount
     const lineTotal = baseAmount - discountAmount;
 
     // Check if product has serial numbers
@@ -131,6 +132,7 @@ export function FormItemRow({
                                     step="1"
                                     className="h-8 text-sm"
                                     {...field}
+                                    value={field.value ?? ''}
                                     onChange={(e) => {
                                         const val = Number(e.target.value);
                                         field.onChange(val);
@@ -157,6 +159,7 @@ export function FormItemRow({
                                     step="0.01"
                                     className="h-8 text-sm"
                                     {...field}
+                                    value={field.value ?? ''}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === '') {
@@ -172,19 +175,16 @@ export function FormItemRow({
 
                     {/* Discount */}
                     <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Discount %</Label>
+                        <Label className="text-xs text-muted-foreground">Discount</Label>
                         <Controller
                             name={`items.${index}.discount`}
                             control={control}
                             render={({ field }) => (
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    className="h-8 text-sm"
-                                    {...field}
-                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                <DiscountPolicySelector
+                                    itemPrice={unitPrice}
+                                    itemQuantity={quantity}
+                                    currentDiscountAmount={Number(field.value) || 0}
+                                    onApply={(calculatedDiscount) => field.onChange(calculatedDiscount)}
                                 />
                             )}
                         />

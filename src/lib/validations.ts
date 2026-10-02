@@ -197,7 +197,7 @@ export const invoiceItemSchema = z.object({
       return Number.isNaN(n) ? val : n;
     }
     return val;
-  }, z.number().min(0).max(100).optional()),
+  }, z.number().min(0).optional()),
   gstRate: z.number().min(0).max(28),
   cessRate: z.number().min(0).max(100).optional(),
   cgst: z.number(),
@@ -244,7 +244,7 @@ export const invoiceFormSchema = z.object({
         return Number.isNaN(n) ? val : n;
       }
       return val;
-    }, z.number().min(0).max(100).optional()),
+    }, z.number().min(0).optional()),
   })).min(1, 'At least one item is required'),
 });
 
@@ -282,7 +282,7 @@ export const quotationFormSchema = z.object({
         return Number.isNaN(n) ? val : n;
       }
       return val;
-    }, z.number().min(0).max(100).optional()),
+    }, z.number().min(0).optional()),
   })).min(1, 'At least one item is required'),
 });
 

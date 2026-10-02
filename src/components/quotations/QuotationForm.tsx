@@ -93,7 +93,7 @@ export function QuotationForm({ quotation, companyId, company, products, clients
         const items = validItems.map((item: any) => {
             const p = localProducts.find(pr => pr.id === item.productId); if (!p) return null;
             const qty = Number(item.quantity), price = Number(item.unitPrice), disc = Number(item.discount) || 0;
-            const base = qty * price, discAmt = (base * disc) / 100, taxable = base - discAmt;
+            const base = qty * price, discAmt = disc, taxable = base - discAmt;
             let c = 0, s = 0, i = 0;
             if (isInter) i = (taxable * p.gstRate) / 100; else { c = s = (taxable * p.gstRate / 2) / 100; }
             taxableAmt += taxable; cgst += c; sgst += s; igst += i;
@@ -220,7 +220,7 @@ export function QuotationForm({ quotation, companyId, company, products, clients
                                         {watchItems.map((item, idx) => {
                                             const p = localProducts.find(pr => pr.id === item.productId);
                                             if (!p) return null;
-                                            const total = (item.quantity * item.unitPrice) * (1 - (item.discount || 0) / 100);
+                                            const total = (item.quantity * item.unitPrice) - (item.discount || 0);
                                             return (
                                                 <div key={idx} className="grid grid-cols-12 p-2 border-b last:border-0 items-center hover:bg-muted/20">
                                                     <div className="col-span-1 text-muted-foreground">{idx + 1}</div>

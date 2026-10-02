@@ -43,6 +43,8 @@ export { analyticsApi } from './analytics.api';
 export type { EmployeeMetrics, DashboardAnalytics } from './analytics.api';
 
 export { reportsApi } from './reports.api';
+export { discountPoliciesApi } from './discounts.api';
+export type { DiscountPolicy, DiscountPolicyCreate, DiscountPolicyUpdate } from './discounts.api';
 
 // Import for centralized API object
 import { companiesApi } from './companies.api';
@@ -57,6 +59,7 @@ import { customizationsApi } from './customizations.api';
 import { auditApi } from './audit.api';
 import { analyticsApi } from './analytics.api';
 import { reportsApi } from './reports.api';
+import { discountPoliciesApi } from './discounts.api';
 
 /**
  * Centralized API object for convenience
@@ -74,4 +77,5 @@ export const api = {
   audit: auditApi,
   analytics: analyticsApi,
   reports: reportsApi,
+  discountPolicies: discountPoliciesApi,
 };

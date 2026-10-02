@@ -52,4 +52,9 @@ export const queryKeys = {
         byCompany: (companyId: string) => ['users', 'company', companyId] as const,
         byId: (id: string) => ['users', id] as const,
     },
+    
+    // Discounts
+    company: {
+        discounts: (companyId: string) => ['discounts', companyId] as const,
+    }
 } as const;

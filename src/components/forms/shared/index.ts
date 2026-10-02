@@ -7,4 +7,5 @@ export { FormItemRow } from './FormItemRow';
 export { FormItemsTable } from './FormItemsTable';
 export { TotalsSummary } from './TotalsSummary';
 export { ShippingAddressSection } from './ShippingAddressSection';
+export { DiscountPolicySelector } from './DiscountPolicySelector';
 export type { ShippingAddressMode } from './ShippingAddressSection';
