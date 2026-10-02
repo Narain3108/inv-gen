@@ -107,7 +107,8 @@ export default function QuickInvoicePage() {
     // Wait for React to re-render without the UI elements
     setTimeout(async () => {
       try {
-        const element = invoiceRef.current;
+        const element = invoiceRef.current as HTMLElement;
+        if (!element) return;
         const htmlToImage = await import('html-to-image');
         const { jsPDF } = await import('jspdf');
         
